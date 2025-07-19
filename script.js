@@ -37,7 +37,7 @@ let globalTokens = {
     chats: 0
 };
 
-// Voice recording variables
+// Voice recording variables - Using MediaRecorder for GPT-4o-transcribe
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
@@ -1937,6 +1937,7 @@ function formatFileSize(bytes) {
 }
 
 // Voice recording functions
+// OpenAI Whisper Audio Recording Functions
 async function toggleRecording() {
     if (isRecording) {
         stopRecording();
@@ -1963,7 +1964,7 @@ async function startRecording() {
         
         mediaRecorder.onstop = async () => {
             const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            await transcribeAudio(audioBlob);
+            await transcribeWithWhisper(audioBlob);
             
             // Stop all tracks to release microphone
             stream.getTracks().forEach(track => track.stop());
@@ -1975,7 +1976,7 @@ async function startRecording() {
         
         // Show feedback in input placeholder
         const input = document.getElementById('messageInput');
-        input.placeholder = '🎤 Recording... Click the microphone to stop';
+        input.placeholder = '🎤 Recording... Click the microphone to stop and transcribe';
         
     } catch (error) {
         console.error('Error accessing microphone:', error);
@@ -2003,6 +2004,121 @@ function stopRecording() {
         // Reset input placeholder
         const input = document.getElementById('messageInput');
         input.placeholder = 'Message ChatGPT... (paste/drag images, PDFs, or audio)';
+    }
+}
+
+async function transcribeWithWhisper(audioBlob) {
+    const voiceButton = document.getElementById('voiceButton');
+    const messageInput = document.getElementById('messageInput');
+    
+    voiceButton.classList.add('processing');
+    voiceButton.title = 'Transcribing with Whisper...';
+    
+    // Show processing state in placeholder
+    messageInput.placeholder = '🤖 Transcribing with OpenAI Whisper...';
+    
+    try {
+        const apiKey = getApiKey();
+        
+        if (apiKey === 'YOUR_API_KEY' || apiKey === 'your-api-key-here' || !apiKey || apiKey === 'prompt-for-key') {
+            addMessage('⚠️ Please set your OpenAI API key to use speech transcription.', 'ai', 'error');
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'recording.wav');
+        formData.append('model', 'whisper-1');
+        formData.append('language', 'en'); // Can be made configurable
+        formData.append('response_format', 'json');
+        
+        console.log('🎤 Sending audio to OpenAI Whisper...');
+        
+        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Whisper API Error: ${errorData.error?.message || response.statusText}`);
+        }
+        
+        const data = await response.json();
+        const transcribedText = data.text.trim();
+        
+        console.log('✅ Whisper transcription successful:', transcribedText);
+        
+        if (transcribedText) {
+            const currentText = messageInput.value.trim();
+            
+            // Append transcribed text to existing input
+            if (currentText) {
+                messageInput.value = currentText + ' ' + transcribedText;
+            } else {
+                messageInput.value = transcribedText;
+            }
+            
+            // Auto-resize textarea
+            messageInput.style.height = 'auto';
+            messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + 'px';
+            
+            // Focus input for user to edit or send
+            messageInput.focus();
+            
+            // Show success feedback
+            messageInput.placeholder = '✅ Whisper transcription complete! Edit or press Enter to send...';
+            setTimeout(() => {
+                messageInput.placeholder = 'Message ChatGPT... (paste/drag images, PDFs, or audio)';
+            }, 3000);
+            
+        } else {
+            addMessage('⚠️ No speech detected in the recording. Please try again.', 'ai', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error transcribing with Whisper:', error);
+        addMessage(`❌ Whisper transcription error: ${error.message}`, 'ai', 'error');
+        
+        // Reset placeholder on error
+        messageInput.placeholder = 'Message ChatGPT... (paste/drag images, PDFs, or audio)';
+    } finally {
+        voiceButton.classList.remove('processing');
+        voiceButton.title = 'Voice input';
+    }
+}
+
+function updateVoiceButton() {
+    const voiceButton = document.getElementById('voiceButton');
+    
+    if (isRecording) {
+        voiceButton.classList.add('recording');
+        voiceButton.title = 'Stop recording';
+        voiceButton.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="6" y="6" width="12" height="12" rx="2"/>
+            </svg>
+        `;
+    } else if (voiceButton.classList.contains('processing')) {
+        voiceButton.title = 'Transcribing...';
+        voiceButton.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 11-6.219-8.56"/>
+            </svg>
+        `;
+    } else {
+        voiceButton.classList.remove('recording', 'requesting');
+        voiceButton.title = 'Voice input (OpenAI Whisper)';
+        voiceButton.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+        `;
     }
 }
 
@@ -2038,91 +2154,6 @@ async function transcribeAudioFile(audioFile) {
     } catch (error) {
         console.error('Error transcribing audio file:', error);
         throw error;
-    }
-}
-
-async function transcribeAudio(audioBlob) {
-    const voiceButton = document.getElementById('voiceButton');
-    voiceButton.classList.add('processing');
-    voiceButton.title = 'Processing audio...';
-    
-    try {
-        const apiKey = getApiKey();
-        
-        if (apiKey === 'YOUR_API_KEY' || apiKey === 'your-api-key-here' || !apiKey) {
-            addMessage('⚠️ Please set your OpenAI API key in the config.js file.', 'ai', 'error');
-            return;
-        }
-        
-        const formData = new FormData();
-        formData.append('file', audioBlob, 'recording.wav');
-        formData.append('model', 'gpt-4o-transcribe');
-        formData.append('language', 'en'); // Can be made configurable
-        
-        const response = await fetch(WHISPER_URL, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: formData
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`GPT-4o Transcribe API Error: ${errorData.error?.message || response.statusText}`);
-        }
-        
-        const data = await response.json();
-        const transcribedText = data.text.trim();
-        
-        if (transcribedText) {
-            const input = document.getElementById('messageInput');
-            const currentText = input.value.trim();
-            
-            // Append transcribed text to existing input
-            if (currentText) {
-                input.value = currentText + ' ' + transcribedText;
-            } else {
-                input.value = transcribedText;
-            }
-            
-            // Auto-resize textarea
-            input.style.height = 'auto';
-            input.style.height = Math.min(input.scrollHeight, 200) + 'px';
-            
-            // Focus input for user to edit or send
-            input.focus();
-            
-            // Show success feedback
-            input.placeholder = 'Voice transcribed! Edit or press Enter to send...';
-            setTimeout(() => {
-                input.placeholder = 'Message ChatGPT... (paste/drag images, PDFs, or audio)';
-            }, 3000);
-            
-        } else {
-            addMessage('⚠️ No speech detected. Please try again.', 'ai', 'error');
-        }
-        
-    } catch (error) {
-        console.error('Error transcribing audio:', error);
-        addMessage(`❌ Error transcribing audio: ${error.message}`, 'ai', 'error');
-    } finally {
-        voiceButton.classList.remove('processing');
-        voiceButton.title = 'Voice input';
-    }
-}
-
-function updateVoiceButton() {
-    const voiceButton = document.getElementById('voiceButton');
-    
-    // Remove all state classes first
-    voiceButton.classList.remove('recording', 'processing', 'requesting');
-    
-    if (isRecording) {
-        voiceButton.classList.add('recording');
-        voiceButton.title = 'Stop recording';
-    } else {
-        voiceButton.title = 'Voice input';
     }
 }
 
