@@ -5,7 +5,7 @@
 //
 // Example: const OPENAI_API_KEY = 'sk-proj-abc123def456...';
 
-const OPENAI_API_KEY = 'your-api-key-here';
+const OPENAI_API_KEY = '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';
 
 // Optional: Customize these settings
 const CHAT_CONFIG = {
