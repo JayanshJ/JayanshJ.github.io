@@ -1,11 +1,9 @@
 // Configuration file for your ChatGPT app
 // 
-// IMPORTANT: Replace 'your-api-key-here' with your actual OpenAI API key
-// You can get your API key from: https://platform.openai.com/api-keys
-//
-// Example: const OPENAI_API_KEY = 'sk-proj-abc123def456...';
+// API key is now prompted when the website loads - no need to edit this file!
+// This makes the app safe to publish and share
 
-const OPENAI_API_KEY = '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';
+const OPENAI_API_KEY = 'prompt-for-key'; // Will be prompted on load
 
 // Optional: Customize these settings
 const CHAT_CONFIG = {

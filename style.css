@@ -49,6 +49,12 @@ body {
     color: #ececf1;
 }
 
+.header-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
 .global-tokens-sidebar {
     display: flex;
     flex-direction: column;
@@ -84,7 +90,7 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    width: 100%;
+    flex: 1;
     background: none;
     border: 1px solid #404040;
     border-radius: 6px;
@@ -93,14 +99,29 @@ body {
     cursor: pointer;
     font-size: 14px;
     transition: background-color 0.2s;
-    margin-top: 12px;
 }
 
-.new-chat-btn:hover {
+.settings-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    padding: 8px;
+    color: #ececf1;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    min-width: 40px;
+}
+
+.new-chat-btn:hover,
+.settings-btn:hover {
     background-color: #2f2f2f;
 }
 
-.new-chat-btn svg {
+.new-chat-btn svg,
+.settings-btn svg {
     stroke: currentColor;
     fill: none;
     stroke-width: 2;

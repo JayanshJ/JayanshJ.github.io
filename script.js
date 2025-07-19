@@ -1069,8 +1069,108 @@ function showMoveMenu(chatId) {
     }
 }
 
+// Global variable to store the session API key
+let sessionApiKey = null;
+
+// API Key Management Functions
+function promptForApiKey() {
+    const savedKey = localStorage.getItem('chatgpt_api_key');
+    
+    if (savedKey && savedKey !== 'prompt-for-key') {
+        sessionApiKey = savedKey;
+        console.log('✅ Using saved API key from previous session');
+        return true;
+    }
+    
+    const message = `🔑 Welcome to JayanshGPT!
+
+To get started, you'll need an OpenAI API key:
+
+1. Go to: https://platform.openai.com/api-keys
+2. Create a new API key
+3. Copy and paste it below
+
+Your API key will be saved securely in your browser for future visits.
+
+Enter your OpenAI API key:`;
+    
+    const apiKey = prompt(message, '');
+    
+    if (!apiKey || apiKey.trim() === '') {
+        alert('❌ API key is required to use this app. Please refresh and try again.');
+        return false;
+    }
+    
+    if (!apiKey.startsWith('sk-')) {
+        const confirm = window.confirm('⚠️ The API key should start with "sk-". Are you sure this is correct?\n\nClick OK to continue anyway, or Cancel to re-enter.');
+        if (!confirm) {
+            return promptForApiKey(); // Try again
+        }
+    }
+    
+    sessionApiKey = apiKey.trim();
+    
+    // Save the key by default for convenience
+    localStorage.setItem('chatgpt_api_key', sessionApiKey);
+    console.log('💾 API key saved to localStorage for future visits');
+    
+    // Show confirmation
+    alert('✅ API key saved! You won\'t need to enter it again on future visits.\n\n💡 You can update or clear your saved key anytime using the Settings button (⚙️).');
+    
+    return true;
+}
+
+function clearSavedApiKey() {
+    if (confirm('🗑️ Are you sure you want to clear your saved API key?\n\nYou will need to enter it again on your next visit.')) {
+        localStorage.removeItem('chatgpt_api_key');
+        sessionApiKey = null;
+        updateApiKeyStatus(); // Update status display
+        alert('✅ Saved API key has been cleared. You will be prompted for a new key on next visit.');
+    }
+}
+
+function updateApiKey() {
+    const newKey = prompt('🔑 Enter your new OpenAI API key:', sessionApiKey || '');
+    
+    if (newKey && newKey.trim() !== '' && newKey !== sessionApiKey) {
+        sessionApiKey = newKey.trim();
+        
+        // Save the new key automatically
+        localStorage.setItem('chatgpt_api_key', sessionApiKey);
+        updateApiKeyStatus(); // Update status display
+        alert('✅ API key updated and saved successfully!');
+    }
+}
+
 function getApiKey() {
-    return window.CONFIG?.apiKey || 'YOUR_API_KEY';
+    // Return the session API key if available
+    if (sessionApiKey && sessionApiKey !== 'prompt-for-key') {
+        return sessionApiKey;
+    }
+    
+    // Fallback to config (though it should be 'prompt-for-key')
+    const configKey = window.CONFIG?.apiKey;
+    if (configKey && configKey !== 'prompt-for-key' && configKey !== 'YOUR_API_KEY') {
+        return configKey;
+    }
+    
+    return 'YOUR_API_KEY';
+}
+
+// Update API key status indicator
+function updateApiKeyStatus() {
+    const logo = document.querySelector('.logo span');
+    const isApiKeySaved = localStorage.getItem('chatgpt_api_key') !== null;
+    
+    if (logo && sessionApiKey) {
+        if (isApiKeySaved) {
+            logo.title = '🔑 API key saved and ready';
+            console.log('✅ API key is saved and active');
+        } else {
+            logo.title = '🔑 API key active (session only)';
+            console.log('✅ API key is active for this session');
+        }
+    }
 }
 
 function getConfig() {
@@ -1155,6 +1255,59 @@ function closeSidebar() {
     
     sidebar.classList.remove('open');
     backdrop.classList.remove('active');
+}
+
+// Settings menu function
+function showSettingsMenu() {
+    const hasApiKey = sessionApiKey && sessionApiKey !== 'prompt-for-key';
+    const isApiKeySaved = localStorage.getItem('chatgpt_api_key') !== null;
+    
+    let options = [
+        '🔑 Update API Key',
+        '📊 View Token Usage',
+        '💰 Set Credit Balance'
+    ];
+    
+    if (isApiKeySaved) {
+        options.push('🗑️ Clear Saved API Key');
+    }
+    
+    options.push('❌ Cancel');
+    
+    const choice = prompt(
+        `⚙️ Settings Menu:\n\n${options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}\n\nChoose an option (1-${options.length}):`,
+        ''
+    );
+    
+    const choiceNum = parseInt(choice);
+    
+    if (choiceNum === 1) {
+        updateApiKey();
+    } else if (choiceNum === 2) {
+        showTokenUsageInfo();
+    } else if (choiceNum === 3) {
+        setCreditBalance();
+    } else if (choiceNum === 4 && isApiKeySaved) {
+        clearSavedApiKey();
+    }
+}
+
+function showTokenUsageInfo() {
+    const info = `📊 Token Usage Information:
+
+Current Chat:
+• Total: ${currentChatTokens.total.toLocaleString()} tokens
+• Input: ${currentChatTokens.prompt.toLocaleString()} tokens  
+• Output: ${currentChatTokens.completion.toLocaleString()} tokens
+• Requests: ${currentChatTokens.requests}
+
+Global Stats:
+• All Time: ${globalTokens.total.toLocaleString()} tokens
+• Total Chats: ${globalTokens.chats}
+
+💡 Tokens are used for both input and output. Longer conversations use more tokens.`;
+    
+    alert(info);
 }
 
 async function sendMessage() {
@@ -1978,6 +2131,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('fileInput');
     const messageInput = document.getElementById('messageInput');
     const mainContent = document.querySelector('.main-content');
+
+    // Initialize API key first
+    if (!promptForApiKey()) {
+        // If no API key provided, disable the app
+        if (messageInput) messageInput.disabled = true;
+        return;
+    }
+    
+    // Update UI to show API key status
+    updateApiKeyStatus();
 
     // Load chat history on startup
     loadChatHistory();
