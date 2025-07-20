@@ -1393,12 +1393,44 @@ body {
     border-radius: 8px;
     border: 1px solid #404040;
     display: none;
-    align-items: center;
+    flex-direction: column;
     gap: 8px;
 }
 
 .file-preview.active {
     display: flex;
+}
+
+.preview-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.preview-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px;
+    border-radius: 6px;
+    background-color: #1f1f1f;
+}
+
+.clear-all-files {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    margin-top: 4px;
+}
+
+.clear-all-files:hover {
+    background-color: #dc2626;
 }
 
 .preview-image {

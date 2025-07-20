@@ -7,8 +7,8 @@ const SUBSCRIPTION_URL = 'https://api.openai.com/v1/dashboard/billing/subscripti
 
 // Store conversation history
 let conversationHistory = [];
-let selectedImage = null;
-let selectedFile = null;
+let selectedImages = []; // Support multiple images
+let selectedFiles = []; // Support multiple files
 let currentModel = 'gpt-4.1-2025-04-14';
 let currentChatId = null;
 let chatHistory = [];
@@ -1566,7 +1566,7 @@ async function sendMessage() {
     
     const message = input.value.trim();
 
-    if (!message && !selectedImage && !selectedFile) return;
+    if (!message && selectedImages.length === 0 && selectedFiles.length === 0) return;
 
     const apiKey = getApiKey();
 
@@ -1576,8 +1576,8 @@ async function sendMessage() {
         return;
     }
 
-    // Check if model supports vision when image is selected
-    if (selectedImage && !currentModel.includes('gpt-4') && !currentModel.includes('o3')) {
+    // Check if model supports vision when images are selected
+    if (selectedImages.length > 0 && !currentModel.includes('gpt-4') && !currentModel.includes('o3')) {
         addMessage('⚠️ Image analysis requires vision-capable models. Please switch to GPT-4.1-2025-04-14 or o3-2025-04-16.', 'ai', 'error');
         return;
     }
@@ -1592,54 +1592,76 @@ async function sendMessage() {
     input.disabled = true;
     sendButton.disabled = true;
 
-    // Display user message with file if selected
+    // Display user message with files if selected
     let displayMessage = message;
-    if (!message && selectedFile) {
-        if (selectedFile.type === 'application/pdf') {
-            displayMessage = 'Analyze this PDF';
-        } else if (selectedFile.isAudio) {
-            displayMessage = 'Transcribe this audio file';
-        } else {
-            displayMessage = 'Analyze this image';
+    if (!message && (selectedImages.length > 0 || selectedFiles.length > 0)) {
+        const hasImages = selectedImages.length > 0;
+        const hasPDFs = selectedFiles.some(f => !f.isAudio);
+        const hasAudio = selectedFiles.some(f => f.isAudio);
+        
+        if (hasImages && hasPDFs) {
+            displayMessage = 'Analyze these images and PDFs';
+        } else if (hasImages) {
+            displayMessage = selectedImages.length === 1 ? 'Analyze this image' : 'Analyze these images';
+        } else if (hasPDFs) {
+            displayMessage = selectedFiles.filter(f => !f.isAudio).length === 1 ? 'Analyze this PDF' : 'Analyze these PDFs';
+        } else if (hasAudio) {
+            displayMessage = selectedFiles.filter(f => f.isAudio).length === 1 ? 'Transcribe this audio file' : 'Transcribe these audio files';
         }
     }
     
-    addMessage(displayMessage, 'user', 'normal', selectedImage, selectedFile);
+    // For now, pass the first image and file for backward compatibility
+    // TODO: Update addMessage to handle multiple files
+    const firstImage = selectedImages.length > 0 ? selectedImages[0] : null;
+    const firstFile = selectedFiles.length > 0 ? selectedFiles[0] : null;
+    
+    addMessage(displayMessage, 'user', 'normal', firstImage, firstFile);
     input.value = '';
     input.style.height = 'auto';
 
-    // Handle audio file transcription
-    if (selectedFile && selectedFile.isAudio) {
-        // Clear selected files first
-        const audioFile = selectedFile.file;
+    // Handle audio file transcription - process all audio files
+    const audioFiles = selectedFiles.filter(f => f.isAudio);
+    if (audioFiles.length > 0) {
+        // Store audio files before clearing
+        const audioFilesToProcess = audioFiles.map(f => f.file);
         clearSelectedFiles();
         
         // Show processing message
-        const processingId = addMessage('🎵 Transcribing audio file...', 'ai', 'typing');
+        const processingId = addMessage(`🎵 Transcribing ${audioFilesToProcess.length} audio file(s)...`, 'ai', 'typing');
         
         try {
-            const transcription = await transcribeAudioFile(audioFile);
+            const transcriptions = [];
+            
+            // Process each audio file
+            for (let i = 0; i < audioFilesToProcess.length; i++) {
+                const transcription = await transcribeAudioFile(audioFilesToProcess[i]);
+                if (transcription) {
+                    transcriptions.push(`Audio ${i + 1}: ${transcription}`);
+                }
+            }
             
             // Remove processing message
             removeMessage(processingId);
             
-            if (transcription) {
+            if (transcriptions.length > 0) {
+                const allTranscriptions = transcriptions.join('\n\n');
+                
                 // Add transcribed text to conversation
                 conversationHistory.push({
                     role: 'user',
-                    content: `Audio transcription: ${transcription}`
+                    content: `Audio transcription(s): ${allTranscriptions}`
                 });
                 
                 // Prepare message content with transcription
                 const fullMessage = message ? 
-                    `${message}\n\nAudio transcription:\n${transcription}` : 
-                    `Please analyze this audio transcription:\n\n${transcription}`;
+                    `${message}\n\nAudio transcription(s):\n${allTranscriptions}` : 
+                    `Please analyze these audio transcriptions:\n\n${allTranscriptions}`;
                 
                 // Update conversation history
                 conversationHistory[conversationHistory.length - 1].content = fullMessage;
                 
                 // Show transcribed content
-                addMessage(`📝 Transcription: ${transcription}`, 'ai');
+                addMessage(`📝 Transcription(s): ${allTranscriptions}`, 'ai');
                 
                 // Continue with normal chat flow if user added a message
                 if (message) {
@@ -1716,22 +1738,48 @@ async function sendMessage() {
 
     // Prepare message content
     let messageContent;
-    if (selectedImage) {
+    
+    if (selectedImages.length > 0) {
+        // Handle multiple images
         messageContent = [
             {
                 type: "text",
-                text: message || "What do you see in this image?"
-            },
-            {
-                type: "image_url",
-                image_url: {
-                    url: selectedImage.dataUrl
-                }
+                text: message || (selectedImages.length === 1 ? "What do you see in this image?" : "What do you see in these images?")
             }
         ];
-    } else if (selectedFile && selectedFile.type === 'application/pdf') {
-        messageContent = message || "Please analyze this PDF content:";
-        messageContent += `\n\nPDF Content:\n${selectedFile.text}`;
+        
+        // Add all images to the content
+        selectedImages.forEach(image => {
+            messageContent.push({
+                type: "image_url",
+                image_url: {
+                    url: image.dataUrl
+                }
+            });
+        });
+        
+        // Add PDF content if any
+        const pdfFiles = selectedFiles.filter(f => !f.isAudio);
+        if (pdfFiles.length > 0) {
+            let pdfContent = "\n\nPDF Content(s):\n";
+            pdfFiles.forEach((file, index) => {
+                pdfContent += `\nPDF ${index + 1} (${file.name}):\n${file.text}\n`;
+            });
+            messageContent[0].text += pdfContent;
+        }
+    } else if (selectedFiles.length > 0) {
+        // Handle files without images
+        const pdfFiles = selectedFiles.filter(f => !f.isAudio);
+        if (pdfFiles.length > 0) {
+            messageContent = message || "Please analyze this PDF content:";
+            let pdfContent = "\n\nPDF Content(s):\n";
+            pdfFiles.forEach((file, index) => {
+                pdfContent += `\nPDF ${index + 1} (${file.name}):\n${file.text}\n`;
+            });
+            messageContent += pdfContent;
+        } else {
+            messageContent = message;
+        }
     } else {
         messageContent = message;
     }
@@ -1924,9 +1972,11 @@ function clearChat() {
 
 // File handling functions
 function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    processFile(file);
+    const files = Array.from(event.target.files);
+    if (!files.length) return;
+    
+    // Process each file
+    files.forEach(file => processFile(file));
 }
 
 async function processFile(file) {
@@ -1955,12 +2005,14 @@ async function processFile(file) {
     if (isImage) {
         const reader = new FileReader();
         reader.onload = function(e) {
-            selectedImage = {
+            const imageData = {
                 name: file.name,
                 size: file.size,
                 dataUrl: e.target.result
             };
-            selectedFile = null;
+            
+            // Add to selected images array
+            selectedImages.push(imageData);
             showFilePreview();
         };
         reader.readAsDataURL(file);
@@ -1981,14 +2033,16 @@ async function processFile(file) {
                     text += `Page ${i}:\n${pageText}\n\n`;
                 }
                 
-                selectedFile = {
+                const fileData = {
                     name: file.name,
                     size: file.size,
                     type: file.type,
                     text: text.trim(),
                     pages: pdf.numPages
                 };
-                selectedImage = null;
+                
+                // Add to selected files array
+                selectedFiles.push(fileData);
                 showFilePreview();
             } else {
                 addMessage('❌ PDF processing is not available. Please refresh the page and try again.', 'ai', 'error');
@@ -2000,14 +2054,16 @@ async function processFile(file) {
     } else if (isAudio) {
         try {
             // Store audio file for transcription
-            selectedFile = {
+            const audioData = {
                 name: file.name,
                 size: file.size,
                 type: file.type || 'audio/mpeg',
                 file: file, // Store the actual file for transcription
                 isAudio: true
             };
-            selectedImage = null;
+            
+            // Add to selected files array
+            selectedFiles.push(audioData);
             showFilePreview();
         } catch (error) {
             console.error('Error processing audio file:', error);
@@ -2079,7 +2135,10 @@ function handleDrop(event) {
     const files = event.dataTransfer?.files;
     if (!files || files.length === 0) return;
     
-    // Process the first valid file found
+    // Process all valid files
+    let validFiles = 0;
+    let fileTypes = [];
+    
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const isImage = file.type.startsWith('image/');
@@ -2092,65 +2151,84 @@ function handleDrop(event) {
         
         if (isImage || isPDF || isAudio) {
             processFile(file);
+            validFiles++;
             
-            // Show feedback that file was dropped
-            const input = document.getElementById('messageInput');
-            if (input && !input.value.trim()) {
-                let fileType = 'File';
-                if (isImage) fileType = 'Image';
-                else if (isPDF) fileType = 'PDF';
-                else if (isAudio) fileType = 'Audio file';
-                
-                input.placeholder = `${fileType} dropped! Add a message or press Enter to send...`;
-                setTimeout(() => {
-                    input.placeholder = 'Message ChatGPT... (paste/drag images, PDFs, or audio)';
-                }, 3000);
-            }
-            break;
+            if (isImage && !fileTypes.includes('Images')) fileTypes.push('Images');
+            if (isPDF && !fileTypes.includes('PDFs')) fileTypes.push('PDFs');
+            if (isAudio && !fileTypes.includes('Audio files')) fileTypes.push('Audio files');
+        }
+    }
+    
+    // Show feedback that files were dropped
+    if (validFiles > 0) {
+        const input = document.getElementById('messageInput');
+        if (input && !input.value.trim()) {
+            const fileTypeText = fileTypes.join(', ');
+            input.placeholder = `${validFiles} file(s) dropped (${fileTypeText})! Add a message or press Enter to send...`;
+            setTimeout(() => {
+                input.placeholder = 'Message ChatGPT... (paste/drag multiple images, PDFs, or audio files)';
+            }, 3000);
         }
     }
 }
 
 function showFilePreview() {
     const preview = document.getElementById('filePreview');
-    if (!selectedImage && !selectedFile) {
+    if (selectedImages.length === 0 && selectedFiles.length === 0) {
         preview.classList.remove('active');
         return;
     }
 
-    let previewHTML = '';
+    let previewHTML = '<div class="preview-container">';
     
-    if (selectedImage) {
-        previewHTML = `
-            <img src="${selectedImage.dataUrl}" alt="${selectedImage.name}" class="preview-image">
-            <div class="preview-info">
-                <div class="preview-name">${selectedImage.name}</div>
-                <div class="preview-size">${formatFileSize(selectedImage.size)}</div>
-            </div>
-            <button onclick="clearSelectedFiles()" class="remove-file">×</button>
-        `;
-    } else if (selectedFile) {
-        if (selectedFile.isAudio) {
-            previewHTML = `
-                <div class="preview-audio">MP3</div>
+    // Show all selected images
+    selectedImages.forEach((image, index) => {
+        previewHTML += `
+            <div class="preview-item">
+                <img src="${image.dataUrl}" alt="${image.name}" class="preview-image">
                 <div class="preview-info">
-                    <div class="preview-name">${selectedFile.name}</div>
-                    <div class="preview-size">${formatFileSize(selectedFile.size)}</div>
-                    <div class="preview-size">Audio file for transcription</div>
+                    <div class="preview-name">${image.name}</div>
+                    <div class="preview-size">${formatFileSize(image.size)}</div>
                 </div>
-                <button onclick="clearSelectedFiles()" class="remove-file">×</button>
+                <button onclick="removeFile('image', ${index})" class="remove-file">×</button>
+            </div>
+        `;
+    });
+    
+    // Show all selected files
+    selectedFiles.forEach((file, index) => {
+        if (file.isAudio) {
+            previewHTML += `
+                <div class="preview-item">
+                    <div class="preview-audio">MP3</div>
+                    <div class="preview-info">
+                        <div class="preview-name">${file.name}</div>
+                        <div class="preview-size">${formatFileSize(file.size)}</div>
+                        <div class="preview-size">Audio file for transcription</div>
+                    </div>
+                    <button onclick="removeFile('file', ${index})" class="remove-file">×</button>
+                </div>
             `;
         } else {
-            previewHTML = `
-                <div class="preview-pdf">PDF</div>
-                <div class="preview-info">
-                    <div class="preview-name">${selectedFile.name}</div>
-                    <div class="preview-size">${formatFileSize(selectedFile.size)}</div>
-                    ${selectedFile.pages ? `<div class="preview-size">${selectedFile.pages} pages</div>` : ''}
+            previewHTML += `
+                <div class="preview-item">
+                    <div class="preview-pdf">PDF</div>
+                    <div class="preview-info">
+                        <div class="preview-name">${file.name}</div>
+                        <div class="preview-size">${formatFileSize(file.size)}</div>
+                        ${file.pages ? `<div class="preview-size">${file.pages} pages</div>` : ''}
+                    </div>
+                    <button onclick="removeFile('file', ${index})" class="remove-file">×</button>
                 </div>
-                <button onclick="clearSelectedFiles()" class="remove-file">×</button>
             `;
         }
+    });
+    
+    previewHTML += '</div>';
+    
+    // Add clear all button if there are multiple files
+    if (selectedImages.length + selectedFiles.length > 1) {
+        previewHTML += '<button onclick="clearSelectedFiles()" class="clear-all-files">Clear All</button>';
     }
     
     preview.innerHTML = previewHTML;
@@ -2158,11 +2236,28 @@ function showFilePreview() {
 }
 
 function clearSelectedFiles() {
-    selectedImage = null;
-    selectedFile = null;
+    selectedImages = [];
+    selectedFiles = [];
     const preview = document.getElementById('filePreview');
     preview.classList.remove('active');
     document.getElementById('fileInput').value = '';
+}
+
+function removeFile(type, index) {
+    if (type === 'image') {
+        selectedImages.splice(index, 1);
+    } else if (type === 'file') {
+        selectedFiles.splice(index, 1);
+    }
+    
+    // Update preview or hide if no files left
+    if (selectedImages.length === 0 && selectedFiles.length === 0) {
+        const preview = document.getElementById('filePreview');
+        preview.classList.remove('active');
+        document.getElementById('fileInput').value = '';
+    } else {
+        showFilePreview();
+    }
 }
 
 // Keep for backward compatibility
