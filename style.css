@@ -1725,12 +1725,12 @@ body {
         top: 60px; /* Position below the header */
         left: 50%;
         transform: translateX(-50%);
-        background-color: #2f2f2f;
+        background-color: #2f2f2f !important;
         border: 1px solid #404040;
         border-radius: 12px;
         display: none;
         z-index: 1001; /* Higher than other elements */
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
         min-width: 200px;
         max-width: calc(100vw - 40px); /* Ensure it fits on mobile with margin */
         margin: 0 20px; /* Add horizontal margin for mobile */
