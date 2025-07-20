@@ -992,18 +992,18 @@ body {
 
 /* Code block styling - ChatGPT Style */
 .message-text pre {
-    background-color: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 12px;
-    padding: 20px;
-    margin: 20px 0;
+    background-color: #23272f;
+    border: none;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
     overflow-x: auto;
-    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
     font-size: 14px;
-    line-height: 1.45;
-    color: #f0f6fc;
+    line-height: 1.6;
+    color: #f8f8f2;
     position: relative;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
 /* Remove gradient background for cleaner look */
@@ -1184,13 +1184,13 @@ body {
 
 /* Inline code styling */
 .message-text code {
-    background-color: #404040;
+    background-color: #23272f;
     padding: 2px 6px;
     border-radius: 4px;
-    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-    font-size: 0.9em;
-    color: #8be9fd;
-    font-weight: 500;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-size: 14px;
+    color: #f8f8f2;
+    font-weight: 400;
 }
 
 /* Strong/Bold text */
