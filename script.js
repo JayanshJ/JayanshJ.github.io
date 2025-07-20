@@ -9,7 +9,7 @@ const SUBSCRIPTION_URL = 'https://api.openai.com/v1/dashboard/billing/subscripti
 let conversationHistory = [];
 let selectedImage = null;
 let selectedFile = null;
-let currentModel = 'o3-2025-04-16';
+let currentModel = 'gpt-4.1-2025-04-14';
 let currentChatId = null;
 let chatHistory = [];
 let chatFolders = [];
@@ -1015,7 +1015,7 @@ function loadChat(chatId) {
     
     currentChatId = chatId;
     conversationHistory = [...chat.messages];
-    currentModel = chat.model || 'o3-2025-04-16';
+    currentModel = chat.model || 'gpt-4.1-2025-04-14';
     
     // Determine which folder this chat belongs to
     currentFolderId = null;

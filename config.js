@@ -7,7 +7,7 @@ const OPENAI_API_KEY = 'prompt-for-key'; // Will be prompted on load
 
 // Optional: Customize these settings
 const CHAT_CONFIG = {
-    model: 'o3-2025-04-16', // Using o3 model for advanced reasoning capabilities
+    model: 'gpt-4.1-2025-04-14', // Using GPT-4.1 model as default
     maxCompletionTokens: 1000
     // Temperature is automatically set: 1.0 for o3 models, 0.1 for GPT-4.1 models
 };
