@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <title>newGPT</title>
     <link rel="stylesheet" href="style.css">
     <!-- PDF.js for PDF processing -->
@@ -17,7 +17,15 @@
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
                 displayMath: [['$$', '$$'], ['\\[', '\\]']],
                 processEscapes: true,
-                processEnvironments: true
+                processEnvironments: true,
+                macros: {
+                    pentagon: '\\bigstar',  // Use bigstar as pentagon replacement
+                    pentagonSymbol: '{\\text{⬟}}',  // Pentagon symbol ⬟ 
+                    triangle: '\\triangle',
+                    square: '\\square',
+                    diamond: '\\diamond',
+                    circle: '\\circ'
+                }
             },
             options: {
                 skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre'],

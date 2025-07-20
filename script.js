@@ -886,6 +886,13 @@ function highlightGeneric(code) {
 function processMessageText(text) {
     if (!text) return '';
     
+    // Replace LaTeX symbols with Unicode equivalents before processing
+    text = text.replace(/\\pentagon/g, '⬟');
+    text = text.replace(/\\triangle/g, '△');
+    text = text.replace(/\\square/g, '□');
+    text = text.replace(/\\diamond/g, '◇');
+    text = text.replace(/\\nabla/g, '∇');
+    
     // Apply formatting rules to AI responses before processing
     text = formatAIResponse(text);
     
