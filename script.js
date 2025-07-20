@@ -5,6 +5,29 @@ const WHISPER_URL = 'https://api.openai.com/v1/audio/transcriptions';
 const BILLING_URL = 'https://api.openai.com/v1/dashboard/billing/usage';
 const SUBSCRIPTION_URL = 'https://api.openai.com/v1/dashboard/billing/subscription';
 
+// System prompt for enhanced technical assistance
+const systemPrompt = {
+    role: 'system',
+    content: `You are a highly accurate and detail-focused assistant for programming and technical reasoning tasks. When given input, follow these principles:
+
+1. Fully solve the problem; do not leave parts vague, omitted, or incomplete.
+2. Avoid placeholders like "number > 0" or "X value" — instead, use meaningful variable names, or annotate with comments like /* unknown value */ if the value is unclear.
+3. Return structured, readable output. Use code blocks with proper indentation and formatting.
+4. When translating or analyzing code, preserve semantics and explain key decisions clearly.
+5. Do not make assumptions unless necessary. If something is ambiguous, state it.
+6. Use bullet points or sections if the task has multiple parts.
+7. Output should be self-contained — assume the reader has not seen earlier messages.`
+};
+
+// Function to build messages array with system prompt
+function buildMessagesWithSystem(conversationHistory) {
+    // Only add system prompt for non-image models
+    if (currentModel === 'gpt-image-1') {
+        return conversationHistory;
+    }
+    return [systemPrompt, ...conversationHistory];
+}
+
 // Store conversation history
 let conversationHistory = [];
 let selectedImages = []; // Support multiple images
@@ -2256,7 +2279,7 @@ async function sendMessage() {
                         },
                         body: JSON.stringify({
                             model: currentModel,
-                            messages: conversationHistory,
+                            messages: buildMessagesWithSystem(conversationHistory),
                             max_completion_tokens: 1000,
                             temperature: getModelTemperature(currentModel)
                         })
@@ -2365,11 +2388,24 @@ async function sendMessage() {
         messageContent = message;
     }
 
-    // Add user message to conversation history
-    conversationHistory.push({
-        role: 'user',
-        content: messageContent
-    });
+
+    // Build messages array: only systemPrompt and current user message for text models
+    let messages;
+    if (currentModel === 'gpt-image-1') {
+        // For image model, use legacy conversationHistory logic (should not include systemPrompt)
+        conversationHistory.push({
+            role: 'user',
+            content: messageContent
+        });
+        messages = conversationHistory;
+    } else {
+        // For text models, only send systemPrompt and current user message
+        const userMessage = {
+            role: 'user',
+            content: messageContent
+        };
+        messages = [systemPrompt, userMessage];
+    }
 
     // Clear selected files after sending
     clearSelectedFiles();
@@ -2386,8 +2422,8 @@ async function sendMessage() {
             },
             body: JSON.stringify({
                 model: currentModel,
-                messages: conversationHistory,
-                max_completion_tokens: 1000,
+                messages: messages,
+                max_completion_tokens: 10000,
                 temperature: getModelTemperature(currentModel)
             })
         });
