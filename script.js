@@ -422,6 +422,10 @@ function updateCreditBalanceWithUsage(inputTokens, outputTokens, model) {
         'gpt-4.1-2025-04-14': {
             input: 2.00,    // $2.00 per 1M input tokens
             output: 8.00    // $8.00 per 1M output tokens
+        },
+        'gpt-image-1': {
+            input: 0.04,    // $0.04 per image (estimated for image generation)
+            output: 0.00    // No output tokens for image generation
         }
     };
     
@@ -1652,13 +1656,320 @@ function selectModel(model) {
         }
     });
     
+    // Update input placeholder based on model
+    updateInputPlaceholder(model);
+    
+    // Show/hide image generation settings
+    updateImageGenerationUI(model);
+    
     console.log('Model selected:', model);
+}
+
+// Update input placeholder based on selected model
+function updateInputPlaceholder(model) {
+    const messageInput = document.getElementById('messageInput');
+    if (!messageInput) return;
+    
+    const placeholders = {
+        'gpt-image-1': 'Describe the image you want to generate... (or upload images to edit)',
+        'o3-2025-04-16': 'Message o3... (paste/drag multiple images, PDFs, or audio files)',
+        'gpt-4.1-2025-04-14': 'Message GPT-4.1... (paste/drag multiple images, PDFs, or audio files)'
+    };
+    
+    messageInput.placeholder = placeholders[model] || 'Message ChatGPT... (paste/drag multiple images, PDFs, or audio files)';
+}
+
+// Update UI based on selected model (show/hide image generation features)
+function updateImageGenerationUI(model) {
+    const isImageModel = model === 'gpt-image-1';
+    
+    // Show/hide image settings button
+    let imageSettingsBtn = document.getElementById('imageSettingsBtn');
+    if (isImageModel && !imageSettingsBtn) {
+        // Create image settings button if it doesn't exist
+        createImageSettingsButton();
+    } else if (!isImageModel && imageSettingsBtn) {
+        // Remove image settings button if switching away from image model
+        imageSettingsBtn.remove();
+    }
+    
+    // Update welcome screen message
+    updateWelcomeMessage(model);
+}
+
+// Update welcome screen message based on model
+function updateWelcomeMessage(model) {
+    const welcomeScreen = document.querySelector('.welcome-screen h2');
+    if (!welcomeScreen) return;
+    
+    const messages = {
+        'gpt-image-1': 'What image would you like me to create?',
+        'o3-2025-04-16': 'How can I help you reason through complex problems?',
+        'gpt-4.1-2025-04-14': 'How can I assist you today?'
+    };
+    
+    welcomeScreen.textContent = messages[model] || 'How can I help you today?';
+}
+
+// Create image generation settings button
+function createImageSettingsButton() {
+    const inputActions = document.querySelector('.input-actions');
+    if (!inputActions) return;
+    
+    const settingsBtn = document.createElement('button');
+    settingsBtn.id = 'imageSettingsBtn';
+    settingsBtn.className = 'image-settings-btn';
+    settingsBtn.title = 'Image Generation Settings';
+    settingsBtn.onclick = showImageSettings;
+    settingsBtn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+    `;
+    
+    // Insert before the voice button
+    const voiceBtn = document.getElementById('voiceButton');
+    inputActions.insertBefore(settingsBtn, voiceBtn);
+}
+
+// Show image generation settings modal
+function showImageSettings() {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('imageSettingsModal');
+    if (!modal) {
+        createImageSettingsModal();
+        modal = document.getElementById('imageSettingsModal');
+    }
+    
+    // Update current settings in the modal
+    updateImageSettingsModal();
+    
+    // Show modal
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+// Close image settings modal
+function closeImageSettings() {
+    const modal = document.getElementById('imageSettingsModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+}
+
+// Create image settings modal
+function createImageSettingsModal() {
+    const modalHTML = `
+        <div id="imageSettingsModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>🎨 Image Generation Settings</h3>
+                    <button class="modal-close" onclick="closeImageSettings()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="image-settings-options">
+                        <div class="setting-group">
+                            <label for="qualitySetting">Quality:</label>
+                            <select id="qualitySetting" class="setting-select" onchange="updatePricingDisplay()">
+                                <option value="auto">Auto (Recommended)</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="sizeSetting">Size:</label>
+                            <select id="sizeSetting" class="setting-select" onchange="updatePricingDisplay()">
+                                <option value="auto">Auto (Recommended)</option>
+                                <option value="1024x1024">Square (1024x1024)</option>
+                                <option value="1024x1536">Portrait (1024x1536)</option>
+                                <option value="1536x1024">Landscape (1536x1024)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="backgroundSetting">Background Control:</label>
+                            <select id="backgroundSetting" class="setting-select">
+                                <option value="auto">Auto (Recommended)</option>
+                                <option value="opaque">Opaque</option>
+                                <option value="transparent">Transparent</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="formatSetting">Output Format:</label>
+                            <select id="formatSetting" class="setting-select">
+                                <option value="png">PNG (Default)</option>
+                                <option value="webp">WebP</option>
+                                <option value="jpeg">JPEG</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="pricing-section">
+                        <h4>💰 Pricing Information</h4>
+                        <div class="pricing-grid" id="pricingGrid">
+                            <!-- Pricing will be populated dynamically -->
+                        </div>
+                        <div class="current-price">
+                            <div class="price-label">Current Selection:</div>
+                            <div class="price-value" id="currentPrice">$0.042 per image</div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button class="modal-btn secondary" onclick="resetImageSettings()">Reset to Default</button>
+                        <button class="modal-btn primary" onclick="saveImageSettings()">Save Settings</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-backdrop" onclick="closeImageSettings()"></div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+// Image pricing data based on quality and size
+const imagePricing = {
+    'low': {
+        '1024x1024': 0.011,
+        '1024x1536': 0.016,
+        '1536x1024': 0.016
+    },
+    'medium': {
+        '1024x1024': 0.042,
+        '1024x1536': 0.063,
+        '1536x1024': 0.063
+    },
+    'high': {
+        '1024x1024': 0.167,
+        '1024x1536': 0.25,
+        '1536x1024': 0.25
+    }
+};
+
+// Update pricing display based on current selections
+function updatePricingDisplay() {
+    const quality = document.getElementById('qualitySetting').value;
+    const size = document.getElementById('sizeSetting').value;
+    const pricingGrid = document.getElementById('pricingGrid');
+    const currentPriceElement = document.getElementById('currentPrice');
+    
+    if (!pricingGrid || !currentPriceElement) return;
+    
+    // Generate pricing grid
+    let gridHTML = '';
+    const qualities = ['low', 'medium', 'high'];
+    const sizes = ['1024x1024', '1024x1536', '1536x1024'];
+    const sizeLabels = {
+        '1024x1024': 'Square',
+        '1024x1536': 'Portrait', 
+        '1536x1024': 'Landscape'
+    };
+    
+    qualities.forEach(q => {
+        gridHTML += `<div class="pricing-quality-section">`;
+        gridHTML += `<div class="pricing-quality-header">${q.charAt(0).toUpperCase() + q.slice(1)} Quality</div>`;
+        gridHTML += `<div class="pricing-row">`;
+        
+        sizes.forEach(s => {
+            const price = imagePricing[q][s];
+            const isSelected = (quality === q || quality === 'auto') && (size === s || size === 'auto');
+            gridHTML += `
+                <div class="pricing-item ${isSelected ? 'selected' : ''}">
+                    <div class="pricing-size">${sizeLabels[s]}</div>
+                    <div class="pricing-dimensions">${s}</div>
+                    <div class="pricing-cost">$${price.toFixed(3)}</div>
+                </div>
+            `;
+        });
+        
+        gridHTML += `</div></div>`;
+    });
+    
+    pricingGrid.innerHTML = gridHTML;
+    
+    // Update current price
+    let currentPrice = 0.042; // Default medium quality
+    if (quality !== 'auto' && size !== 'auto' && imagePricing[quality] && imagePricing[quality][size]) {
+        currentPrice = imagePricing[quality][size];
+    } else if (quality !== 'auto' && imagePricing[quality]) {
+        // Use default size (1024x1024) for the quality
+        currentPrice = imagePricing[quality]['1024x1024'];
+    } else if (size !== 'auto') {
+        // Use medium quality for the size
+        currentPrice = imagePricing['medium'][size] || 0.042;
+    }
+    
+    currentPriceElement.textContent = `$${currentPrice.toFixed(3)} per image`;
+}
+
+// Update image settings modal with current values
+function updateImageSettingsModal() {
+    document.getElementById('qualitySetting').value = imageSettings.quality;
+    document.getElementById('sizeSetting').value = imageSettings.size;
+    document.getElementById('backgroundSetting').value = imageSettings.background;
+    document.getElementById('formatSetting').value = imageSettings.outputFormat;
+    
+    // Update pricing display
+    setTimeout(() => updatePricingDisplay(), 100);
+}
+
+// Save image settings
+function saveImageSettings() {
+    imageSettings.quality = document.getElementById('qualitySetting').value;
+    imageSettings.size = document.getElementById('sizeSetting').value;
+    imageSettings.background = document.getElementById('backgroundSetting').value;
+    imageSettings.outputFormat = document.getElementById('formatSetting').value;
+    
+    // Save to localStorage
+    localStorage.setItem('chatgpt_image_settings', JSON.stringify(imageSettings));
+    
+    closeImageSettings();
+    
+    // Show confirmation
+    const successMsg = addMessage('✅ Image generation settings saved!', 'ai', 'normal');
+    setTimeout(() => removeMessage(successMsg), 2000);
+}
+
+// Reset image settings to default
+function resetImageSettings() {
+    imageSettings = {
+        quality: 'auto',
+        size: 'auto',
+        background: 'auto',
+        outputFormat: 'png'
+    };
+    
+    updateImageSettingsModal();
+    localStorage.removeItem('chatgpt_image_settings');
+    
+    // Show confirmation
+    const successMsg = addMessage('🔄 Image settings reset to default!', 'ai', 'normal');
+    setTimeout(() => removeMessage(successMsg), 2000);
+}
+
+// Load image settings from localStorage
+function loadImageSettings() {
+    const saved = localStorage.getItem('chatgpt_image_settings');
+    if (saved) {
+        try {
+            imageSettings = { ...imageSettings, ...JSON.parse(saved) };
+        } catch (e) {
+            console.warn('Failed to load image settings:', e);
+        }
+    }
 }
 
 function getModelDisplayName(model) {
     const names = {
         'o3-2025-04-16': 'o3',
-        'gpt-4.1-2025-04-14': 'GPT-4.1'
+        'gpt-4.1-2025-04-14': 'GPT-4.1',
+        'gpt-image-1': 'Image Gen'
     };
     return names[model] || model;
 }
@@ -1666,13 +1977,14 @@ function getModelDisplayName(model) {
 function getModelTemperature(model) {
     const temperatures = {
         'o3-2025-04-16': 1,
-        'gpt-4.1-2025-04-14': 0.3
+        'gpt-4.1-2025-04-14': 0.3,
+        'gpt-image-1': 0.7
     };
     return temperatures[model] || 0.7; // Default fallback
 }
 
 // Available models for cycling
-const availableModels = ['gpt-4.1-2025-04-14', 'o3-2025-04-16'];
+const availableModels = ['gpt-4.1-2025-04-14', 'o3-2025-04-16', 'gpt-image-1'];
 
 // Function to cycle to next model
 function cycleToNextModel() {
@@ -1838,9 +2150,25 @@ async function sendMessage() {
     }
 
     // Check if model supports vision when images are selected
-    if (selectedImages.length > 0 && !currentModel.includes('gpt-4') && !currentModel.includes('o3')) {
-        addMessage('⚠️ Image analysis requires vision-capable models. Please switch to GPT-4.1-2025-04-14 or o3-2025-04-16.', 'ai', 'error');
+    if (selectedImages.length > 0 && !currentModel.includes('gpt-4') && !currentModel.includes('o3') && !currentModel.includes('gpt-image-1')) {
+        addMessage('⚠️ Image analysis requires vision-capable models. Please switch to GPT-4.1-2025-04-14, o3-2025-04-16, or gpt-image-1.', 'ai', 'error');
         return;
+    }
+
+    // Special handling for gpt-image-1 model
+    if (currentModel === 'gpt-image-1') {
+        // For gpt-image-1, treat text input as image generation prompt
+        if (message.trim()) {
+            await handleImageGeneration(message.trim());
+            return;
+        } else if (selectedImages.length > 0) {
+            // Image editing mode with gpt-image-1
+            await handleImageEditing(message.trim() || 'Edit this image', selectedImages);
+            return;
+        } else {
+            addMessage('⚠️ gpt-image-1 requires either a text prompt for image generation or images for editing.', 'ai', 'error');
+            return;
+        }
     }
 
     // Hide welcome screen
@@ -2818,6 +3146,9 @@ function initializeApp() {
     // Load credit balance
     loadCreditBalance();
     
+    // Load image generation settings
+    loadImageSettings();
+    
     // Initialize token display
     updateTokenDisplay();
     
@@ -2929,5 +3260,487 @@ function initializeApp() {
                 }
             }
         });
+    }
+}
+
+// Image generation settings
+let imageSettings = {
+    quality: 'auto',
+    size: 'auto',
+    background: 'auto',
+    outputFormat: 'png'
+};
+
+// Image generation function for gpt-image-1
+async function handleImageGeneration(prompt) {
+    const input = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
+    
+    // Disable input and button during request
+    input.disabled = true;
+    sendButton.disabled = true;
+
+    // Hide welcome screen
+    const welcomeScreen = document.querySelector('.welcome-screen');
+    if (welcomeScreen) {
+        welcomeScreen.style.display = 'none';
+    }
+
+    // Add user message
+    addMessage(prompt, 'user', 'normal');
+    
+    // Clear input
+    input.value = '';
+    input.style.height = 'auto';
+
+    // Show generating indicator
+    const generatingId = addMessage('🎨 Generating image...', 'ai', 'typing');
+
+    try {
+        const apiKey = getApiKey();
+        
+        // Enhance prompt based on settings
+        let enhancedPrompt = prompt;
+        
+        // Add quality modifiers to prompt
+        if (imageSettings.quality === 'high') {
+            enhancedPrompt += ', high quality, detailed, professional';
+        } else if (imageSettings.quality === 'medium') {
+            enhancedPrompt += ', good quality, clear';
+        } else if (imageSettings.quality === 'low') {
+            enhancedPrompt += ', simple, basic style';
+        }
+        
+        // Add background preferences to prompt
+        if (imageSettings.background === 'transparent') {
+            enhancedPrompt += ', transparent background, PNG format';
+        } else if (imageSettings.background === 'opaque') {
+            enhancedPrompt += ', solid background, no transparency';
+        }
+        
+        // Add aspect ratio hints to prompt based on size
+        if (imageSettings.size === '1024x1536') {
+            enhancedPrompt += ', portrait orientation, vertical composition';
+        } else if (imageSettings.size === '1536x1024') {
+            enhancedPrompt += ', landscape orientation, horizontal composition';
+        } else if (imageSettings.size === '1024x1024') {
+            enhancedPrompt += ', square composition';
+        }
+        
+        // Prepare request body with correct parameters for gpt-image-1
+        const requestBody = {
+            model: 'gpt-image-1', // Use the real gpt-image-1 model
+            prompt: enhancedPrompt,
+            n: 1
+            // Note: gpt-image-1 may not support response_format parameter
+        };
+        
+        // Add size if not auto (only if supported by the model)
+        if (imageSettings.size !== 'auto') {
+            requestBody.size = imageSettings.size;
+        }
+        
+        // Note: quality parameter may not be supported by gpt-image-1
+        // Quality is handled through prompt enhancement instead
+        
+        const response = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        // Remove generating indicator
+        removeMessage(generatingId);
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || 'Image generation failed');
+        }
+
+        const data = await response.json();
+        
+        if (data.data && data.data.length > 0) {
+            const imageData = data.data[0];
+            
+            // Handle different response formats
+            if (imageData.b64_json) {
+                // Base64 format (if supported)
+                displayGeneratedImage(imageData.b64_json, prompt);
+            } else if (imageData.url) {
+                // URL format - convert to base64 for our display function
+                await convertUrlToBase64AndDisplay(imageData.url, prompt);
+            } else {
+                throw new Error('Unknown image response format');
+            }
+            
+            // Track token usage if available
+            if (data.usage) {
+                currentChatTokens.prompt += data.usage.prompt_tokens || 0;
+                currentChatTokens.completion += data.usage.completion_tokens || 0;
+                currentChatTokens.total = currentChatTokens.prompt + currentChatTokens.completion;
+                currentChatTokens.requests += 1;
+                
+                globalTokens.total += (data.usage.prompt_tokens || 0) + (data.usage.completion_tokens || 0);
+                
+                updateTokenDisplay();
+                updateGlobalTokenDisplay();
+                saveGlobalTokens();
+                updateCreditBalanceWithUsage(data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0, currentModel);
+            }
+            
+            // Save the conversation
+            conversationHistory.push({
+                role: 'user',
+                content: prompt
+            });
+            conversationHistory.push({
+                role: 'assistant',
+                content: `Generated image: ${prompt}`
+            });
+            
+            saveCurrentChat();
+        }
+
+    } catch (error) {
+        removeMessage(generatingId);
+        console.error('Image generation error:', error);
+        addMessage(`❌ Image generation failed: ${error.message}`, 'ai', 'error');
+    } finally {
+        input.disabled = false;
+        sendButton.disabled = false;
+    }
+}
+
+// Image editing function for gpt-image-1
+async function handleImageEditing(prompt, images) {
+    const input = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
+    
+    // Disable input and button during request
+    input.disabled = true;
+    sendButton.disabled = true;
+
+    // Hide welcome screen
+    const welcomeScreen = document.querySelector('.welcome-screen');
+    if (welcomeScreen) {
+        welcomeScreen.style.display = 'none';
+    }
+
+    // Add user message with images
+    addMessage(prompt || 'Edit this image', 'user', 'normal', images[0]);
+    
+    // Clear input and files
+    input.value = '';
+    input.style.height = 'auto';
+    clearSelectedFiles();
+
+    // Show editing indicator
+    const editingId = addMessage('🎨 Editing image...', 'ai', 'typing');
+
+    try {
+        const apiKey = getApiKey();
+        
+        // Convert image to form data
+        const formData = new FormData();
+        formData.append('prompt', prompt || 'Edit this image');
+        formData.append('model', 'gpt-image-1'); // Use the real gpt-image-1 model
+        formData.append('n', '1');
+        // Note: response_format may not be supported by gpt-image-1
+        
+        // Add size if not auto (only if supported by the model)
+        if (imageSettings.size !== 'auto') {
+            formData.append('size', imageSettings.size);
+        }
+        
+        // Add the image file
+        const imageFile = images[0];
+        if (imageFile instanceof File) {
+            formData.append('image', imageFile);
+        } else {
+            // Convert base64 to file if needed
+            const response = await fetch(imageFile);
+            const blob = await response.blob();
+            formData.append('image', blob, 'image.png');
+        }
+
+        const response = await fetch('https://api.openai.com/v1/images/edits', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: formData
+        });
+
+        // Remove editing indicator
+        removeMessage(editingId);
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || 'Image editing failed');
+        }
+
+        const data = await response.json();
+        
+        if (data.data && data.data.length > 0) {
+            const imageData = data.data[0];
+            
+            // Handle different response formats
+            if (imageData.b64_json) {
+                // Base64 format (if supported)
+                displayGeneratedImage(imageData.b64_json, `Edited: ${prompt}`);
+            } else if (imageData.url) {
+                // URL format - convert to base64 for our display function
+                await convertUrlToBase64AndDisplay(imageData.url, `Edited: ${prompt}`);
+            } else {
+                throw new Error('Unknown image response format');
+            }
+            
+            // Track token usage if available
+            if (data.usage) {
+                currentChatTokens.prompt += data.usage.prompt_tokens || 0;
+                currentChatTokens.completion += data.usage.completion_tokens || 0;
+                currentChatTokens.total = currentChatTokens.prompt + currentChatTokens.completion;
+                currentChatTokens.requests += 1;
+                
+                globalTokens.total += (data.usage.prompt_tokens || 0) + (data.usage.completion_tokens || 0);
+                
+                updateTokenDisplay();
+                updateGlobalTokenDisplay();
+                saveGlobalTokens();
+                updateCreditBalanceWithUsage(data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0, currentModel);
+            }
+            
+            // Save the conversation
+            conversationHistory.push({
+                role: 'user',
+                content: [
+                    { type: 'text', text: prompt || 'Edit this image' },
+                    { type: 'image_url', image_url: { url: imageFile } }
+                ]
+            });
+            conversationHistory.push({
+                role: 'assistant',
+                content: `Edited image: ${prompt}`
+            });
+            
+            saveCurrentChat();
+        }
+
+    } catch (error) {
+        removeMessage(editingId);
+        console.error('Image editing error:', error);
+        addMessage(`❌ Image editing failed: ${error.message}`, 'ai', 'error');
+    } finally {
+        input.disabled = false;
+        sendButton.disabled = false;
+    }
+}
+
+// Convert URL to base64 for display
+async function convertUrlToBase64AndDisplay(imageUrl, description) {
+    try {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const base64Data = reader.result.split(',')[1]; // Remove data:image/png;base64, prefix
+                displayGeneratedImage(base64Data, description);
+                resolve();
+            };
+            reader.readAsDataURL(blob);
+        });
+    } catch (error) {
+        console.error('Failed to convert URL to base64:', error);
+        // Fallback: display image directly with URL
+        displayGeneratedImageFromUrl(imageUrl, description);
+    }
+}
+
+// Display image directly from URL (fallback method)
+function displayGeneratedImageFromUrl(imageUrl, description) {
+    const messagesContainer = document.getElementById('messages');
+    const messageDiv = document.createElement('div');
+    const messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    messageDiv.id = messageId;
+    messageDiv.className = 'message ai-message';
+    
+    messageDiv.innerHTML = `
+        <div class="message-content">
+            <div class="message-text">
+                <div class="generated-image-container">
+                    <img src="${imageUrl}" alt="${description}" class="generated-image">
+                    <div class="image-description">${description}</div>
+                    <div class="image-settings-info">
+                        <small>Quality: ${imageSettings.quality} • Size: ${imageSettings.size} • Format: URL</small>
+                    </div>
+                    <div class="image-actions">
+                        <button onclick="downloadImageFromUrl('${imageUrl}', '${description}')" class="image-action-btn">
+                            📥 Download
+                        </button>
+                        <button onclick="copyImageUrlToClipboard('${imageUrl}')" class="image-action-btn">
+                            📋 Copy URL
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Convert image format based on settings
+async function convertImageFormat(base64Data, targetFormat) {
+    if (targetFormat === 'png') {
+        return { data: base64Data, mimeType: 'image/png' };
+    }
+    
+    try {
+        // Create canvas to convert format
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        return new Promise((resolve) => {
+            img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                // For JPEG, fill with white background (no transparency)
+                if (targetFormat === 'jpeg') {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+                
+                ctx.drawImage(img, 0, 0);
+                
+                const quality = imageSettings.quality === 'high' ? 0.9 : 
+                               imageSettings.quality === 'medium' ? 0.7 : 0.5;
+                
+                const convertedData = canvas.toDataURL(
+                    `image/${targetFormat}`, 
+                    targetFormat === 'jpeg' ? quality : undefined
+                ).split(',')[1];
+                
+                resolve({
+                    data: convertedData,
+                    mimeType: `image/${targetFormat}`
+                });
+            };
+            img.src = `data:image/png;base64,${base64Data}`;
+        });
+    } catch (error) {
+        console.warn('Format conversion failed, using original:', error);
+        return { data: base64Data, mimeType: 'image/png' };
+    }
+}
+
+// Display generated/edited image
+async function displayGeneratedImage(base64Data, description) {
+    const messagesContainer = document.getElementById('messages');
+    const messageDiv = document.createElement('div');
+    const messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    messageDiv.id = messageId;
+    messageDiv.className = 'message ai-message';
+    
+    // Convert to desired format
+    const convertedImage = await convertImageFormat(base64Data, imageSettings.outputFormat);
+    
+    // Create file extension based on format
+    const extension = imageSettings.outputFormat;
+    
+    messageDiv.innerHTML = `
+        <div class="message-content">
+            <div class="message-text">
+                <div class="generated-image-container">
+                    <img src="data:${convertedImage.mimeType};base64,${convertedImage.data}" alt="${description}" class="generated-image">
+                    <div class="image-description">${description}</div>
+                    <div class="image-settings-info">
+                        <small>Quality: ${imageSettings.quality} • Size: ${imageSettings.size} • Format: ${extension.toUpperCase()}</small>
+                    </div>
+                    <div class="image-actions">
+                        <button onclick="downloadImage('${convertedImage.data}', '${description}', '${extension}', '${convertedImage.mimeType}')" class="image-action-btn">
+                            📥 Download
+                        </button>
+                        <button onclick="copyImageToClipboard('${convertedImage.data}', '${convertedImage.mimeType}')" class="image-action-btn">
+                            📋 Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Download generated image
+function downloadImage(base64Data, description, extension = 'png', mimeType = 'image/png') {
+    const link = document.createElement('a');
+    link.href = `data:${mimeType};base64,${base64Data}`;
+    link.download = `${description.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.${extension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Copy image to clipboard
+async function copyImageToClipboard(base64Data, mimeType = 'image/png') {
+    try {
+        const response = await fetch(`data:${mimeType};base64,${base64Data}`);
+        const blob = await response.blob();
+        await navigator.clipboard.write([
+            new ClipboardItem({ [mimeType]: blob })
+        ]);
+        // Show temporary success message
+        const successMsg = addMessage('✅ Image copied to clipboard!', 'ai', 'normal');
+        setTimeout(() => removeMessage(successMsg), 2000);
+    } catch (error) {
+        console.error('Failed to copy image:', error);
+        addMessage('❌ Failed to copy image to clipboard', 'ai', 'error');
+    }
+}
+
+// Download image from URL
+async function downloadImageFromUrl(imageUrl, description) {
+    try {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${description.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${Date.now()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('Failed to download image:', error);
+        addMessage('❌ Failed to download image', 'ai', 'error');
+    }
+}
+
+// Copy image URL to clipboard
+async function copyImageUrlToClipboard(imageUrl) {
+    try {
+        await navigator.clipboard.writeText(imageUrl);
+        // Show temporary success message
+        const successMsg = addMessage('✅ Image URL copied to clipboard!', 'ai', 'normal');
+        setTimeout(() => removeMessage(successMsg), 2000);
+    } catch (error) {
+        console.error('Failed to copy URL:', error);
+        addMessage('❌ Failed to copy URL to clipboard', 'ai', 'error');
     }
 }

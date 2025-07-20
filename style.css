@@ -2286,6 +2286,8 @@ body {
     max-width: 480px;
     width: 90%;
     max-height: 80vh;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
     animation: modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2338,6 +2340,26 @@ body {
 
 .modal-body {
     padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background: #404040;
+    border-radius: 3px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+    background: #565869;
 }
 
 .settings-options {
@@ -2649,4 +2671,406 @@ body {
 .folder-option-name {
     flex: 1;
     font-weight: 500;
+}
+
+/* Generated Image Styles */
+.generated-image-container {
+    max-width: 100%;
+    margin: 16px 0;
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: #1a1a1a;
+    border: 1px solid #2a2a2a;
+}
+
+.generated-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-width: 512px;
+    border-radius: 12px 12px 0 0;
+}
+
+.image-description {
+    padding: 12px 16px;
+    font-size: 14px;
+    color: #d1d5db;
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #2a2a2a;
+}
+
+.image-settings-info {
+    padding: 8px 16px;
+    font-size: 12px;
+    color: #9ca3af;
+    background-color: #151515;
+    border-bottom: 1px solid #2a2a2a;
+    font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+.image-actions {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    background-color: #1a1a1a;
+}
+
+.image-action-btn {
+    background-color: #2a2a2a;
+    border: 1px solid #404040;
+    color: #d1d5db;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.image-action-btn:hover {
+    background-color: #404040;
+    border-color: #525252;
+    color: #ffffff;
+}
+
+.image-action-btn:active {
+    transform: translateY(1px);
+}
+
+/* Mobile adjustments for generated images */
+@media (max-width: 768px) {
+    .generated-image-container {
+        margin: 12px 0;
+    }
+    
+    .generated-image {
+        max-width: 100%;
+        border-radius: 8px 8px 0 0;
+    }
+    
+    .image-actions {
+        flex-direction: column;
+        gap: 6px;
+    }
+    
+    .image-action-btn {
+        justify-content: center;
+        padding: 10px;
+        font-size: 13px;
+    }
+}
+
+/* Image Generation Settings */
+.image-settings-btn {
+    background-color: #2a2a2a;
+    border: 1px solid #404040;
+    color: #d1d5db;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-settings-btn:hover {
+    background-color: #404040;
+    border-color: #525252;
+    color: #ffffff;
+}
+
+.image-settings-options {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 4px 0;
+}
+
+.setting-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+}
+
+.setting-group::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, #10b981, #3b82f6, #8b5cf6);
+    border-radius: 2px;
+    opacity: 0.6;
+}
+
+.setting-group:nth-child(1)::before { background: linear-gradient(180deg, #10b981, #059669); }
+.setting-group:nth-child(2)::before { background: linear-gradient(180deg, #3b82f6, #2563eb); }
+.setting-group:nth-child(3)::before { background: linear-gradient(180deg, #8b5cf6, #7c3aed); }
+.setting-group:nth-child(4)::before { background: linear-gradient(180deg, #f59e0b, #d97706); }
+
+.setting-group label {
+    font-weight: 600;
+    color: #f3f4f6;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.setting-group label::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.5;
+}
+
+.setting-group:nth-child(1) label { color: #10b981; }
+.setting-group:nth-child(2) label { color: #3b82f6; }
+.setting-group:nth-child(3) label { color: #8b5cf6; }
+.setting-group:nth-child(4) label { color: #f59e0b; }
+
+.setting-select {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border: 2px solid #374151;
+    color: #f9fafb;
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-size: 15px;
+    font-weight: 400;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    min-height: 48px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 12px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+    padding-right: 40px;
+}
+
+.setting-select:hover {
+    border-color: #4b5563;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+    background: linear-gradient(135deg, #252f3f 0%, #1a202c 100%);
+}
+
+.setting-select:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15), 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+.setting-group:nth-child(1) .setting-select:focus { 
+    border-color: #10b981; 
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15), 0 4px 12px rgba(0, 0, 0, 0.15); 
+}
+.setting-group:nth-child(2) .setting-select:focus { 
+    border-color: #3b82f6; 
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15), 0 4px 12px rgba(0, 0, 0, 0.15); 
+}
+.setting-group:nth-child(3) .setting-select:focus { 
+    border-color: #8b5cf6; 
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15), 0 4px 12px rgba(0, 0, 0, 0.15); 
+}
+.setting-group:nth-child(4) .setting-select:focus { 
+    border-color: #f59e0b; 
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15), 0 4px 12px rgba(0, 0, 0, 0.15); 
+}
+
+.setting-select option {
+    background-color: #1f2937;
+    color: #f9fafb;
+    padding: 12px 16px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-weight: 400;
+    font-size: 15px;
+}
+
+.setting-select option:hover {
+    background-color: #374151;
+}
+
+.setting-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.setting-select:disabled:hover {
+    border-color: #374151;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transform: none;
+}
+
+/* Pricing Section Styles */
+.pricing-section {
+    margin-top: 24px;
+    padding: 20px;
+    background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+    border: 1px solid #374151;
+    border-radius: 12px;
+}
+
+.pricing-section h4 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #f59e0b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pricing-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.pricing-quality-section {
+    background-color: #1a1a1a;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+}
+
+.pricing-quality-header {
+    background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+    padding: 12px 16px;
+    font-weight: 600;
+    color: #f3f4f6;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #2a2a2a;
+}
+
+.pricing-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background-color: #2a2a2a;
+}
+
+.pricing-item {
+    background-color: #1a1a1a;
+    padding: 16px 12px;
+    text-align: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.pricing-item:hover {
+    background-color: #242424;
+    transform: translateY(-1px);
+}
+
+.pricing-item.selected {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+.pricing-size {
+    font-weight: 600;
+    font-size: 13px;
+    color: #f3f4f6;
+    margin-bottom: 4px;
+}
+
+.pricing-item.selected .pricing-size {
+    color: #ffffff;
+}
+
+.pricing-dimensions {
+    font-size: 11px;
+    color: #9ca3af;
+    margin-bottom: 8px;
+    font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+.pricing-item.selected .pricing-dimensions {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.pricing-cost {
+    font-size: 16px;
+    font-weight: 700;
+    color: #10b981;
+}
+
+.pricing-item.selected .pricing-cost {
+    color: #ffffff;
+}
+
+.current-price {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border: 2px solid #10b981;
+    border-radius: 8px;
+    margin-top: 16px;
+}
+
+.price-label {
+    font-weight: 600;
+    color: #f3f4f6;
+    font-size: 14px;
+}
+
+.price-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #10b981;
+    font-family: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+/* Mobile adjustments for image settings */
+@media (max-width: 768px) {
+    .image-settings-options {
+        gap: 16px;
+    }
+    
+    .setting-select {
+        padding: 12px;
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    .pricing-section {
+        margin-top: 16px;
+        padding: 16px;
+    }
+    
+    .pricing-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .pricing-item {
+        padding: 12px;
+    }
+    
+    .current-price {
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+    }
 }
