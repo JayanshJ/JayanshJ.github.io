@@ -32,7 +32,7 @@ body {
 }
 
 .sidebar-header {
-    padding: 14px;
+    padding: 24px 20px;
     border-bottom: 1px solid #2f2f2f;
 }
 
@@ -40,19 +40,19 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px; /* Reduced from 12px to give more space */
+    margin-bottom: 20px; /* Increased for better separation from buttons */
 }
 
 .logo span {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
     color: #ececf1;
 }
 
 .header-actions {
     display: flex;
-    gap: 8px;
-    margin-top: 12px;
+    gap: 12px;
+    align-items: center;
 }
 
 .global-tokens-sidebar {
@@ -89,16 +89,17 @@ body {
 .new-chat-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     flex: 1;
     background: none;
     border: 1px solid #404040;
-    border-radius: 6px;
-    padding: 8px 12px;
+    border-radius: 8px;
+    padding: 12px 16px;
     color: #ececf1;
     cursor: pointer;
     font-size: 14px;
     transition: background-color 0.2s;
+    min-height: 44px;
 }
 
 .settings-btn {
@@ -107,12 +108,13 @@ body {
     justify-content: center;
     background: none;
     border: 1px solid #404040;
-    border-radius: 6px;
-    padding: 8px;
+    border-radius: 8px;
+    padding: 12px;
     color: #ececf1;
     cursor: pointer;
     transition: background-color 0.2s;
-    min-width: 40px;
+    min-width: 44px;
+    min-height: 44px;
 }
 
 .new-chat-btn:hover,
@@ -130,17 +132,17 @@ body {
 /* Chat History */
 .chat-history {
     flex: 1;
-    padding: 0 12px;
+    padding: 0 20px 20px;
     overflow-y: auto;
-    margin-top: 4px;
+    margin-top: 8px;
 }
 
 .history-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
-    padding: 12px 8px 8px;
+    margin-bottom: 16px;
+    padding: 16px 0 12px;
     font-size: 12px;
     font-weight: 600;
     color: #8e8ea0;
@@ -175,11 +177,11 @@ body {
 .history-list {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 4px;
 }
 
 .history-item {
-    padding: 10px 12px;
+    padding: 12px 16px;
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -187,7 +189,7 @@ body {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    min-height: 44px;
+    min-height: 48px;
     background: transparent;
     border: 1px solid transparent;
 }
@@ -283,20 +285,20 @@ body {
 
 /* Folder Styles */
 .folders-section, .previous-chats-section {
-    margin-bottom: 16px;
+    margin-bottom: 24px;
 }
 
 .section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 12px 0;
     font-size: 12px;
     font-weight: 600;
     color: #8e8ea0;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
 }
 
 .create-folder-btn, .folder-action-btn {
@@ -323,14 +325,14 @@ body {
 }
 
 .folder-item {
-    margin-bottom: 2px;
+    margin-bottom: 6px;
 }
 
 .folder-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 10px 16px;
     cursor: pointer;
     border-radius: 6px;
     transition: all 0.2s ease;
@@ -398,14 +400,14 @@ body {
 
 .folder-chats {
     margin-left: 24px;
-    margin-top: 4px;
+    margin-top: 8px;
     border-left: 1px solid #2a2a2a;
-    padding-left: 12px;
+    padding-left: 16px;
 }
 
 .folder-chat {
-    margin-bottom: 1px;
-    padding: 8px 10px !important;
+    margin-bottom: 4px;
+    padding: 10px 12px !important;
     font-size: 13px;
 }
 
@@ -1707,4 +1709,398 @@ body {
         align-items: center;
         text-align: center;
     }
+}
+
+/* Settings Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+}
+
+.modal-content {
+    position: relative;
+    background-color: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 12px;
+    max-width: 480px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+    animation: modalSlideIn 0.2s ease-out;
+    z-index: 1001;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid #2a2a2a;
+    background-color: #1f1f1f;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #ececf1;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: #8e8ea0;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    background-color: #2a2a2a;
+    color: #ececf1;
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.settings-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.settings-option {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 16px;
+    background: none;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    color: #ececf1;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.settings-option:hover {
+    background-color: #242424;
+    border-color: #404040;
+    transform: translateY(-1px);
+}
+
+.settings-option.danger:hover {
+    background-color: #dc26261a;
+    border-color: #dc2626;
+    color: #fca5a5;
+}
+
+.option-icon {
+    font-size: 20px;
+    width: 24px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.option-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.option-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: #ececf1;
+}
+
+.option-description {
+    font-size: 12px;
+    color: #8e8ea0;
+    line-height: 1.4;
+}
+
+.settings-option.danger .option-title {
+    color: #fca5a5;
+}
+
+.settings-option.danger .option-description {
+    color: #dc2626;
+    opacity: 0.8;
+}
+
+/* Modal Form Styles */
+.input-group {
+    margin-bottom: 20px;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #ececf1;
+}
+
+.modal-input {
+    width: 100%;
+    padding: 12px 16px;
+    background-color: #2a2a2a;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    color: #ececf1;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+    box-sizing: border-box;
+}
+
+.modal-input:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.modal-input::placeholder {
+    color: #6b7280;
+}
+
+.input-help {
+    margin-top: 12px;
+    padding: 12px;
+    background-color: #1a1a1a;
+    border-radius: 6px;
+    border-left: 3px solid #6366f1;
+}
+
+.input-help p {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: #8e8ea0;
+}
+
+.input-help ol {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 12px;
+    color: #8e8ea0;
+}
+
+.input-help ol li {
+    margin-bottom: 4px;
+}
+
+.input-help a {
+    color: #6366f1;
+    text-decoration: none;
+}
+
+.input-help a:hover {
+    text-decoration: underline;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #2a2a2a;
+}
+
+.modal-btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    min-width: 80px;
+}
+
+.modal-btn.secondary {
+    background-color: #2a2a2a;
+    color: #8e8ea0;
+    border: 1px solid #404040;
+}
+
+.modal-btn.secondary:hover {
+    background-color: #333;
+    color: #ececf1;
+}
+
+.modal-btn.primary {
+    background-color: #6366f1;
+    color: white;
+}
+
+.modal-btn.primary:hover {
+    background-color: #5b5bf6;
+}
+
+/* Token Stats Styles */
+.token-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.stat-section h4 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #ececf1;
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.stat-item {
+    background-color: #1a1a1a;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #2a2a2a;
+    text-align: center;
+}
+
+.stat-label {
+    display: block;
+    font-size: 12px;
+    color: #8e8ea0;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat-value {
+    display: block;
+    font-size: 18px;
+    font-weight: 600;
+    color: #ececf1;
+}
+
+.token-info {
+    padding: 16px;
+    background-color: #1a1a1a;
+    border-radius: 8px;
+    border-left: 3px solid #10b981;
+    font-size: 13px;
+    color: #8e8ea0;
+    line-height: 1.5;
+}
+
+/* Confirmation Modal Styles */
+.confirmation-content {
+    text-align: center;
+    padding: 20px 0;
+}
+
+.confirmation-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.confirmation-message {
+    font-size: 16px;
+    color: #ececf1;
+    line-height: 1.5;
+    margin-bottom: 24px;
+}
+
+.modal-btn.danger {
+    background-color: #dc2626;
+    color: white;
+}
+
+.modal-btn.danger:hover {
+    background-color: #b91c1c;
+}
+
+/* Move Chat Modal Styles */
+.folder-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.folder-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background-color: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    color: #ececf1;
+}
+
+.folder-option:hover {
+    background-color: #242424;
+    border-color: #404040;
+    transform: translateY(-1px);
+}
+
+.folder-option.remove-option {
+    border-color: #dc2626;
+    color: #fca5a5;
+}
+
+.folder-option.remove-option:hover {
+    background-color: #dc26261a;
+    border-color: #dc2626;
+}
+
+.folder-option-icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.folder-option-name {
+    flex: 1;
+    font-weight: 500;
 }

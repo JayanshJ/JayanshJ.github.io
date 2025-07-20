@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChatGPT</title>
+    <title>newGPT</title>
     <link rel="stylesheet" href="style.css">
     <!-- PDF.js for PDF processing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -37,7 +37,7 @@
         <div class="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <span>JayanshGPT</span>
+                    <span>newGPT</span>
                 </div>
                 <div class="header-actions">
                     <button class="new-chat-btn" onclick="startNewChat()">
@@ -50,7 +50,7 @@
                     <button class="settings-btn" onclick="showSettingsMenu()" title="Settings">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="3"/>
-                            <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                         </svg>
                     </button>
                 </div>
@@ -147,6 +147,220 @@
             </div>
         </div>
     </div>
+    
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚙️ Settings</h3>
+                <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-options">
+                    <button class="settings-option" onclick="updateApiKey()">
+                        <span class="option-icon">🔑</span>
+                        <div class="option-content">
+                            <span class="option-title">Update API Key</span>
+                            <span class="option-description">Change your OpenAI API key</span>
+                        </div>
+                    </button>
+                    <button class="settings-option" onclick="showTokenUsageInfo()">
+                        <span class="option-icon">📊</span>
+                        <div class="option-content">
+                            <span class="option-title">View Token Usage</span>
+                            <span class="option-description">Check current token consumption</span>
+                        </div>
+                    </button>
+                    <button class="settings-option" onclick="setCreditBalance()">
+                        <span class="option-icon">💰</span>
+                        <div class="option-content">
+                            <span class="option-title">Set Credit Balance</span>
+                            <span class="option-description">Update your account balance</span>
+                        </div>
+                    </button>
+                    <button id="clearApiKeyBtn" class="settings-option danger" onclick="clearSavedApiKey()" style="display: none;">
+                        <span class="option-icon">🗑️</span>
+                        <div class="option-content">
+                            <span class="option-title">Clear Saved API Key</span>
+                            <span class="option-description">Remove stored API key</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop" onclick="closeSettingsModal()"></div>
+    </div>
+    
+    <!-- API Key Modal -->
+    <div id="apiKeyModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔑 Update API Key</h3>
+                <button class="modal-close" onclick="closeApiKeyModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="apiKeyInput">Enter your OpenAI API key:</label>
+                    <input type="password" id="apiKeyInput" class="modal-input" placeholder="sk-proj-...">
+                    <div class="input-help">
+                        <p>💡 To get your API key:</p>
+                        <ol>
+                            <li>Go to <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a></li>
+                            <li>Create a new API key</li>
+                            <li>Copy and paste it above</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn secondary" onclick="closeApiKeyModal()">Cancel</button>
+                    <button class="modal-btn primary" onclick="saveApiKey()">Save API Key</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop" onclick="closeApiKeyModal()"></div>
+    </div>
+    
+    <!-- Token Usage Modal -->
+    <div id="tokenUsageModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📊 Token Usage</h3>
+                <button class="modal-close" onclick="closeTokenUsageModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="token-stats">
+                    <div class="stat-section">
+                        <h4>Current Chat</h4>
+                        <div class="stat-grid">
+                            <div class="stat-item">
+                                <span class="stat-label">Total</span>
+                                <span class="stat-value" id="currentChatTotal">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Input</span>
+                                <span class="stat-value" id="currentChatInput">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Output</span>
+                                <span class="stat-value" id="currentChatOutput">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Requests</span>
+                                <span class="stat-value" id="currentChatRequests">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-section">
+                        <h4>Global Stats</h4>
+                        <div class="stat-grid">
+                            <div class="stat-item">
+                                <span class="stat-label">All Time</span>
+                                <span class="stat-value" id="globalTokenTotal">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Total Chats</span>
+                                <span class="stat-value" id="globalChatCount">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="token-info">
+                        💡 Tokens are used for both input and output. Longer conversations use more tokens.
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop" onclick="closeTokenUsageModal()"></div>
+    </div>
+    
+    <!-- Credit Balance Modal -->
+    <div id="creditBalanceModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>💰 Set Credit Balance</h3>
+                <button class="modal-close" onclick="closeCreditBalanceModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="creditBalanceInput">Enter your OpenAI credit balance:</label>
+                    <input type="number" id="creditBalanceInput" class="modal-input" placeholder="15.50" step="0.01" min="0">
+                    <div class="input-help">
+                        <p>💡 To find your balance:</p>
+                        <ol>
+                            <li>Go to <a href="https://platform.openai.com/usage" target="_blank">platform.openai.com/usage</a></li>
+                            <li>Look for "Credits" or "Balance" section</li>
+                            <li>Enter the amount here (e.g., 15.50)</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn secondary" onclick="closeCreditBalanceModal()">Cancel</button>
+                    <button class="modal-btn primary" onclick="saveCreditBalance()">Save Balance</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop" onclick="closeCreditBalanceModal()"></div>
+    </div>
+    
+    <!-- Confirmation Modal -->
+    <div id="confirmationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="confirmationTitle">Confirm Action</h3>
+                <button class="modal-close" onclick="closeConfirmationModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="confirmation-content">
+                    <div class="confirmation-icon" id="confirmationIcon">⚠️</div>
+                    <div class="confirmation-message" id="confirmationMessage">
+                        Are you sure you want to proceed?
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn secondary" onclick="closeConfirmationModal()">Cancel</button>
+                    <button class="modal-btn primary danger" id="confirmationButton" onclick="confirmAction()">Confirm</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop" onclick="closeConfirmationModal()"></div>
+    </div>
+    
+    <!-- Rename Folder Modal -->
+    <div id="renameFolderModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📁 Rename Folder</h3>
+                <button class="modal-close" onclick="closeRenameFolderModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="folderNameInput">Folder name:</label>
+                    <input type="text" id="folderNameInput" class="modal-input" placeholder="Enter folder name">
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn secondary" onclick="closeRenameFolderModal()">Cancel</button>
+                    <button class="modal-btn primary" onclick="saveFolderName()">Rename</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop" onclick="closeRenameFolderModal()"></div>
+    </div>
+    
+    <!-- Move Chat Modal -->
+    <div id="moveChatModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📂 Move Chat to Folder</h3>
+                <button class="modal-close" onclick="closeMoveChat()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="folder-options" id="folderOptions">
+                    <!-- Folder options will be populated here -->
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop" onclick="closeMoveChat()"></div>
+    </div>
+    
     <script src="config.js"></script>
     <script src="script.js"></script>
 </body>

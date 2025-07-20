@@ -140,16 +140,57 @@ function deleteFolder(folderId) {
 }
 
 // Rename a folder
+// Global variable to store folder ID being renamed
+let currentRenamingFolderId = null;
+// Global variable to store chat ID being moved
+let currentMovingChatId = null;
+
 function renameFolder(folderId) {
     const folder = chatFolders.find(f => f.id === folderId);
     if (!folder) return;
     
-    const newName = prompt('Rename folder:', folder.name);
-    if (newName && newName.trim() && newName.trim() !== folder.name) {
-        folder.name = newName.trim();
-        saveChatFolders();
-        updateHistoryDisplay();
+    // Store the folder ID and show the modal
+    currentRenamingFolderId = folderId;
+    const modal = document.getElementById('renameFolderModal');
+    const input = document.getElementById('folderNameInput');
+    
+    if (modal && input) {
+        input.value = folder.name; // Pre-fill with current name
+        modal.style.display = 'flex';
+        input.focus();
+        input.select(); // Select all text for easy editing
+        document.body.style.overflow = 'hidden';
     }
+}
+
+function closeRenameFolderModal() {
+    const modal = document.getElementById('renameFolderModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+        currentRenamingFolderId = null;
+    }
+}
+
+function saveFolderName() {
+    const input = document.getElementById('folderNameInput');
+    const newName = input.value.trim();
+    
+    if (!newName) {
+        alert('❌ Please enter a folder name');
+        return;
+    }
+    
+    if (currentRenamingFolderId) {
+        const folder = chatFolders.find(f => f.id === currentRenamingFolderId);
+        if (folder && newName !== folder.name) {
+            folder.name = newName;
+            saveChatFolders();
+            updateHistoryDisplay();
+        }
+    }
+    
+    closeRenameFolderModal();
 }
 
 // Toggle folder expanded/collapsed state
@@ -278,24 +319,36 @@ function updateGlobalTokenDisplay() {
 
 // Manual credit balance setting
 function setCreditBalance() {
-    const currentBalance = creditBalance.remaining > 0 ? creditBalance.remaining.toFixed(2) : '';
+    closeSettingsModal(); // Close the settings modal first
     
-    // More detailed prompt with instructions
-    const message = `Enter your OpenAI credit balance:
-
-💡 To find your balance:
-1. Go to https://platform.openai.com/usage
-2. Look for "Credits" or "Balance" section
-3. Enter the amount here (e.g., 15.50)
-
-Current balance: ${currentBalance || 'Not set'}
-
-Note: Automatic balance fetching is not available in browser apps due to OpenAI's security restrictions. Manual entry is the standard approach.`;
+    // Show the credit balance modal
+    const modal = document.getElementById('creditBalanceModal');
+    const input = document.getElementById('creditBalanceInput');
     
-    const newBalance = prompt(message, currentBalance);
+    if (modal && input) {
+        // Pre-fill current balance if available
+        const currentBalance = creditBalance.remaining > 0 ? creditBalance.remaining.toFixed(2) : '';
+        input.value = currentBalance;
+        modal.style.display = 'flex';
+        input.focus();
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeCreditBalanceModal() {
+    const modal = document.getElementById('creditBalanceModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+}
+
+function saveCreditBalance() {
+    const input = document.getElementById('creditBalanceInput');
+    const newBalance = input.value.trim();
     
-    if (newBalance !== null && newBalance.trim() !== '') {
-        const balanceNumber = parseFloat(newBalance.trim());
+    if (newBalance !== '' && newBalance !== null) {
+        const balanceNumber = parseFloat(newBalance);
         if (!isNaN(balanceNumber) && balanceNumber >= 0) {
             creditBalance = {
                 total: balanceNumber,
@@ -312,11 +365,48 @@ Note: Automatic balance fetching is not available in browser apps due to OpenAI'
             // Update display
             updateGlobalTokenDisplay();
             
+            closeCreditBalanceModal();
             console.log('✅ Manual credit balance set to:', `$${balanceNumber.toFixed(2)}`);
             console.log('💾 Balance saved to localStorage');
+            alert(`✅ Credit balance set to $${balanceNumber.toFixed(2)}`);
         } else {
-            alert('Please enter a valid number (e.g., 15.50)');
+            alert('❌ Please enter a valid positive number (e.g., 15.50)');
         }
+    }
+}
+
+// Confirmation modal utility functions
+let confirmationCallback = null;
+
+function showConfirmationModal(title, message, icon, callback) {
+    const modal = document.getElementById('confirmationModal');
+    const titleElement = document.getElementById('confirmationTitle');
+    const messageElement = document.getElementById('confirmationMessage');
+    const iconElement = document.getElementById('confirmationIcon');
+    
+    if (modal && titleElement && messageElement && iconElement) {
+        titleElement.textContent = title;
+        messageElement.textContent = message;
+        iconElement.textContent = icon;
+        confirmationCallback = callback;
+        
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeConfirmationModal() {
+    const modal = document.getElementById('confirmationModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+        confirmationCallback = null;
+    }
+}
+
+function confirmAction() {
+    if (confirmationCallback) {
+        confirmationCallback();
     }
 }
 
@@ -1146,21 +1236,20 @@ function updateHistoryDisplay() {
     
     let html = '';
     
-    // Show folders section
-    if (chatFolders.length > 0 || chatHistory.length > 0) {
-        html += `
-            <div class="folders-section">
-                <div class="section-header">
-                    <span>Folders</span>
-                    <button class="create-folder-btn" onclick="createFolder()" title="Create new folder">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="12" y1="5" x2="12" y2="19"/>
-                            <line x1="5" y1="12" x2="19" y2="12"/>
-                        </svg>
-                    </button>
-                </div>
-                <div class="folders-list">
-        `;
+    // Show folders section (always visible to allow folder creation)
+    html += `
+        <div class="folders-section">
+            <div class="section-header">
+                <span>Folders</span>
+                <button class="create-folder-btn" onclick="createFolder()" title="Create new folder">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"/>
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="folders-list">
+    `;
         
         // Display folders
         chatFolders.forEach(folder => {
@@ -1237,7 +1326,6 @@ function updateHistoryDisplay() {
         });
         
         html += '</div></div>';
-    }
     
     // Get chats not in any folder
     const chatsInFolders = chatFolders.flatMap(folder => folder.chats);
@@ -1288,25 +1376,73 @@ function updateHistoryDisplay() {
 
 // Show move menu for chat
 function showMoveMenu(chatId) {
-    const moveOptions = ['Remove from folder', ...chatFolders.map(f => f.name)];
-    const choice = prompt(
-        `Move chat to:\n\n${moveOptions.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}\n\nEnter number:`,
-        ''
-    );
+    currentMovingChatId = chatId;
     
-    const choiceIndex = parseInt(choice) - 1;
-    if (choiceIndex >= 0 && choiceIndex < moveOptions.length) {
-        if (choiceIndex === 0) {
-            // Remove from folder
-            moveChatToFolder(chatId, null);
-        } else {
-            // Move to selected folder
-            const targetFolder = chatFolders[choiceIndex - 1];
-            if (targetFolder) {
-                moveChatToFolder(chatId, targetFolder.id);
-            }
-        }
+    // Create folder options
+    const folderOptions = document.getElementById('folderOptions');
+    folderOptions.innerHTML = '';
+    
+    // Add "Remove from folder" option
+    const removeOption = document.createElement('div');
+    removeOption.className = 'folder-option remove-option';
+    removeOption.innerHTML = `
+        <span class="folder-option-icon">🗂️</span>
+        <span class="folder-option-name">Remove from folder</span>
+    `;
+    removeOption.onclick = () => moveChatToFolderModal(null);
+    folderOptions.appendChild(removeOption);
+    
+    // Add existing folders
+    chatFolders.forEach(folder => {
+        const folderOption = document.createElement('div');
+        folderOption.className = 'folder-option';
+        folderOption.innerHTML = `
+            <span class="folder-option-icon">📁</span>
+            <span class="folder-option-name">${folder.name}</span>
+        `;
+        folderOption.onclick = () => moveChatToFolderModal(folder.id);
+        folderOptions.appendChild(folderOption);
+    });
+    
+    // Show modal
+    document.getElementById('moveChatModal').style.display = 'flex';
+}
+
+// Close move chat modal
+function closeMoveChat() {
+    document.getElementById('moveChatModal').style.display = 'none';
+    currentMovingChatId = null;
+}
+
+// Handle moving chat to folder from modal
+function moveChatToFolderModal(folderId) {
+    if (currentMovingChatId) {
+        moveChatToFolder(currentMovingChatId, folderId);
+        closeMoveChat();
     }
+}
+
+// Find the sidebar initialization and ensure folder button is always visible
+
+// Around line where sidebar is rendered, update to always show the add folder button
+function updateChatHistory() {
+    const chatHistoryContainer = document.querySelector('.chat-history-container');
+    if (!chatHistoryContainer) return;
+
+    const chats = Object.values(chatHistory).sort((a, b) => b.timestamp - a.timestamp);
+    
+    // Always show the add folder button, regardless of chat count
+    const addFolderButton = document.querySelector('.add-folder-btn');
+    if (addFolderButton) {
+        addFolderButton.style.display = 'block'; // Always visible
+    }
+
+    if (chats.length === 0) {
+        chatHistoryContainer.innerHTML = '<div class="no-chats">No chat history yet</div>';
+        return;
+    }
+
+    // Rest of the chat history rendering...
 }
 
 // Global variable to store the session API key
@@ -1322,7 +1458,7 @@ function promptForApiKey() {
         return true;
     }
     
-    const message = `🔑 Welcome to JayanshGPT!
+    const message = `🔑 Welcome to newGPT!
 
 To get started, you'll need an OpenAI API key:
 
@@ -1361,25 +1497,66 @@ Enter your OpenAI API key:`;
 }
 
 function clearSavedApiKey() {
-    if (confirm('🗑️ Are you sure you want to clear your saved API key?\n\nYou will need to enter it again on your next visit.')) {
-        localStorage.removeItem('chatgpt_api_key');
-        sessionApiKey = null;
-        updateApiKeyStatus(); // Update status display
-        alert('✅ Saved API key has been cleared. You will be prompted for a new key on next visit.');
-    }
+    closeSettingsModal(); // Close the settings modal first
+    showConfirmationModal(
+        '🗑️ Clear Saved API Key',
+        'Are you sure you want to clear your saved API key?\n\nYou will need to enter it again on your next visit.',
+        '🗑️',
+        function() {
+            localStorage.removeItem('chatgpt_api_key');
+            sessionApiKey = null;
+            updateApiKeyStatus();
+            closeConfirmationModal();
+            alert('✅ Saved API key has been cleared. You will be prompted for a new key on next visit.');
+        }
+    );
 }
 
 function updateApiKey() {
-    const newKey = prompt('🔑 Enter your new OpenAI API key:', sessionApiKey || '');
+    closeSettingsModal(); // Close the settings modal first
     
-    if (newKey && newKey.trim() !== '' && newKey !== sessionApiKey) {
-        sessionApiKey = newKey.trim();
-        
-        // Save the new key automatically
-        localStorage.setItem('chatgpt_api_key', sessionApiKey);
-        updateApiKeyStatus(); // Update status display
-        alert('✅ API key updated and saved successfully!');
+    // Show the API key modal
+    const modal = document.getElementById('apiKeyModal');
+    const input = document.getElementById('apiKeyInput');
+    
+    if (modal && input) {
+        // Pre-fill current API key if available
+        input.value = sessionApiKey || '';
+        modal.style.display = 'flex';
+        input.focus();
+        document.body.style.overflow = 'hidden';
     }
+}
+
+function closeApiKeyModal() {
+    const modal = document.getElementById('apiKeyModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+}
+
+function saveApiKey() {
+    const input = document.getElementById('apiKeyInput');
+    const newKey = input.value.trim();
+    
+    if (!newKey) {
+        alert('❌ Please enter an API key');
+        return;
+    }
+    
+    if (!newKey.startsWith('sk-')) {
+        if (!confirm('⚠️ The API key should start with "sk-". Are you sure this is correct?\n\nClick OK to continue anyway, or Cancel to re-enter.')) {
+            return;
+        }
+    }
+    
+    sessionApiKey = newKey;
+    localStorage.setItem('chatgpt_api_key', sessionApiKey);
+    updateApiKeyStatus();
+    
+    closeApiKeyModal();
+    alert('✅ API key updated and saved successfully!');
 }
 
 function getApiKey() {
@@ -1499,55 +1676,114 @@ function closeSidebar() {
 
 // Settings menu function
 function showSettingsMenu() {
-    const hasApiKey = sessionApiKey && sessionApiKey !== 'prompt-for-key';
     const isApiKeySaved = localStorage.getItem('chatgpt_api_key') !== null;
     
-    let options = [
-        '🔑 Update API Key',
-        '📊 View Token Usage',
-        '💰 Set Credit Balance'
-    ];
-    
-    if (isApiKeySaved) {
-        options.push('🗑️ Clear Saved API Key');
+    // Show/hide the clear API key option based on whether a key is saved
+    const clearApiKeyBtn = document.getElementById('clearApiKeyBtn');
+    if (clearApiKeyBtn) {
+        clearApiKeyBtn.style.display = isApiKeySaved ? 'flex' : 'none';
     }
     
-    options.push('❌ Cancel');
-    
-    const choice = prompt(
-        `⚙️ Settings Menu:\n\n${options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}\n\nChoose an option (1-${options.length}):`,
-        ''
-    );
-    
-    const choiceNum = parseInt(choice);
-    
-    if (choiceNum === 1) {
-        updateApiKey();
-    } else if (choiceNum === 2) {
-        showTokenUsageInfo();
-    } else if (choiceNum === 3) {
-        setCreditBalance();
-    } else if (choiceNum === 4 && isApiKeySaved) {
-        clearSavedApiKey();
+    // Show the modal
+    const modal = document.getElementById('settingsModal');
+    if (modal) {
+        console.log('Modal found, showing...'); // Debug log
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    } else {
+        console.error('Settings modal not found!'); // Debug log
     }
 }
 
+function closeSettingsModal() {
+    const modal = document.getElementById('settingsModal');
+    if (modal) {
+        console.log('Closing modal...'); // Debug log
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto'; // Restore scrolling
+    } else {
+        console.error('Modal not found when trying to close!'); // Debug log
+    }
+}
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        // Check for any open modal and close it
+        const modals = ['settingsModal', 'apiKeyModal', 'tokenUsageModal', 'creditBalanceModal', 'confirmationModal', 'renameFolderModal', 'moveChatModal'];
+        
+        for (const modalId of modals) {
+            const modal = document.getElementById(modalId);
+            if (modal && modal.style.display === 'flex') {
+                console.log(`Closing ${modalId} with Escape key`);
+                
+                // Call the appropriate close function
+                switch(modalId) {
+                    case 'settingsModal':
+                        closeSettingsModal();
+                        break;
+                    case 'apiKeyModal':
+                        closeApiKeyModal();
+                        break;
+                    case 'tokenUsageModal':
+                        closeTokenUsageModal();
+                        break;
+                    case 'creditBalanceModal':
+                        closeCreditBalanceModal();
+                        break;
+                    case 'confirmationModal':
+                        closeConfirmationModal();
+                        break;
+                    case 'renameFolderModal':
+                        closeRenameFolderModal();
+                        break;
+                    case 'moveChatModal':
+                        closeMoveChat();
+                        break;
+                }
+                break; // Only close the first open modal
+            }
+        }
+    }
+});
+
+// Also add a global shortcut to force close in case of issues (Ctrl+Shift+M)
+document.addEventListener('keydown', function(event) {
+    if (event.ctrlKey && event.shiftKey && event.key === 'M') {
+        console.log('Force closing modal with Ctrl+Shift+M'); // Debug log
+        const modal = document.getElementById('settingsModal');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+    }
+});
+
 function showTokenUsageInfo() {
-    const info = `📊 Token Usage Information:
-
-Current Chat:
-• Total: ${currentChatTokens.total.toLocaleString()} tokens
-• Input: ${currentChatTokens.prompt.toLocaleString()} tokens  
-• Output: ${currentChatTokens.completion.toLocaleString()} tokens
-• Requests: ${currentChatTokens.requests}
-
-Global Stats:
-• All Time: ${globalTokens.total.toLocaleString()} tokens
-• Total Chats: ${globalTokens.chats}
-
-💡 Tokens are used for both input and output. Longer conversations use more tokens.`;
+    closeSettingsModal(); // Close the settings modal first
     
-    alert(info);
+    // Update token display values
+    document.getElementById('currentChatTotal').textContent = currentChatTokens.total.toLocaleString();
+    document.getElementById('currentChatInput').textContent = currentChatTokens.prompt.toLocaleString();
+    document.getElementById('currentChatOutput').textContent = currentChatTokens.completion.toLocaleString();
+    document.getElementById('currentChatRequests').textContent = currentChatTokens.requests;
+    document.getElementById('globalTokenTotal').textContent = globalTokens.total.toLocaleString();
+    document.getElementById('globalChatCount').textContent = globalTokens.chats;
+    
+    // Show the token usage modal
+    const modal = document.getElementById('tokenUsageModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeTokenUsageModal() {
+    const modal = document.getElementById('tokenUsageModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
 }
 
 async function sendMessage() {
