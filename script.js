@@ -415,10 +415,6 @@ function updateCreditBalanceWithUsage(inputTokens, outputTokens, model) {
     
     // Current pricing per 1M tokens (July 2025 - from OpenAI API pricing page)
     const pricingPer1M = {
-        'o3-2025-04-16': {
-            input: 2.50,    // $2.50 per 1M input tokens (estimated for o3 model)
-            output: 10.00   // $10.00 per 1M output tokens (estimated for o3 model)
-        },
         'gpt-4.1-2025-04-14': {
             input: 2.00,    // $2.00 per 1M input tokens
             output: 8.00    // $8.00 per 1M output tokens
@@ -429,7 +425,7 @@ function updateCreditBalanceWithUsage(inputTokens, outputTokens, model) {
         }
     };
     
-    const pricing = pricingPer1M[model] || pricingPer1M['o3-2025-04-16'];
+    const pricing = pricingPer1M[model] || pricingPer1M['gpt-4.1-2025-04-14'];
     
     // Calculate separate costs for input and output tokens
     const inputCost = (inputTokens / 1000000) * pricing.input;
@@ -1672,7 +1668,6 @@ function updateInputPlaceholder(model) {
     
     const placeholders = {
         'gpt-image-1': 'Describe the image you want to generate... (or upload images to edit)',
-        'o3-2025-04-16': 'Message o3... (paste/drag multiple images, PDFs, or audio files)',
         'gpt-4.1-2025-04-14': 'Message GPT-4.1... (paste/drag multiple images, PDFs, or audio files)'
     };
     
@@ -1704,7 +1699,6 @@ function updateWelcomeMessage(model) {
     
     const messages = {
         'gpt-image-1': 'What image would you like me to create?',
-        'o3-2025-04-16': 'How can I help you reason through complex problems?',
         'gpt-4.1-2025-04-14': 'How can I assist you today?'
     };
     
@@ -1967,7 +1961,6 @@ function loadImageSettings() {
 
 function getModelDisplayName(model) {
     const names = {
-        'o3-2025-04-16': 'o3',
         'gpt-4.1-2025-04-14': 'GPT-4.1',
         'gpt-image-1': 'Image Gen'
     };
@@ -1976,7 +1969,6 @@ function getModelDisplayName(model) {
 
 function getModelTemperature(model) {
     const temperatures = {
-        'o3-2025-04-16': 1,
         'gpt-4.1-2025-04-14': 0.3,
         'gpt-image-1': 0.7
     };
@@ -1984,7 +1976,7 @@ function getModelTemperature(model) {
 }
 
 // Available models for cycling
-const availableModels = ['gpt-4.1-2025-04-14', 'o3-2025-04-16', 'gpt-image-1'];
+const availableModels = ['gpt-4.1-2025-04-14', 'gpt-image-1'];
 
 // Function to cycle to next model
 function cycleToNextModel() {
@@ -2150,8 +2142,8 @@ async function sendMessage() {
     }
 
     // Check if model supports vision when images are selected
-    if (selectedImages.length > 0 && !currentModel.includes('gpt-4') && !currentModel.includes('o3') && !currentModel.includes('gpt-image-1')) {
-        addMessage('⚠️ Image analysis requires vision-capable models. Please switch to GPT-4.1-2025-04-14, o3-2025-04-16, or gpt-image-1.', 'ai', 'error');
+    if (selectedImages.length > 0 && !currentModel.includes('gpt-4') && !currentModel.includes('gpt-image-1')) {
+        addMessage('⚠️ Image analysis requires vision-capable models. Please switch to GPT-4.1-2025-04-14 or gpt-image-1.', 'ai', 'error');
         return;
     }
 

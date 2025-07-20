@@ -46,7 +46,7 @@ The formatting assistant works by:
 
 - The formatting is applied automatically to all AI responses
 - Original content meaning is preserved - only formatting changes
-- Works with all supported AI models (GPT-4, o3, etc.)
+- Works with all supported AI models (GPT-4.1, Image Gen, etc.)
 - Enhances readability without changing functionality
 
 ### ✅ Ready to Use
