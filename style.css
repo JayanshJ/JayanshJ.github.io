@@ -280,7 +280,6 @@ body {
     font-size: 13px;
     padding: 32px 16px;
     font-style: italic;
-    opacity: 0.7;
 }
 
 /* Folder Styles */
@@ -1198,12 +1197,14 @@ body {
     left: 0;
     background-color: #2f2f2f;
     border: 1px solid #404040;
-    border-radius: 8px;
+    border-radius: 12px;
     display: none;
     z-index: 1000;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     min-width: 200px;
 }
+
+
 
 .model-dropdown-input.active {
     display: block;
@@ -1216,8 +1217,15 @@ body {
     transition: background-color 0.2s;
 }
 
+.model-option:first-child {
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
 .model-option:last-child {
     border-bottom: none;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
 }
 
 .model-option:hover {
@@ -1632,14 +1640,34 @@ body {
     
     .sidebar {
         position: fixed;
-        left: -320px;
+        left: -280px;
         z-index: 1000;
         height: 100%;
+        width: 280px;
         transition: transform 0.3s ease;
     }
     
     .sidebar.open {
-        transform: translateX(320px);
+        transform: translateX(280px);
+    }
+    
+    .sidebar-header {
+        padding: 20px 16px;
+    }
+    
+    .new-chat-btn {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+    
+    .history-item {
+        padding: 8px 12px;
+        margin: 2px 8px;
+    }
+    
+    .folder-header {
+        padding: 8px 12px;
+        margin: 2px 8px;
     }
     
     /* Add backdrop overlay */
@@ -1664,6 +1692,56 @@ body {
     .chat-header {
         display: flex;
         flex-shrink: 0;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 16px;
+        background-color: #1a1a1a;
+        border-bottom: 1px solid #2a2a2a;
+    }
+    
+    .chat-header .model-selector-input {
+        position: static;
+        margin: 0;
+        padding: 0;
+        border: none;
+        width: auto;
+        flex: 1;
+        display: flex;
+        justify-content: center;
+    }
+    
+    .chat-header .model-selector-btn {
+        background-color: #2f2f2f;
+        border: 1px solid #404040;
+        border-radius: 12px;
+        padding: 4px 12px;
+        font-size: 11px;
+        min-width: 120px;
+        max-width: 180px;
+    }
+    
+    .chat-header .model-dropdown-input {
+        position: fixed; /* Use fixed position for better mobile control */
+        top: 60px; /* Position below the header */
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #2f2f2f;
+        border: 1px solid #404040;
+        border-radius: 12px;
+        display: none;
+        z-index: 1001; /* Higher than other elements */
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        min-width: 200px;
+        max-width: calc(100vw - 40px); /* Ensure it fits on mobile with margin */
+        margin: 0 20px; /* Add horizontal margin for mobile */
+    }
+    
+    .chat-header .model-dropdown-input.active {
+        display: block;
+    }
+    
+    .chat-header .global-tokens {
+        display: none !important; /* Never show token/credit info in mobile header */
     }
     
     .global-tokens-sidebar {
@@ -1727,6 +1805,31 @@ body {
     
     .input-wrapper {
         border-radius: 20px;
+        gap: 8px;
+        padding: 12px 16px;
+    }
+    
+    .input-wrapper .model-selector-input {
+        display: none; /* Hide model selector from input area on mobile */
+    }
+    
+    #messageInput {
+        font-size: 16px; /* Prevent zoom on iOS */
+        width: 100%;
+        min-height: 20px;
+    }
+    
+    .input-actions {
+        gap: 2px;
+        flex-shrink: 0;
+    }
+    
+    .attach-btn,
+    .send-btn,
+    .voice-btn {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
     }
     
     .input-footer {

@@ -296,22 +296,19 @@ function updateGlobalTokenDisplay() {
     } else if (creditBalance.usageOnly && creditBalance.used > 0) {
         creditContent = `<div class="credit-balance" onclick="setCreditBalance()" style="cursor: pointer; color: #f59e0b;" title="Usage data only - click to set balance">$${creditBalance.used.toFixed(2)} used (set balance)</div>`;
     } else if (creditBalance.lastUpdated === null && !globalTokens.total) {
-        // Still loading on first run
+        // Still loading on first run - only show in sidebar, not in mobile header
         creditContent = `<div class="credit-balance" style="color: #f59e0b;">Checking balance... ⏳</div>`;
     } else {
         // Show manual entry option with helpful message
         creditContent = `<div class="credit-balance" onclick="setCreditBalance()" style="cursor: pointer; color: #10b981;" title="Click to set your credit balance manually">Click to set balance 💰</div>`;
     }
     
-    // For the main header (top right), show credit more prominently
+    // For the main header (mobile), hide token/credit display - available in settings
     if (globalElement) {
-        globalElement.innerHTML = `
-            ${creditContent}
-            ${tokenContent}
-        `;
+        globalElement.innerHTML = '';
     }
     
-    // For sidebar, keep the original order
+    // For sidebar, keep the original order with both tokens and credits
     if (globalSidebarElement) {
         globalSidebarElement.innerHTML = tokenContent + creditContent;
     }
@@ -1607,37 +1604,89 @@ function getConfig() {
 
 // Model switching functions
 function toggleModelSelector() {
-    const dropdown = document.getElementById('modelDropdown');
-    const button = document.querySelector('.model-selector-btn');
+    console.log('toggleModelSelector called');
     
-    if (dropdown) {
-        dropdown.classList.toggle('active');
-        if (button) {
-            button.classList.toggle('active');
+    // Simplified mobile detection
+    const isMobile = window.innerWidth <= 768;
+    
+    console.log('isMobile:', isMobile);
+    console.log('window.innerWidth:', window.innerWidth);
+    
+    if (isMobile) {
+        // Use header dropdown on mobile
+        const headerDropdown = document.getElementById('modelDropdownHeader');
+        const headerButton = document.querySelector('.chat-header .model-selector-btn');
+        
+        console.log('headerDropdown found:', !!headerDropdown);
+        console.log('headerButton found:', !!headerButton);
+        
+        if (headerDropdown && headerButton) {
+            const isActive = headerDropdown.classList.contains('active');
+            
+            if (isActive) {
+                headerDropdown.classList.remove('active');
+                headerButton.classList.remove('active');
+                console.log('Mobile header dropdown closed');
+            } else {
+                headerDropdown.classList.add('active');
+                headerButton.classList.add('active');
+                console.log('Mobile header dropdown opened');
+            }
+        } else {
+            console.error('Mobile header dropdown elements not found');
+            console.log('Available elements with modelDropdownHeader:', document.getElementById('modelDropdownHeader'));
+            console.log('Available buttons:', document.querySelectorAll('.model-selector-btn'));
         }
-        console.log('Dropdown toggled, active:', dropdown.classList.contains('active'));
     } else {
-        console.error('Model dropdown not found');
+        // Use input dropdown on desktop
+        const inputDropdown = document.getElementById('modelDropdown');
+        const inputButton = document.querySelector('.input-wrapper .model-selector-btn');
+        
+        if (inputDropdown && inputButton) {
+            inputDropdown.classList.toggle('active');
+            inputButton.classList.toggle('active');
+            console.log('Desktop input dropdown toggled, active:', inputDropdown.classList.contains('active'));
+        } else {
+            console.error('Desktop input dropdown elements not found');
+        }
     }
 }
 
 function selectModel(model) {
     currentModel = model;
-    const currentModelElement = document.getElementById('currentModel');
-    if (currentModelElement) {
-        currentModelElement.textContent = getModelDisplayName(model);
+    const displayName = getModelDisplayName(model);
+    
+    // Update both header and input model displays
+    const currentModelHeader = document.getElementById('currentModelHeader');
+    const currentModelInput = document.getElementById('currentModel');
+    
+    if (currentModelHeader) {
+        currentModelHeader.textContent = displayName;
+    }
+    if (currentModelInput) {
+        currentModelInput.textContent = displayName;
     }
     
-    const dropdown = document.getElementById('modelDropdown');
-    const button = document.querySelector('.model-selector-btn');
-    if (dropdown) {
-        dropdown.classList.remove('active');
+    // Close both dropdowns
+    const headerDropdown = document.getElementById('modelDropdownHeader');
+    const inputDropdown = document.getElementById('modelDropdown');
+    const headerButton = document.querySelector('.chat-header .model-selector-btn');
+    const inputButton = document.querySelector('.input-wrapper .model-selector-btn');
+    
+    if (headerDropdown) {
+        headerDropdown.classList.remove('active');
     }
-    if (button) {
-        button.classList.remove('active');
+    if (inputDropdown) {
+        inputDropdown.classList.remove('active');
+    }
+    if (headerButton) {
+        headerButton.classList.remove('active');
+    }
+    if (inputButton) {
+        inputButton.classList.remove('active');
     }
     
-    // Update selected state
+    // Update selected state for all model options
     document.querySelectorAll('.model-option').forEach(option => {
         option.classList.remove('selected');
         if (option.dataset.model === model) {
@@ -2823,18 +2872,74 @@ document.addEventListener('DOMContentLoaded', function() {
                 selectModel(model);
             });
         });
+        
+        // Add touch event listeners for mobile model selector buttons
+        const headerButton = document.querySelector('.chat-header .model-selector-btn');
+        const inputButton = document.querySelector('.input-wrapper .model-selector-btn');
+        
+        if (headerButton) {
+            headerButton.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Header button touched');
+                toggleModelSelector();
+            });
+        }
+        
+        if (inputButton) {
+            inputButton.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Input button touched');
+                toggleModelSelector();
+            });
+        }
     }, 100);
 
     // Close model dropdown when clicking outside
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.model-selector-input')) {
-            const dropdown = document.getElementById('modelDropdown');
-            const button = document.querySelector('.model-selector-btn');
-            if (dropdown) {
-                dropdown.classList.remove('active');
+            // Close both dropdowns
+            const headerDropdown = document.getElementById('modelDropdownHeader');
+            const inputDropdown = document.getElementById('modelDropdown');
+            const headerButton = document.querySelector('.chat-header .model-selector-btn');
+            const inputButton = document.querySelector('.input-wrapper .model-selector-btn');
+            
+            if (headerDropdown) {
+                headerDropdown.classList.remove('active');
             }
-            if (button) {
-                button.classList.remove('active');
+            if (inputDropdown) {
+                inputDropdown.classList.remove('active');
+            }
+            if (headerButton) {
+                headerButton.classList.remove('active');
+            }
+            if (inputButton) {
+                inputButton.classList.remove('active');
+            }
+        }
+    });
+
+    // Also handle touch events for mobile
+    document.addEventListener('touchend', (e) => {
+        if (!e.target.closest('.model-selector-input')) {
+            // Close both dropdowns
+            const headerDropdown = document.getElementById('modelDropdownHeader');
+            const inputDropdown = document.getElementById('modelDropdown');
+            const headerButton = document.querySelector('.chat-header .model-selector-btn');
+            const inputButton = document.querySelector('.input-wrapper .model-selector-btn');
+            
+            if (headerDropdown) {
+                headerDropdown.classList.remove('active');
+            }
+            if (inputDropdown) {
+                inputDropdown.classList.remove('active');
+            }
+            if (headerButton) {
+                headerButton.classList.remove('active');
+            }
+            if (inputButton) {
+                inputButton.classList.remove('active');
             }
         }
     });
