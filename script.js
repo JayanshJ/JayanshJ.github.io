@@ -1613,30 +1613,9 @@ function toggleModelSelector() {
     console.log('window.innerWidth:', window.innerWidth);
     
     if (isMobile) {
-        // Use header dropdown on mobile
-        const headerDropdown = document.getElementById('modelDropdownHeader');
-        const headerButton = document.querySelector('.chat-header .model-selector-btn');
-        
-        console.log('headerDropdown found:', !!headerDropdown);
-        console.log('headerButton found:', !!headerButton);
-        
-        if (headerDropdown && headerButton) {
-            const isActive = headerDropdown.classList.contains('active');
-            
-            if (isActive) {
-                headerDropdown.classList.remove('active');
-                headerButton.classList.remove('active');
-                console.log('Mobile header dropdown closed');
-            } else {
-                headerDropdown.classList.add('active');
-                headerButton.classList.add('active');
-                console.log('Mobile header dropdown opened');
-            }
-        } else {
-            console.error('Mobile header dropdown elements not found');
-            console.log('Available elements with modelDropdownHeader:', document.getElementById('modelDropdownHeader'));
-            console.log('Available buttons:', document.querySelectorAll('.model-selector-btn'));
-        }
+        // On mobile, tap to cycle through models instead of showing dropdown
+        console.log('Mobile tap-to-switch: cycling to next model');
+        cycleToNextModel();
     } else {
         // Use input dropdown on desktop
         const inputDropdown = document.getElementById('modelDropdown');
@@ -1656,13 +1635,21 @@ function selectModel(model) {
     currentModel = model;
     const displayName = getModelDisplayName(model);
     
-    // Update both header and input model displays
+    // Update both header and input model displays with animation
     const currentModelHeader = document.getElementById('currentModelHeader');
     const currentModelInput = document.getElementById('currentModel');
+    const headerButton = document.querySelector('.chat-header .model-selector-btn');
+    const inputButton = document.querySelector('.input-wrapper .model-selector-btn');
     
-    if (currentModelHeader) {
-        currentModelHeader.textContent = displayName;
+    // Add animation class and animate the change
+    if (currentModelHeader && headerButton) {
+        headerButton.classList.add('changing');
+        setTimeout(() => {
+            currentModelHeader.textContent = displayName;
+            headerButton.classList.remove('changing');
+        }, 150);
     }
+    
     if (currentModelInput) {
         currentModelInput.textContent = displayName;
     }
@@ -1670,8 +1657,6 @@ function selectModel(model) {
     // Close both dropdowns
     const headerDropdown = document.getElementById('modelDropdownHeader');
     const inputDropdown = document.getElementById('modelDropdown');
-    const headerButton = document.querySelector('.chat-header .model-selector-btn');
-    const inputButton = document.querySelector('.input-wrapper .model-selector-btn');
     
     if (headerDropdown) {
         headerDropdown.classList.remove('active');
@@ -1699,8 +1684,8 @@ function selectModel(model) {
 
 function getModelDisplayName(model) {
     const names = {
-        'o3-2025-04-16': 'o3-2025-04-16',
-        'gpt-4.1-2025-04-14': 'GPT-4.1-2025-04-14'
+        'o3-2025-04-16': 'o3',
+        'gpt-4.1-2025-04-14': 'GPT-4.1'
     };
     return names[model] || model;
 }
@@ -1711,6 +1696,17 @@ function getModelTemperature(model) {
         'gpt-4.1-2025-04-14': 0.1
     };
     return temperatures[model] || 0.7; // Default fallback
+}
+
+// Available models for cycling
+const availableModels = ['gpt-4.1-2025-04-14', 'o3-2025-04-16'];
+
+// Function to cycle to next model
+function cycleToNextModel() {
+    const currentIndex = availableModels.indexOf(currentModel);
+    const nextIndex = (currentIndex + 1) % availableModels.length;
+    const nextModel = availableModels[nextIndex];
+    selectModel(nextModel);
 }
 
 // Sidebar functions
@@ -2176,7 +2172,6 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
     } else if (type === 'typing') {
         messageDiv.className = 'message ai-message typing-message';
         messageDiv.innerHTML = `
-            <div class="message-avatar">🤖</div>
             <div class="message-content">
                 <div class="typing-dots">
                     <span></span>
@@ -2186,7 +2181,6 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
             </div>
         `;
     } else {
-        const avatar = sender === 'user' ? '�‍💻' : '🤖';
         let contentHtml = '';
         
         if (image) {
@@ -2223,7 +2217,6 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
         }
         
         messageDiv.innerHTML = `
-            <div class="message-avatar">${avatar}</div>
             <div class="message-content">${contentHtml}</div>
         `;
     }
