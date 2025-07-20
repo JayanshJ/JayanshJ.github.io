@@ -1666,7 +1666,7 @@ function getModelDisplayName(model) {
 function getModelTemperature(model) {
     const temperatures = {
         'o3-2025-04-16': 1,
-        'gpt-4.1-2025-04-14': 0.1
+        'gpt-4.1-2025-04-14': 0.3
     };
     return temperatures[model] || 0.7; // Default fallback
 }
