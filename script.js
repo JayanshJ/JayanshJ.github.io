@@ -1462,42 +1462,9 @@ function promptForApiKey() {
         return true;
     }
     
-    const message = `🔑 Welcome to newGPT!
-
-To get started, you'll need an OpenAI API key:
-
-1. Go to: https://platform.openai.com/api-keys
-2. Create a new API key
-3. Copy and paste it below
-
-Your API key will be saved securely in your browser for future visits.
-
-Enter your OpenAI API key:`;
-    
-    const apiKey = prompt(message, '');
-    
-    if (!apiKey || apiKey.trim() === '') {
-        alert('❌ API key is required to use this app. Please refresh and try again.');
-        return false;
-    }
-    
-    if (!apiKey.startsWith('sk-')) {
-        const confirm = window.confirm('⚠️ The API key should start with "sk-". Are you sure this is correct?\n\nClick OK to continue anyway, or Cancel to re-enter.');
-        if (!confirm) {
-            return promptForApiKey(); // Try again
-        }
-    }
-    
-    sessionApiKey = apiKey.trim();
-    
-    // Save the key by default for convenience
-    localStorage.setItem('chatgpt_api_key', sessionApiKey);
-    console.log('💾 API key saved to localStorage for future visits');
-    
-    // Show confirmation
-    alert('✅ API key saved! You won\'t need to enter it again on future visits.\n\n💡 You can update or clear your saved key anytime using the Settings button (⚙️).');
-    
-    return true;
+    // No API key found - user can set it in settings
+    console.log('ℹ️ No API key found. User can set it in Settings.');
+    return false;
 }
 
 function clearSavedApiKey() {
@@ -1558,6 +1525,12 @@ function saveApiKey() {
     sessionApiKey = newKey;
     localStorage.setItem('chatgpt_api_key', sessionApiKey);
     updateApiKeyStatus();
+    
+    // Refresh the welcome screen if it's showing the no-API-key message
+    const welcomeScreen = document.querySelector('.welcome-screen');
+    if (welcomeScreen && welcomeScreen.innerHTML.includes('add your OpenAI API key')) {
+        location.reload(); // Simple reload to reset the app with the new API key
+    }
     
     closeApiKeyModal();
     alert('✅ API key updated and saved successfully!');
@@ -2789,12 +2762,49 @@ document.addEventListener('DOMContentLoaded', function() {
     const messageInput = document.getElementById('messageInput');
     const mainContent = document.querySelector('.main-content');
 
-    // Initialize API key first
-    if (!promptForApiKey()) {
-        // If no API key provided, disable the app
-        if (messageInput) messageInput.disabled = true;
-        return;
+    // Check for API key
+    const hasApiKey = promptForApiKey();
+    
+    // Always initialize the app, but show a message if no API key
+    initializeApp();
+    
+    if (!hasApiKey) {
+        // Show a helpful message in the welcome screen
+        updateWelcomeScreenForNoApiKey();
     }
+});
+
+function updateWelcomeScreenForNoApiKey() {
+    const welcomeScreen = document.querySelector('.welcome-screen');
+    if (welcomeScreen) {
+        welcomeScreen.innerHTML = `
+            <div class="welcome-icon">🔑</div>
+            <h2>Welcome to newGPT!</h2>
+            <p style="color: #8e8ea0; margin: 16px 0; font-size: 16px;">
+                To get started, please add your OpenAI API key in the Settings.
+            </p>
+            <button onclick="showSettingsMenu()" style="
+                background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+                border: none;
+                border-radius: 8px;
+                color: white;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                margin-top: 8px;
+            " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                ⚙️ Open Settings
+            </button>
+        `;
+    }
+}
+
+function initializeApp() {
+    const fileInput = document.getElementById('fileInput');
+    const messageInput = document.getElementById('messageInput');
+    const mainContent = document.querySelector('.main-content');
     
     // Update UI to show API key status
     updateApiKeyStatus();
@@ -2816,21 +2826,6 @@ document.addEventListener('DOMContentLoaded', function() {
         messageInput.disabled = false;
         messageInput.value = '';
         console.log('Message input initialized');
-        
-        // Test that the input is clickable and focusable
-        messageInput.addEventListener('click', function() {
-            console.log('Input clicked successfully');
-        });
-        
-        messageInput.addEventListener('focus', function() {
-            console.log('Input focused successfully');
-        });
-        
-        // Try to focus the input
-        setTimeout(() => {
-            messageInput.focus();
-            console.log('Focus attempted');
-        }, 100);
     } else {
         console.error('Message input element not found!');
     }
@@ -2865,28 +2860,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 selectModel(model);
             });
         });
-        
-        // Add touch event listeners for mobile model selector buttons
-        const headerButton = document.querySelector('.chat-header .model-selector-btn');
-        const inputButton = document.querySelector('.input-wrapper .model-selector-btn');
-        
-        if (headerButton) {
-            headerButton.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('Header button touched');
-                toggleModelSelector();
-            });
-        }
-        
-        if (inputButton) {
-            inputButton.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('Input button touched');
-                toggleModelSelector();
-            });
-        }
     }, 100);
 
     // Close model dropdown when clicking outside
@@ -2898,42 +2871,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const headerButton = document.querySelector('.chat-header .model-selector-btn');
             const inputButton = document.querySelector('.input-wrapper .model-selector-btn');
             
-            if (headerDropdown) {
-                headerDropdown.classList.remove('active');
-            }
-            if (inputDropdown) {
-                inputDropdown.classList.remove('active');
-            }
-            if (headerButton) {
-                headerButton.classList.remove('active');
-            }
-            if (inputButton) {
-                inputButton.classList.remove('active');
-            }
-        }
-    });
-
-    // Also handle touch events for mobile
-    document.addEventListener('touchend', (e) => {
-        if (!e.target.closest('.model-selector-input')) {
-            // Close both dropdowns
-            const headerDropdown = document.getElementById('modelDropdownHeader');
-            const inputDropdown = document.getElementById('modelDropdown');
-            const headerButton = document.querySelector('.chat-header .model-selector-btn');
-            const inputButton = document.querySelector('.input-wrapper .model-selector-btn');
-            
-            if (headerDropdown) {
-                headerDropdown.classList.remove('active');
-            }
-            if (inputDropdown) {
-                inputDropdown.classList.remove('active');
-            }
-            if (headerButton) {
-                headerButton.classList.remove('active');
-            }
-            if (inputButton) {
-                inputButton.classList.remove('active');
-            }
+            if (headerDropdown) headerDropdown.classList.remove('active');
+            if (inputDropdown) inputDropdown.classList.remove('active');
+            if (headerButton) headerButton.classList.remove('active');
+            if (inputButton) inputButton.classList.remove('active');
         }
     });
 
@@ -2964,28 +2905,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Auto-save current chat when page is about to unload
     window.addEventListener('beforeunload', () => {
-        // Stop any ongoing recording
-        if (isRecording) {
-            stopRecording();
-        }
-        
-        if (conversationHistory.length > 0) {
-            saveCurrentChat();
-        }
+        if (isRecording) stopRecording();
+        if (conversationHistory.length > 0) saveCurrentChat();
     });
 
     // Close sidebar on ESC key
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            closeSidebar();
-        }
+        if (e.key === 'Escape') closeSidebar();
     });
 
     // Close sidebar when resizing to desktop
     window.addEventListener('resize', () => {
-        if (window.innerWidth > 768) {
-            closeSidebar();
-        }
+        if (window.innerWidth > 768) closeSidebar();
     });
 
     // Close sidebar when clicking on main content on mobile
@@ -2999,4 +2930,4 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-});
+}
