@@ -787,6 +787,20 @@ body {
     width: fit-content;
 }
 
+.quoted-context {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-left: 3px solid rgba(255, 255, 255, 0.2);
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    font-size: 14px;
+    color: rgba(236, 239, 241, 0.8);
+    font-style: italic;
+    max-width: 100%;
+    word-wrap: break-word;
+    overflow: hidden;
+}
+
 .message-text {
     color: #ececf1;
     word-wrap: break-word;

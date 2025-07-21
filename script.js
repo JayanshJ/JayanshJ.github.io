@@ -2624,7 +2624,33 @@ async function sendMessage() {
         return;
     }
     
-    const message = input.value.trim();
+    let message = input.value.trim();
+    let displayMessage = message; // What to show in the chat
+    let hasSelectedContext = false;
+    
+    // If there's a selected text context, combine it with the user's input
+    if (selectedTextContext) {
+        console.log('Found selectedTextContext:', selectedTextContext);
+        const userPrompt = message || '';
+        const combinedMessage = selectedTextContext.prefix + selectedTextContext.text;
+        hasSelectedContext = true;
+        
+        // If user added additional context, append it
+        if (userPrompt) {
+            message = combinedMessage + '\n\nAdditional context: ' + userPrompt;
+            // Create a formatted display message with quoted context
+            displayMessage = `<div class="quoted-context">${selectedTextContext.text}</div>${userPrompt}`;
+        } else {
+            message = combinedMessage;
+            // Show only the selected text as quoted context
+            displayMessage = `<div class="quoted-context">${selectedTextContext.text}</div>`;
+        }
+        
+        console.log('Combined message:', message);
+        console.log('Display message:', displayMessage);
+    } else {
+        console.log('No selectedTextContext found');
+    }
 
     if (!message && selectedImages.length === 0 && selectedFiles.length === 0) return;
 
@@ -2668,9 +2694,8 @@ async function sendMessage() {
     input.disabled = true;
     sendButton.disabled = true;
 
-    // Display user message with files if selected
-    let displayMessage = message;
-    if (!message && (selectedImages.length > 0 || selectedFiles.length > 0)) {
+    // Update display message for files if no display message
+    if (!displayMessage && (selectedImages.length > 0 || selectedFiles.length > 0)) {
         const hasImages = selectedImages.length > 0;
         const hasPDFs = selectedFiles.some(f => !f.isAudio);
         const hasAudio = selectedFiles.some(f => f.isAudio);
@@ -2694,6 +2719,9 @@ async function sendMessage() {
     addMessage(displayMessage, 'user', 'normal', firstImage, firstFile);
     input.value = '';
     input.style.height = 'auto';
+    
+    // Only hide the UI, don't clear the context yet
+    hideSelectionPreviewUI();
 
     // Handle audio file transcription - process all audio files
     const audioFiles = selectedFiles.filter(f => f.isAudio);
@@ -2955,6 +2983,12 @@ async function sendMessage() {
         input.disabled = false;
         sendButton.disabled = false;
         input.focus();
+        
+        // Clear selected text context in all cases (success or error)
+        if (selectedTextContext) {
+            console.log('Clearing selectedTextContext in finally block');
+            selectedTextContext = null;
+        }
     }
 }
 
@@ -3013,8 +3047,13 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
         }
         
         if (text) {
-            const processedText = processMessageText(text);
-            contentHtml += `<div class="message-text">${processedText}</div>`;
+            // Check if text contains quoted context HTML - if so, use as-is, otherwise process
+            if (text.includes('<div class="quoted-context">')) {
+                contentHtml += `<div class="message-text">${text}</div>`;
+            } else {
+                const processedText = processMessageText(text);
+                contentHtml += `<div class="message-text">${processedText}</div>`;
+            }
         }
         
 
@@ -3119,6 +3158,285 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
     
     return messageId;
+}
+
+// Text Selection Tooltip Feature
+let selectionTooltip = null;
+let selectionTimeout = null;
+let selectedTextContext = null; // Store selected text context
+let previewBubble = null;
+
+// Initialize text selection listener
+document.addEventListener('DOMContentLoaded', function() {
+    initializeSelectionTooltip();
+});
+
+function initializeSelectionTooltip() {
+    document.addEventListener('mouseup', handleTextSelection);
+    document.addEventListener('touchend', handleTextSelection);
+    document.addEventListener('scroll', hideSelectionTooltip);
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.selection-tooltip')) {
+            hideSelectionTooltip();
+        }
+    });
+}
+
+
+function handleTextSelection(e) {
+    // Small delay to ensure selection is stable
+    setTimeout(() => {
+        const selection = window.getSelection();
+        const selectedText = selection.toString().trim();
+        
+        if (selectedText.length > 0) {
+            showSelectionTooltip(selection);
+        } else {
+            hideSelectionTooltip();
+        }
+    }, 50);
+}
+
+function showSelectionTooltip(selection) {
+    const selectedText = selection.toString().trim();
+    if (selectedText.length < 3) return; // Don't show for very short selections
+    
+    hideSelectionTooltip(); // Remove any existing tooltip
+    
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    
+    // Create tooltip element
+    selectionTooltip = document.createElement('div');
+    selectionTooltip.className = 'selection-tooltip';
+    selectionTooltip.innerHTML = `
+        <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; margin-right: 6px;">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        Ask ChatGPT
+    `;
+    
+    // Style the tooltip
+    selectionTooltip.style.cssText = `
+        position: fixed;
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+        z-index: 1000;
+        opacity: 0;
+        transform: scale(0.9);
+        transition: all 0.2s ease;
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+        user-select: none;
+    `;
+    
+    // Position tooltip
+    const isMobile = window.innerWidth <= 768;
+    let tooltipX, tooltipY;
+    
+    if (isMobile) {
+        // Position below selection on mobile
+        tooltipX = Math.max(10, Math.min(window.innerWidth - 150, rect.left + rect.width / 2 - 75));
+        tooltipY = rect.bottom + 10;
+    } else {
+        // Position above selection on desktop
+        tooltipX = Math.max(10, Math.min(window.innerWidth - 150, rect.left + rect.width / 2 - 75));
+        tooltipY = rect.top - 45;
+        
+        // If tooltip would be above viewport, position below
+        if (tooltipY < 10) {
+            tooltipY = rect.bottom + 10;
+        }
+    }
+    
+    selectionTooltip.style.left = tooltipX + 'px';
+    selectionTooltip.style.top = tooltipY + 'px';
+    
+    // Add click handler
+    selectionTooltip.addEventListener('click', () => {
+        askAboutSelection(selectedText);
+        hideSelectionTooltip();
+    });
+    
+    // Add to DOM and animate in
+    document.body.appendChild(selectionTooltip);
+    
+    // Trigger animation
+    setTimeout(() => {
+        selectionTooltip.style.opacity = '1';
+        selectionTooltip.style.transform = 'scale(1)';
+    }, 10);
+}
+
+function hideSelectionTooltip() {
+    clearTimeout(selectionTimeout);
+    if (selectionTooltip) {
+        selectionTooltip.style.opacity = '0';
+        selectionTooltip.style.transform = 'scale(0.9)';
+        setTimeout(() => {
+            if (selectionTooltip && selectionTooltip.parentNode) {
+                selectionTooltip.parentNode.removeChild(selectionTooltip);
+            }
+            selectionTooltip = null;
+        }, 200);
+    }
+}
+
+function askAboutSelection(selectedText) {
+    // Clear current selection
+    window.getSelection().removeAllRanges();
+    
+    // Determine appropriate prefix based on text length and content
+    let prefix = 'Explain this: ';
+    if (selectedText.length > 200) {
+        prefix = 'Summarize this: ';
+    } else if (selectedText.includes('?')) {
+        prefix = 'Help me understand this: ';
+    } else if (selectedText.match(/^\d+[\d\s\+\-\*\/\(\)\.]*$/)) {
+        prefix = 'Calculate this: ';
+    }
+    
+    // Store the selected text context
+    selectedTextContext = {
+        text: selectedText,
+        prefix: prefix
+    };
+    
+    console.log('Set selectedTextContext:', selectedTextContext);
+    
+    // Show preview bubble
+    showSelectionPreview(selectedText, prefix);
+    
+    // Focus on input area
+    const messageInput = document.getElementById('messageInput');
+    if (messageInput) {
+        messageInput.focus();
+        messageInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+function showSelectionPreview(selectedText, prefix) {
+    // Remove any existing preview UI only (don't clear context)
+    hideSelectionPreviewUI();
+    
+    // Create preview bubble
+    previewBubble = document.createElement('div');
+    previewBubble.className = 'selection-preview-bubble';
+    
+    // Truncate text if too long for display
+    let displayText = selectedText;
+    if (displayText.length > 100) {
+        displayText = displayText.substring(0, 100) + '...';
+    }
+    
+    previewBubble.innerHTML = `
+        <div class="preview-content">
+            <div class="preview-prefix">${prefix}</div>
+            <div class="preview-text">"${displayText}"</div>
+        </div>
+        <button class="preview-remove-btn" onclick="hideSelectionPreview()" aria-label="Remove selected text">
+            <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2;">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    `;
+    
+    // Style the preview bubble
+    previewBubble.style.cssText = `
+        position: relative;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        line-height: 1.4;
+        opacity: 0;
+        transform: translateY(-10px);
+        transition: all 0.2s ease;
+    `;
+    
+    // Style the content
+    const style = document.createElement('style');
+    style.textContent = `
+        .preview-content {
+            flex: 1;
+            margin-right: 8px;
+        }
+        .preview-prefix {
+            font-weight: 600;
+            color: #3b82f6;
+            margin-bottom: 4px;
+        }
+        .preview-text {
+            color: #6b7280;
+            font-style: italic;
+            word-break: break-word;
+        }
+        .preview-remove-btn {
+            background: none;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+        .preview-remove-btn:hover {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Insert before the input wrapper
+    const inputContainer = document.querySelector('.input-container');
+    if (inputContainer) {
+        inputContainer.insertBefore(previewBubble, inputContainer.firstChild);
+        
+        // Animate in
+        setTimeout(() => {
+            previewBubble.style.opacity = '1';
+            previewBubble.style.transform = 'translateY(0)';
+        }, 10);
+    }
+}
+
+function hideSelectionPreviewUI() {
+    // Only hide the UI, don't clear the context
+    if (previewBubble) {
+        previewBubble.style.opacity = '0';
+        previewBubble.style.transform = 'translateY(-10px)';
+        setTimeout(() => {
+            if (previewBubble && previewBubble.parentNode) {
+                previewBubble.parentNode.removeChild(previewBubble);
+            }
+            previewBubble = null;
+        }, 200);
+    }
+}
+
+function hideSelectionPreview() {
+    console.log('Clearing selectedTextContext');
+    selectedTextContext = null;
+    hideSelectionPreviewUI();
 }
 
 // Add Copy and Rewrite buttons to AI messages
