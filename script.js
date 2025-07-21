@@ -1458,34 +1458,43 @@ function updateChatUrl(chatId) {
 
 function getChatIdFromUrl() {
     const hash = window.location.hash;
+    console.log('Current URL hash:', hash);
     if (hash.startsWith('#chat/')) {
-        return hash.substring(6); // Remove '#chat/' prefix
+        const chatId = hash.substring(6); // Remove '#chat/' prefix
+        console.log('Extracted chat ID:', chatId);
+        return chatId;
     }
+    console.log('No chat ID found in URL');
     return null;
 }
 
 function handleUrlChange() {
     const urlChatId = getChatIdFromUrl();
+    console.log('URL change detected. URL chat ID:', urlChatId, 'Current chat ID:', currentChatId);
     
     if (urlChatId && urlChatId !== currentChatId) {
+        console.log('Loading chat from URL');
         // Load the chat from URL
         loadChatFromId(urlChatId);
     } else if (!urlChatId && currentChatId) {
+        console.log('Starting new chat from URL');
         // URL shows no chat but we have a current chat - start new chat
         startNewChat();
     }
 }
 
 function loadChatFromId(chatId) {
-    const chatHistory = getChatHistory();
+    console.log('Loading chat from ID:', chatId);
+    console.log('Available chats:', chatHistory.length);
     const chat = chatHistory.find(c => c.id === chatId);
     
     if (chat) {
+        console.log('Found chat:', chat.title);
         // Load the found chat using existing loadChat function
         loadChat(chatId);
     } else {
         // Chat not found, start new chat and update URL
-        console.warn(`Chat with ID ${chatId} not found`);
+        console.warn(`Chat with ID ${chatId} not found in ${chatHistory.length} chats`);
         startNewChat();
     }
 }
@@ -4302,8 +4311,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // Always initialize the app, but show a message if no API key
     initializeApp();
     
-    // Initialize URL routing
-    initializeUrlRouting();
+    // Initialize URL routing after app is loaded
+    setTimeout(() => {
+        initializeUrlRouting();
+    }, 50);
+    
+    // Also try immediate URL check after a longer delay
+    setTimeout(() => {
+        const urlChatId = getChatIdFromUrl();
+        if (urlChatId && !currentChatId) {
+            console.log('Fallback: attempting to load chat from URL');
+            handleUrlChange();
+        }
+    }, 500);
     
     if (!hasApiKey) {
         // Show a helpful message in the welcome screen
@@ -4313,6 +4333,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Initialize URL routing
 function initializeUrlRouting() {
+    console.log('Initializing URL routing');
+    
     // Handle browser back/forward navigation
     window.addEventListener('popstate', function(event) {
         handleUrlChange();
@@ -4320,13 +4342,27 @@ function initializeUrlRouting() {
     
     // Check URL on page load
     const urlChatId = getChatIdFromUrl();
+    console.log('URL on page load:', window.location.href, 'Chat ID:', urlChatId);
+    
     if (urlChatId) {
-        // Load chat from URL after a brief delay to ensure everything is initialized
+        // Load chat from URL after ensuring chat history is loaded
         setTimeout(() => {
+            console.log('Attempting to load chat from URL after delay');
             handleUrlChange();
-        }, 100);
+        }, 200);
     }
 }
+
+// Debug function - you can call this in console to test
+window.testUrlRouting = function() {
+    console.log('=== URL Routing Debug ===');
+    console.log('Current URL:', window.location.href);
+    console.log('Hash:', window.location.hash);
+    console.log('Chat ID from URL:', getChatIdFromUrl());
+    console.log('Current chat ID:', currentChatId);
+    console.log('Chat history length:', chatHistory.length);
+    console.log('Available chat IDs:', chatHistory.map(c => c.id));
+};
 
 function updateWelcomeScreenForNoApiKey() {
     const welcomeScreen = document.querySelector('.welcome-screen');
