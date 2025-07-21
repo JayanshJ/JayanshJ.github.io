@@ -32,7 +32,7 @@ function buildMessagesWithSystem(conversationHistory) {
 let conversationHistory = [];
 let selectedImages = []; // Support multiple images
 let selectedFiles = []; // Support multiple files
-let currentModel = 'chatgpt-4o-latest';
+let currentModel = 'gpt-4.1-2025-04-14';
 let currentChatId = null;
 let chatHistory = [];
 let chatFolders = [];
@@ -2966,6 +2966,7 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
     messageDiv.id = messageId;
     messageDiv.className = `message ${sender}-message`;
     
+    
     if (type === 'error') {
         messageDiv.className = 'error-message';
         messageDiv.innerHTML = `<div class="message-text">${text}</div>`;
@@ -3016,12 +3017,96 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
             contentHtml += `<div class="message-text">${processedText}</div>`;
         }
         
+
         messageDiv.innerHTML = `
-            <div class="message-content">${contentHtml}</div>
+            <div class="message-content" style="overflow: visible !important;">${contentHtml}</div>
         `;
+        
+        // Store the message text for the copy function
+        if (sender === 'ai' && type === 'normal' && text) {
+            messageDiv.dataset.messageText = text;
+        }
     }
     
     messagesContainer.appendChild(messageDiv);
+    
+    // Add buttons as separate element for AI messages
+    if (sender === 'ai' && type === 'normal' && text) {
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'ai-message-buttons';
+        buttonsDiv.style.cssText = `
+            display: flex !important;
+            gap: 8px !important;
+            margin: 8px auto 16px auto !important;
+            padding: 0 24px !important;
+            max-width: 48rem !important;
+            background: transparent !important;
+            border: none !important;
+            justify-content: flex-start !important;
+            align-items: center !important;
+        `;
+        
+        const copyBtn = document.createElement('button');
+        copyBtn.style.cssText = `
+            display: flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+            padding: 6px 12px !important;
+            background-color: rgba(34, 197, 94, 0.15) !important;
+            border: 1px solid rgba(34, 197, 94, 0.5) !important;
+            border-radius: 8px !important;
+            color: #22c55e !important;
+            font-size: 12px !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+        `;
+        copyBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2;">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="m5 15-2-2v-6a2 2 0 0 1 2-2h6l2 2"></path>
+            </svg>
+            Copy
+        `;
+        copyBtn.setAttribute('aria-label', 'Copy message');
+        copyBtn.onclick = () => copyMessageToClipboard(copyBtn, messageDiv);
+        
+        const rewriteBtn = document.createElement('button');
+        rewriteBtn.style.cssText = `
+            display: flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+            padding: 6px 12px !important;
+            background-color: rgba(59, 130, 246, 0.15) !important;
+            border: 1px solid rgba(59, 130, 246, 0.5) !important;
+            border-radius: 8px !important;
+            color: #3b82f6 !important;
+            font-size: 12px !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+        `;
+        rewriteBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2;">
+                <path d="m3 16 4 4 4-4"></path>
+                <path d="M7 20V4"></path>
+                <path d="M20 8l-4-4-4 4"></path>
+                <path d="M17 4v16"></path>
+            </svg>
+            Rewrite
+        `;
+        rewriteBtn.setAttribute('aria-label', 'Regenerate response');
+        rewriteBtn.onclick = () => rewriteMessage(messageDiv);
+        
+        // Add responsive behavior for mobile
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            buttonsDiv.style.justifyContent = 'flex-start';
+            buttonsDiv.style.padding = '0 16px';
+        }
+        
+        buttonsDiv.appendChild(copyBtn);
+        buttonsDiv.appendChild(rewriteBtn);
+        messagesContainer.appendChild(buttonsDiv);
+    }
     
     // Render LaTeX if this is an AI message with text
     if (sender === 'ai' && text && type === 'normal') {
@@ -3034,6 +3119,255 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
     
     return messageId;
+}
+
+// Add Copy and Rewrite buttons to AI messages
+function addMessageActions(messageDiv, messageText) {
+    console.log('addMessageActions called with:', messageDiv, messageText);
+    const messageContent = messageDiv.querySelector('.message-content');
+    console.log('messageContent found:', messageContent);
+    if (!messageContent) {
+        console.log('No message-content found, returning');
+        return;
+    }
+    
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'message-actions';
+    // Force visibility for debugging
+    actionsDiv.style.setProperty('display', 'flex', 'important');
+    actionsDiv.style.setProperty('opacity', '1', 'important');
+    actionsDiv.style.setProperty('visibility', 'visible', 'important');
+    actionsDiv.style.setProperty('transform', 'translateY(0)', 'important');
+    actionsDiv.style.setProperty('margin-top', '12px', 'important');
+    actionsDiv.style.setProperty('gap', '8px', 'important');
+    actionsDiv.style.setProperty('background-color', 'red', 'important'); // Debug background
+    
+    // Store the message text on the message div for safe access
+    messageDiv.dataset.messageText = messageText;
+    
+    const copyButton = document.createElement('button');
+    copyButton.className = 'message-action-btn copy-btn';
+    copyButton.setAttribute('aria-label', 'Copy message to clipboard');
+    // Force button styling for debugging
+    copyButton.style.setProperty('display', 'flex', 'important');
+    copyButton.style.setProperty('align-items', 'center', 'important');
+    copyButton.style.setProperty('gap', '4px', 'important');
+    copyButton.style.setProperty('padding', '6px 12px', 'important');
+    copyButton.style.setProperty('background-color', '#22c55e', 'important');
+    copyButton.style.setProperty('border', '1px solid #22c55e', 'important');
+    copyButton.style.setProperty('border-radius', '8px', 'important');
+    copyButton.style.setProperty('color', 'white', 'important');
+    copyButton.style.setProperty('font-size', '12px', 'important');
+    copyButton.style.setProperty('cursor', 'pointer', 'important');
+    copyButton.style.setProperty('visibility', 'visible', 'important');
+    copyButton.innerHTML = `
+        <svg viewBox="0 0 24 24">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="m5 15-2-2v-6a2 2 0 0 1 2-2h6l2 2"></path>
+        </svg>
+        Copy
+    `;
+    copyButton.addEventListener('click', () => copyMessageToClipboard(copyButton, messageDiv));
+    
+    const rewriteButton = document.createElement('button');
+    rewriteButton.className = 'message-action-btn rewrite-btn';
+    rewriteButton.setAttribute('aria-label', 'Ask AI to rewrite this message');
+    // Force button styling for debugging
+    rewriteButton.style.setProperty('display', 'flex', 'important');
+    rewriteButton.style.setProperty('align-items', 'center', 'important');
+    rewriteButton.style.setProperty('gap', '4px', 'important');
+    rewriteButton.style.setProperty('padding', '6px 12px', 'important');
+    rewriteButton.style.setProperty('background-color', '#3b82f6', 'important');
+    rewriteButton.style.setProperty('border', '1px solid #3b82f6', 'important');
+    rewriteButton.style.setProperty('border-radius', '8px', 'important');
+    rewriteButton.style.setProperty('color', 'white', 'important');
+    rewriteButton.style.setProperty('font-size', '12px', 'important');
+    rewriteButton.style.setProperty('cursor', 'pointer', 'important');
+    rewriteButton.style.setProperty('visibility', 'visible', 'important');
+    rewriteButton.innerHTML = `
+        <svg viewBox="0 0 24 24">
+            <path d="m3 16 4 4 4-4"></path>
+            <path d="M7 20V4"></path>
+            <path d="M20 8l-4-4-4 4"></path>
+            <path d="M17 4v16"></path>
+        </svg>
+        Rewrite
+    `;
+    rewriteButton.addEventListener('click', () => rewriteMessage(messageDiv));
+    
+    actionsDiv.appendChild(copyButton);
+    actionsDiv.appendChild(rewriteButton);
+    messageContent.appendChild(actionsDiv);
+    console.log('Message actions added to DOM:', actionsDiv);
+    
+    // Check if buttons are still there after 1 second
+    setTimeout(() => {
+        const stillThere = document.contains(actionsDiv);
+        const parentStillThere = actionsDiv.parentElement;
+        console.log('Buttons still in DOM after 1 second:', stillThere, 'Parent:', parentStillThere);
+        if (stillThere) {
+            console.log('Computed styles for actionsDiv:', window.getComputedStyle(actionsDiv));
+            console.log('Computed styles for copyButton:', window.getComputedStyle(copyButton));
+        }
+    }, 1000);
+}
+
+// Copy message content to clipboard
+async function copyMessageToClipboard(button, messageDiv) {
+    try {
+        const messageText = messageDiv.dataset.messageText;
+        if (!messageText) {
+            showCopyTooltip(button, 'No text to copy');
+            return;
+        }
+        
+        await navigator.clipboard.writeText(messageText);
+        showCopyTooltip(button, 'Copied!');
+    } catch (err) {
+        console.error('Failed to copy text: ', err);
+        showCopyTooltip(button, 'Copy failed');
+    }
+}
+
+// Show tooltip feedback for copy action
+function showCopyTooltip(button, message) {
+    // Remove existing tooltip
+    const existingTooltip = button.querySelector('.tooltip');
+    if (existingTooltip) {
+        existingTooltip.remove();
+    }
+    
+    // Create tooltip
+    const tooltip = document.createElement('div');
+    tooltip.className = 'tooltip';
+    tooltip.textContent = message;
+    
+    // Position tooltip relative to button
+    button.style.position = 'relative';
+    button.appendChild(tooltip);
+    
+    // Show tooltip
+    setTimeout(() => {
+        tooltip.classList.add('show');
+    }, 10);
+    
+    // Hide tooltip after delay
+    setTimeout(() => {
+        tooltip.classList.remove('show');
+        setTimeout(() => {
+            if (tooltip.parentNode) {
+                tooltip.remove();
+            }
+        }, 200);
+    }, 2000);
+}
+
+// Rewrite message by automatically submitting a rewrite request
+function rewriteMessage(messageDiv) {
+    const messageText = messageDiv.dataset.messageText;
+    if (!messageText || conversationHistory.length === 0) {
+        return;
+    }
+    
+    // Remove the AI message from the DOM
+    messageDiv.remove();
+    
+    // Remove the associated buttons (they come right after the message)
+    const messagesContainer = document.getElementById('messages');
+    const nextElement = messagesContainer.querySelector('.ai-message-buttons:last-child');
+    if (nextElement) {
+        nextElement.remove();
+    }
+    
+    // Remove the last AI response from conversation history
+    // Find the last assistant message and remove it
+    for (let i = conversationHistory.length - 1; i >= 0; i--) {
+        if (conversationHistory[i].role === 'assistant') {
+            conversationHistory.splice(i, 1);
+            break;
+        }
+    }
+    
+    // Regenerate the AI response using existing conversation history
+    regenerateLastResponse();
+}
+
+async function regenerateLastResponse() {
+    if (conversationHistory.length === 0) {
+        return;
+    }
+    
+    const apiKey = getApiKey();
+    
+    // Validate API key
+    if (apiKey === 'YOUR_API_KEY' || apiKey === 'your-api-key-here' || !apiKey) {
+        addMessage('⚠️ Please set your OpenAI API key to regenerate responses.', 'ai', 'error');
+        return;
+    }
+    
+    // Show typing indicator
+    const typingId = addMessage('', 'ai', 'typing');
+    
+    try {
+        // Build messages array for API call
+        let messages;
+        if (currentModel === 'gpt-image-1') {
+            messages = conversationHistory;
+        } else {
+            messages = buildMessagesWithSystem(conversationHistory);
+        }
+        
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: currentModel,
+                messages: messages,
+                max_completion_tokens: 10000,
+                temperature: getModelTemperature(currentModel)
+            })
+        });
+
+        // Remove typing indicator
+        removeMessage(typingId);
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || `HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const aiMessage = data.choices[0].message.content;
+        
+        // Update token usage
+        if (data.usage) {
+            currentChatTokens.input += data.usage.prompt_tokens;
+            currentChatTokens.output += data.usage.completion_tokens;
+            currentChatTokens.total += data.usage.total_tokens;
+            updateTokenDisplay();
+        }
+
+        // Add new AI response to conversation history
+        conversationHistory.push({
+            role: 'assistant',
+            content: aiMessage
+        });
+
+        // Display the new AI response
+        addMessage(aiMessage, 'ai');
+        
+        // Save the updated chat
+        saveCurrentChat();
+
+    } catch (error) {
+        // Remove typing indicator on error
+        removeMessage(typingId);
+        console.error('Error regenerating response:', error);
+        addMessage(`❌ Error regenerating response: ${error.message}`, 'ai', 'error');
+    }
 }
 
 function removeMessage(messageId) {
