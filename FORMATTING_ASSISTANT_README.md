@@ -26,6 +26,12 @@ The formatting assistant automatically applies the following rules to AI respons
 - Steps/Process → 🔄
 - Code/Implementation → 💻
 - Notes/Important → 📌
+- Questions/FAQ → ❓
+- References/Links → 🔗
+- Quotes/Highlights → ✨
+- Warnings → 🚨
+- Information → ℹ️
+- Updates/Changelog → 🆕
 
 #### Enhanced Styling
 - Color-coded headings (H1: blue, H2: yellow, H3: green)

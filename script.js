@@ -698,7 +698,13 @@ function formatAIResponse(text) {
         { pattern: /^(#{1,3}\s+)(Success|Complete|Done|Solution:?)/gim, emoji: '✅ ' },
         { pattern: /^(#{1,3}\s+)(Steps?|Process|Procedure|Instructions?:?)/gim, emoji: '🔄 ' },
         { pattern: /^(#{1,3}\s+)(Code|Implementation|Development:?)/gim, emoji: '💻 ' },
-        { pattern: /^(#{1,3}\s+)(Note|Important|Warning:?)/gim, emoji: '� ' }
+        { pattern: /^(#{1,3}\s+)(Note|Important:?)/gim, emoji: '📌 ' },
+        { pattern: /^(#{1,3}\s+)(Questions?|FAQ|Q&A:?)/gim, emoji: '❓ ' },
+        { pattern: /^(#{1,3}\s+)(References?|Links?:?)/gim, emoji: '🔗 ' },
+        { pattern: /^(#{1,3}\s+)(Quotes?|Highlights?:?)/gim, emoji: '✨ ' },
+        { pattern: /^(#{1,3}\s+)(Warnings?|Caution:?)/gim, emoji: '🚨 ' },
+        { pattern: /^(#{1,3}\s+)(Information|Info:?)/gim, emoji: 'ℹ️ ' },
+        { pattern: /^(#{1,3}\s+)(Updates?|Changelog:?)/gim, emoji: '🆕 ' }
     ];
     
     emojiPatterns.forEach(({ pattern, emoji }) => {
