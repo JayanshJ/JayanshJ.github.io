@@ -1447,12 +1447,11 @@ function generateChatId() {
 // URL management functions
 function updateChatUrl(chatId) {
     if (chatId) {
-        const newUrl = `${window.location.origin}${window.location.pathname}#chat/${chatId}`;
-        window.history.pushState({ chatId: chatId }, '', newUrl);
+        // Use hash directly instead of pushState for better compatibility
+        window.location.hash = `#chat/${chatId}`;
     } else {
-        // New chat or no chat - go to root
-        const newUrl = `${window.location.origin}${window.location.pathname}`;
-        window.history.pushState({ chatId: null }, '', newUrl);
+        // New chat or no chat - clear hash
+        window.location.hash = '';
     }
 }
 
@@ -4316,14 +4315,22 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeUrlRouting();
     }, 50);
     
-    // Also try immediate URL check after a longer delay
+    // Multiple fallback attempts for GitHub Pages
     setTimeout(() => {
         const urlChatId = getChatIdFromUrl();
         if (urlChatId && !currentChatId) {
-            console.log('Fallback: attempting to load chat from URL');
+            console.log('Fallback 1: attempting to load chat from URL');
             handleUrlChange();
         }
     }, 500);
+    
+    setTimeout(() => {
+        const urlChatId = getChatIdFromUrl();
+        if (urlChatId && !currentChatId) {
+            console.log('Fallback 2: attempting to load chat from URL');
+            handleUrlChange();
+        }
+    }, 1000);
     
     if (!hasApiKey) {
         // Show a helpful message in the welcome screen
@@ -4335,7 +4342,13 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeUrlRouting() {
     console.log('Initializing URL routing');
     
-    // Handle browser back/forward navigation
+    // Handle hash changes (back/forward navigation and direct URL access)
+    window.addEventListener('hashchange', function(event) {
+        console.log('Hash changed:', window.location.hash);
+        handleUrlChange();
+    });
+    
+    // Also handle popstate for broader compatibility
     window.addEventListener('popstate', function(event) {
         handleUrlChange();
     });
