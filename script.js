@@ -1444,6 +1444,52 @@ function generateChatId() {
     return 'chat_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
+// URL management functions
+function updateChatUrl(chatId) {
+    if (chatId) {
+        const newUrl = `${window.location.origin}${window.location.pathname}#chat/${chatId}`;
+        window.history.pushState({ chatId: chatId }, '', newUrl);
+    } else {
+        // New chat or no chat - go to root
+        const newUrl = `${window.location.origin}${window.location.pathname}`;
+        window.history.pushState({ chatId: null }, '', newUrl);
+    }
+}
+
+function getChatIdFromUrl() {
+    const hash = window.location.hash;
+    if (hash.startsWith('#chat/')) {
+        return hash.substring(6); // Remove '#chat/' prefix
+    }
+    return null;
+}
+
+function handleUrlChange() {
+    const urlChatId = getChatIdFromUrl();
+    
+    if (urlChatId && urlChatId !== currentChatId) {
+        // Load the chat from URL
+        loadChatFromId(urlChatId);
+    } else if (!urlChatId && currentChatId) {
+        // URL shows no chat but we have a current chat - start new chat
+        startNewChat();
+    }
+}
+
+function loadChatFromId(chatId) {
+    const chatHistory = getChatHistory();
+    const chat = chatHistory.find(c => c.id === chatId);
+    
+    if (chat) {
+        // Load the found chat using existing loadChat function
+        loadChat(chatId);
+    } else {
+        // Chat not found, start new chat and update URL
+        console.warn(`Chat with ID ${chatId} not found`);
+        startNewChat();
+    }
+}
+
 // Get chat title from first message
 function getChatTitle(messages) {
     if (messages.length === 0) return 'New Chat';
@@ -1569,6 +1615,9 @@ function saveCurrentChat() {
         chatHistory.unshift(chatData); // Add to beginning
         currentChatId = chatData.id;
         
+        // Update URL for new chat
+        updateChatUrl(currentChatId);
+        
         // If starting in a folder, add chat to that folder
         if (currentFolderId) {
             const folder = chatFolders.find(f => f.id === currentFolderId);
@@ -1600,6 +1649,9 @@ function loadChat(chatId) {
     
     currentChatId = chatId;
     conversationHistory = [...chat.messages];
+    
+    // Update URL when loading a chat
+    updateChatUrl(currentChatId);
     currentModel = chat.model || 'chatgpt-4o-latest';
     
     // Determine which folder this chat belongs to
@@ -1722,6 +1774,9 @@ function startNewChat(preserveFolder = false) {
     };
     updateTokenDisplay();
     updateHistoryDisplay();
+    
+    // Update URL to reflect new chat
+    updateChatUrl(null);
 }
 
 // Update history display
@@ -4247,11 +4302,31 @@ document.addEventListener('DOMContentLoaded', function() {
     // Always initialize the app, but show a message if no API key
     initializeApp();
     
+    // Initialize URL routing
+    initializeUrlRouting();
+    
     if (!hasApiKey) {
         // Show a helpful message in the welcome screen
         updateWelcomeScreenForNoApiKey();
     }
 });
+
+// Initialize URL routing
+function initializeUrlRouting() {
+    // Handle browser back/forward navigation
+    window.addEventListener('popstate', function(event) {
+        handleUrlChange();
+    });
+    
+    // Check URL on page load
+    const urlChatId = getChatIdFromUrl();
+    if (urlChatId) {
+        // Load chat from URL after a brief delay to ensure everything is initialized
+        setTimeout(() => {
+            handleUrlChange();
+        }, 100);
+    }
+}
 
 function updateWelcomeScreenForNoApiKey() {
     const welcomeScreen = document.querySelector('.welcome-screen');
