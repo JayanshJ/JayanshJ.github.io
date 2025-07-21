@@ -761,6 +761,36 @@ function applySyntaxHighlighting(code, language = '') {
         case 'typescript':
         case 'ts':
             return highlightTypeScript(code);
+        case 'c':
+        case 'cpp':
+        case 'c++':
+        case 'cc':
+            return highlightC(code);
+        case 'java':
+            return highlightJava(code);
+        case 'go':
+        case 'golang':
+            return highlightGo(code);
+        case 'rust':
+        case 'rs':
+            return highlightRust(code);
+        case 'php':
+            return highlightPHP(code);
+        case 'ruby':
+        case 'rb':
+            return highlightRuby(code);
+        case 'swift':
+            return highlightSwift(code);
+        case 'kotlin':
+        case 'kt':
+            return highlightKotlin(code);
+        case 'csharp':
+        case 'cs':
+        case 'c#':
+            return highlightCSharp(code);
+        case 'dart':
+        case 'flutter':
+            return highlightDart(code);
         default:
             return highlightGeneric(code);
     }
@@ -820,13 +850,25 @@ function detectLanguage(code) {
     return 'generic';
 }
 
-// JavaScript syntax highlighting
+// JavaScript syntax highlighting  
 function highlightJavaScript(code) {
-    return code
+    // Simple approach: escape HTML first, then highlight
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    
+    // Auto-indent JavaScript code
+    const indented = autoIndentCode(escaped);
+    
+    return indented
         .replace(/\b(function|const|let|var|if|else|for|while|do|switch|case|break|continue|return|try|catch|finally|throw|async|await|class|extends|import|export|default|from)\b/g, '<span class="keyword">$1</span>')
         .replace(/\b(true|false|null|undefined|this|new|typeof|instanceof)\b/g, '<span class="keyword">$1</span>')
         .replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>')
-        .replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, '<span class="string">$1$2$1</span>')
+        .replace(/&quot;([^&])*?&quot;/g, '<span class="string">$&</span>')
+        .replace(/&#x27;([^&])*?&#x27;/g, '<span class="string">$&</span>')
         .replace(/(\/\/.*$)/gm, '<span class="comment">$1</span>')
         .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>')
         .replace(/\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*(?=\()/g, '<span class="function">$1</span>');
@@ -834,11 +876,23 @@ function highlightJavaScript(code) {
 
 // Python syntax highlighting
 function highlightPython(code) {
-    return code
+    // First escape HTML entities
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    
+    // Auto-indent Python code
+    const indented = autoIndentPython(escaped);
+    
+    return indented
         .replace(/\b(def|class|if|elif|else|for|while|try|except|finally|with|as|import|from|return|yield|break|continue|pass|raise|assert|global|nonlocal|lambda|and|or|not|in|is)\b/g, '<span class="keyword">$1</span>')
         .replace(/\b(True|False|None)\b/g, '<span class="keyword">$1</span>')
         .replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>')
-        .replace(/(["'])((?:\\.|(?!\1)[^\\])*?)\1/g, '<span class="string">$1$2$1</span>')
+        .replace(/&quot;([^&]|&(?!quot;))*?&quot;/g, '<span class="string">$&</span>')
+        .replace(/&#x27;([^&]|&(?!#x27;))*?&#x27;/g, '<span class="string">$&</span>')
         .replace(/(#.*$)/gm, '<span class="comment">$1</span>')
         .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function">$1</span>');
 }
@@ -894,11 +948,291 @@ function highlightTypeScript(code) {
         + highlightJavaScript(code); // Apply JS highlighting as well
 }
 
+// C/C++ syntax highlighting
+function highlightC(code) {
+    // First escape HTML entities
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    
+    // Auto-indent C code
+    const indented = autoIndentCode(escaped);
+    
+        return indented
+          .replace(/^(#\s*(?:include|define|ifdef|ifndef|endif|if|else|elif|pragma|undef|line|error|warning))\b/gm, '<span class="keyword">$1</span>')
+          .replace(/\b(auto|break|case|char|const|continue|default|do|double|else|enum|extern|float|for|goto|if|inline|int|long|register|restrict|return|short|signed|sizeof|static|struct|switch|typedef|union|unsigned|void|volatile|while|bool|true|false|NULL)\b/g, '<span class="keyword">$1</span>')
+          .replace(/\b(\d+\.?\d*[fFlL]?)\b/g, '<span class="number">$1</span>')
+          .replace(/&quot;([^&]|&(?!quot;))*?&quot;/g, '<span class="string">$&</span>')
+          .replace(/&#x27;([^&]|&(?!#x27;))*?&#x27;/g, '<span class="string">$&</span>')
+          .replace(/(\/\/.*$)/gm, '<span class="comment">$1</span>')
+          .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>')
+          .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function">$1</span>');
+}
+
+// Auto-indentation helper for brace-based languages (Java, C, JavaScript, etc.)
+function autoIndentCode(code) {
+    const lines = code.split('\n');
+    let indentLevel = 0;
+    const indentedLines = lines.map(line => {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) return line; // Keep empty lines as-is
+        
+        // Decrease indent for closing braces
+        if (trimmedLine.startsWith('}')) {
+            indentLevel = Math.max(0, indentLevel - 1);
+        }
+        
+        // Add proper indentation
+        const indentedLine = '    '.repeat(indentLevel) + trimmedLine;
+        
+        // Increase indent for opening braces
+        if (trimmedLine.endsWith('{')) {
+            indentLevel++;
+        }
+        
+        return indentedLine;
+    });
+    
+    return indentedLines.join('\n');
+}
+
+// Auto-indentation helper for Python (colon-based indentation)
+function autoIndentPython(code) {
+    const lines = code.split('\n');
+    let indentLevel = 0;
+    const indentedLines = lines.map((line, index) => {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) return line; // Keep empty lines as-is
+        
+        // Check if previous line ended with colon (increase indent)
+        if (index > 0) {
+            const prevTrimmed = lines[index - 1].trim();
+            if (prevTrimmed.endsWith(':')) {
+                indentLevel++;
+            }
+        }
+        
+        // Decrease indent for dedenting keywords
+        if (trimmedLine.startsWith('except') || trimmedLine.startsWith('elif') || 
+            trimmedLine.startsWith('else') || trimmedLine.startsWith('finally')) {
+            indentLevel = Math.max(0, indentLevel - 1);
+        }
+        
+        // Add proper indentation
+        const indentedLine = '    '.repeat(indentLevel) + trimmedLine;
+        
+        return indentedLine;
+    });
+    
+    return indentedLines.join('\n');
+}
+
+// Java syntax highlighting
+function highlightJava(code) {
+    // First escape HTML entities
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    
+    // Auto-indent Java code
+    const properlyIndented = autoIndentCode(escaped);
+    
+    return properlyIndented
+        .replace(/\b(abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|enum|extends|final|finally|float|for|goto|if|implements|import|instanceof|int|interface|long|native|new|package|private|protected|public|return|short|static|strictfp|super|switch|synchronized|this|throw|throws|transient|try|void|volatile|while|true|false|null)\b/g, '<span class="keyword">$1</span>')
+        .replace(/\b(\d+\.?\d*[fFlLdD]?)\b/g, '<span class="number">$1</span>')
+        .replace(/&quot;([^&]|&(?!quot;))*?&quot;/g, '<span class="string">$&</span>')
+        .replace(/&#x27;([^&]|&(?!#x27;))*?&#x27;/g, '<span class="string">$&</span>')
+        .replace(/(\/\/.*$)/gm, '<span class="comment">$1</span>')
+        .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>')
+        .replace(/(@\w+)/g, '<span class="keyword">$1</span>')
+        .replace(/\b([A-Z][a-zA-Z0-9_]*)\b/g, '<span class="type">$1</span>')
+        .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function">$1</span>');
+}
+
+// Go syntax highlighting
+function highlightGo(code) {
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    
+    return escaped
+        .replace(/\b(break|case|chan|const|continue|default|defer|else|fallthrough|for|func|go|goto|if|import|interface|map|package|range|return|select|struct|switch|type|var|true|false|nil|iota)\b/g, '<span class="keyword">$1</span>')
+        .replace(/\b(bool|byte|complex64|complex128|error|float32|float64|int|int8|int16|int32|int64|rune|string|uint|uint8|uint16|uint32|uint64|uintptr)\b/g, '<span class="type">$1</span>')
+        .replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>')
+        .replace(/&quot;([^&]|&(?!quot;))*?&quot;/g, '<span class="string">$&</span>')
+        .replace(/&#x27;([^&]|&(?!#x27;))*?&#x27;/g, '<span class="string">$&</span>')
+        .replace(/(\/\/.*$)/gm, '<span class="comment">$1</span>')
+        .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>')
+        .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function">$1</span>');
+}
+
+// Rust syntax highlighting
+function highlightRust(code) {
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    
+    return escaped
+        .replace(/\b(as|async|await|break|const|continue|crate|dyn|else|enum|extern|false|fn|for|if|impl|in|let|loop|match|mod|move|mut|pub|ref|return|self|Self|static|struct|super|trait|true|type|unsafe|use|where|while)\b/g, '<span class="keyword">$1</span>')
+        .replace(/\b(bool|char|str|i8|i16|i32|i64|i128|isize|u8|u16|u32|u64|u128|usize|f32|f64)\b/g, '<span class="type">$1</span>')
+        .replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>')
+        .replace(/&quot;([^&]|&(?!quot;))*?&quot;/g, '<span class="string">$&</span>')
+        .replace(/&#x27;([^&]|&(?!#x27;))*?&#x27;/g, '<span class="string">$&</span>')
+        .replace(/(\/\/.*$)/gm, '<span class="comment">$1</span>')
+        .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>')
+        .replace(/(#\[.*?\])/g, '<span class="keyword">$1</span>')
+        .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function">$1</span>');
+}
+
+// PHP syntax highlighting
+function highlightPHP(code) {
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    
+    return escaped
+        .replace(/(&lt;\?php|\?&gt;)/g, '<span class="keyword">$1</span>')
+        .replace(/\b(abstract|and|array|as|break|callable|case|catch|class|clone|const|continue|declare|default|die|do|echo|else|elseif|empty|enddeclare|endfor|endforeach|endif|endswitch|endwhile|eval|exit|extends|final|finally|for|foreach|function|global|goto|if|implements|include|include_once|instanceof|insteadof|interface|isset|list|namespace|new|or|print|private|protected|public|require|require_once|return|static|switch|throw|trait|try|unset|use|var|while|xor|true|false|null)\b/g, '<span class="keyword">$1</span>')
+        .replace(/(\$[a-zA-Z_][a-zA-Z0-9_]*)/g, '<span class="variable">$1</span>')
+        .replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>')
+        .replace(/&quot;([^&]|&(?!quot;))*?&quot;/g, '<span class="string">$&</span>')
+        .replace(/&#x27;([^&]|&(?!#x27;))*?&#x27;/g, '<span class="string">$&</span>')
+        .replace(/(\/\/.*$|#.*$)/gm, '<span class="comment">$1</span>')
+        .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>')
+        .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function">$1</span>');
+}
+
+// Ruby syntax highlighting
+function highlightRuby(code) {
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    
+    return escaped
+        .replace(/\b(alias|and|begin|break|case|class|def|defined|do|else|elsif|end|ensure|false|for|if|in|module|next|nil|not|or|redo|rescue|retry|return|self|super|then|true|undef|unless|until|when|while|yield)\b/g, '<span class="keyword">$1</span>')
+        .replace(/(@[a-zA-Z_][a-zA-Z0-9_]*|@@[a-zA-Z_][a-zA-Z0-9_]*)/g, '<span class="variable">$1</span>')
+        .replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>')
+        .replace(/&quot;([^&]|&(?!quot;))*?&quot;/g, '<span class="string">$&</span>')
+        .replace(/&#x27;([^&]|&(?!#x27;))*?&#x27;/g, '<span class="string">$&</span>')
+        .replace(/(#.*$)/gm, '<span class="comment">$1</span>')
+        .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function">$1</span>');
+}
+
+// Swift syntax highlighting
+function highlightSwift(code) {
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    
+    return escaped
+        .replace(/\b(associatedtype|class|deinit|enum|extension|fileprivate|func|import|init|inout|internal|let|open|operator|private|protocol|public|static|struct|subscript|typealias|var|break|case|continue|default|defer|do|else|fallthrough|for|guard|if|in|repeat|return|switch|where|while|as|catch|false|is|nil|rethrows|super|self|Self|throw|throws|true|try)\b/g, '<span class="keyword">$1</span>')
+        .replace(/\b(Any|AnyObject|Bool|Character|Double|Float|Int|String|Void)\b/g, '<span class="type">$1</span>')
+        .replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>')
+        .replace(/&quot;([^&]|&(?!quot;))*?&quot;/g, '<span class="string">$&</span>')
+        .replace(/&#x27;([^&]|&(?!#x27;))*?&#x27;/g, '<span class="string">$&</span>')
+        .replace(/(\/\/.*$)/gm, '<span class="comment">$1</span>')
+        .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>')
+        .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function">$1</span>');
+}
+
+// Kotlin syntax highlighting
+function highlightKotlin(code) {
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    
+    return escaped
+        .replace(/\b(abstract|actual|annotation|as|break|by|catch|class|companion|const|constructor|continue|crossinline|data|do|dynamic|else|enum|expect|external|false|final|finally|for|fun|get|if|import|in|infix|init|inline|inner|interface|internal|is|lateinit|noinline|null|object|open|operator|out|override|package|private|protected|public|reified|return|sealed|set|super|suspend|tailrec|this|throw|true|try|typealias|typeof|val|var|vararg|when|where|while)\b/g, '<span class="keyword">$1</span>')
+        .replace(/\b(Any|Boolean|Byte|Char|Double|Float|Int|Long|Nothing|Short|String|Unit)\b/g, '<span class="type">$1</span>')
+        .replace(/\b(\d+\.?\d*[fFlL]?)\b/g, '<span class="number">$1</span>')
+        .replace(/&quot;([^&]|&(?!quot;))*?&quot;/g, '<span class="string">$&</span>')
+        .replace(/&#x27;([^&]|&(?!#x27;))*?&#x27;/g, '<span class="string">$&</span>')
+        .replace(/(\/\/.*$)/gm, '<span class="comment">$1</span>')
+        .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>')
+        .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function">$1</span>');
+}
+
+// C# syntax highlighting
+function highlightCSharp(code) {
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    
+    return escaped
+        .replace(/\b(abstract|as|base|bool|break|byte|case|catch|char|checked|class|const|continue|decimal|default|delegate|do|double|else|enum|event|explicit|extern|false|finally|fixed|float|for|foreach|goto|if|implicit|in|int|interface|internal|is|lock|long|namespace|new|null|object|operator|out|override|params|private|protected|public|readonly|ref|return|sbyte|sealed|short|sizeof|stackalloc|static|string|struct|switch|this|throw|true|try|typeof|uint|ulong|unchecked|unsafe|ushort|using|virtual|void|volatile|while)\b/g, '<span class="keyword">$1</span>')
+        .replace(/\b(bool|byte|char|decimal|double|float|int|long|object|sbyte|short|string|uint|ulong|ushort|void)\b/g, '<span class="type">$1</span>')
+        .replace(/\b(\d+\.?\d*[fFlLdDmM]?)\b/g, '<span class="number">$1</span>')
+        .replace(/&quot;([^&]|&(?!quot;))*?&quot;/g, '<span class="string">$&</span>')
+        .replace(/&#x27;([^&]|&(?!#x27;))*?&#x27;/g, '<span class="string">$&</span>')
+        .replace(/(\/\/.*$)/gm, '<span class="comment">$1</span>')
+        .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>')
+        .replace(/\b([A-Z][a-zA-Z0-9_]*)\b/g, '<span class="type">$1</span>')
+        .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function">$1</span>');
+}
+
+// Dart/Flutter syntax highlighting
+function highlightDart(code) {
+    const escaped = code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    
+    return escaped
+        // Dart keywords
+        .replace(/\b(abstract|as|assert|async|await|break|case|catch|class|const|continue|covariant|default|deferred|do|dynamic|else|enum|export|extends|extension|external|factory|false|final|finally|for|Function|get|hide|if|implements|import|in|interface|is|late|library|mixin|new|null|on|operator|part|required|rethrow|return|set|show|static|super|switch|sync|this|throw|true|try|typedef|var|void|while|with|yield)\b/g, '<span class="keyword">$1</span>')
+        // Built-in types
+        .replace(/\b(bool|double|int|num|Object|String|List|Map|Set|Iterable|Future|Stream|Duration|DateTime|Uri)\b/g, '<span class="type">$1</span>')
+        // Flutter-specific widgets and classes
+        .replace(/\b(Widget|StatelessWidget|StatefulWidget|State|BuildContext|MaterialApp|Scaffold|AppBar|Container|Column|Row|Stack|Positioned|Center|Padding|Margin|Text|TextStyle|Icon|IconButton|RaisedButton|FlatButton|ElevatedButton|TextButton|OutlinedButton|FloatingActionButton|ListView|GridView|SingleChildScrollView|CustomScrollView|Slivers|SliverList|SliverGrid|Navigator|Route|MaterialPageRoute|AnimationController|Animation|Tween|Curve|Colors|Theme|ThemeData|MediaQuery|SafeArea|Hero|GestureDetector|InkWell|Dismissible|Draggable|DragTarget|Transform|Opacity|ClipRRect|ClipOval|ClipPath|CustomPaint|CustomPainter|Canvas|Paint|Path|Size|Offset|Rect|RRect|BorderRadius|BoxDecoration|LinearGradient|RadialGradient|SweepGradient|BoxShadow|Border|BorderSide|EdgeInsets|MainAxisAlignment|CrossAxisAlignment|MainAxisSize|TextAlign|TextDirection|FontWeight|FontStyle|TextDecoration|TextOverflow|Alignment|AlignmentGeometry|WrapAlignment|WrapCrossAlignment|Flex|Flexible|Expanded|SizedBox|AspectRatio|FittedBox|LayoutBuilder|Builder|Consumer|Provider|ChangeNotifier|ValueNotifier|StreamBuilder|FutureBuilder|AnimatedBuilder|AnimatedContainer|AnimatedOpacity|AnimatedPositioned|AnimatedCrossFade|AnimatedSwitcher|AnimatedList|SlideTransition|FadeTransition|ScaleTransition|RotationTransition|SizeTransition|PositionedTransition)\b/g, '<span class="type">$1</span>')
+        // Numbers
+        .replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>')
+        // Strings
+        .replace(/&quot;([^&]|&(?!quot;))*?&quot;/g, '<span class="string">$&</span>')
+        .replace(/&#x27;([^&]|&(?!#x27;))*?&#x27;/g, '<span class="string">$&</span>')
+        // Comments
+        .replace(/(\/\/.*$)/gm, '<span class="comment">$1</span>')
+        .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>')
+        // Annotations
+        .replace(/(@\w+)/g, '<span class="keyword">$1</span>')
+        // Functions
+        .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, '<span class="function">$1</span>');
+}
+
 // Generic syntax highlighting
 function highlightGeneric(code) {
     return code
         .replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>')
-        .replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, '<span class="string">$1$2$1</span>')
+        .replace(/(&quot;)([^&]|&(?!quot;))*?(&quot;)/g, '<span class="string">$1$2$3</span>')
+        .replace(/(&#39;)([^&]|&(?!#39;))*?(&#39;)/g, '<span class="string">$1$2$3</span>')
         .replace(/(\/\/.*$|#.*$)/gm, '<span class="comment">$1</span>')
         .replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="comment">$1</span>');
 }
@@ -918,15 +1252,53 @@ function processMessageText(text) {
     
     // First, handle code blocks to preserve them
     const codeBlocks = [];
+    console.log('Processing text for code blocks:', text.substring(0, 200));
+    
+    // Try multiple code block patterns
     text = text.replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, language, code) => {
+        console.log('Found triple backtick code block!');
         const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`;
-        const highlightedCode = applySyntaxHighlighting(code.trim(), language);
+        const cleanCode = code.replace(/^\n+/, '').replace(/\n+$/, '');
+        console.log('Original code:', JSON.stringify(code));
+        console.log('Language:', language);
+        const highlightedCode = applySyntaxHighlighting(cleanCode, language);
         codeBlocks.push(`<pre><code>${highlightedCode}</code></pre>`);
         return placeholder;
     });
     
-    // Handle inline code
-    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Also try to handle code without language specifier  
+    text = text.replace(/```\n?([\s\S]*?)```/g, (match, code) => {
+        console.log('Found plain code block!');
+        const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`;
+        const cleanCode = code.replace(/^\n+/, '').replace(/\n+$/, '');
+        console.log('Plain code:', JSON.stringify(code));
+        
+        // Try to auto-detect language based on content
+        let detectedLanguage = 'text';
+        if (cleanCode.includes('public class') || cleanCode.includes('System.out') || cleanCode.includes('public static void main')) {
+            detectedLanguage = 'java';
+        } else if (cleanCode.includes('function') || cleanCode.includes('const ') || cleanCode.includes('let ')) {
+            detectedLanguage = 'javascript';
+        } else if (cleanCode.includes('def ') || cleanCode.includes('import ') || cleanCode.includes('print(')) {
+            detectedLanguage = 'python';
+        }
+        
+        console.log('Auto-detected language:', detectedLanguage);
+        const highlightedCode = applySyntaxHighlighting(cleanCode, detectedLanguage);
+        codeBlocks.push(`<pre><code>${highlightedCode}</code></pre>`);
+        return placeholder;
+    });
+    
+    // Handle inline code - escape HTML entities in inline code
+    text = text.replace(/`([^`]+)`/g, (match, code) => {
+        const escaped = code
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        return `<code>${escaped}</code>`;
+    });
     
     // Convert **bold** to <strong>
     text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -1065,6 +1437,25 @@ function generateChatId() {
 // Get chat title from first message
 function getChatTitle(messages) {
     if (messages.length === 0) return 'New Chat';
+    
+    // If we have enough conversation (4+ messages), try to generate a smart title
+    if (messages.length >= 4) {
+        generateSmartTitle(messages);
+        // Return a temporary title while we generate the smart one
+        const firstUserMessage = messages.find(msg => msg.role === 'user');
+        if (firstUserMessage) {
+            let content = '';
+            if (typeof firstUserMessage.content === 'string') {
+                content = firstUserMessage.content;
+            } else if (Array.isArray(firstUserMessage.content)) {
+                const textContent = firstUserMessage.content.find(c => c.type === 'text');
+                content = textContent ? textContent.text : 'Image conversation';
+            }
+            return content.length > 30 ? content.substring(0, 30) + '...' : content;
+        }
+    }
+    
+    // Default behavior for short conversations
     const firstUserMessage = messages.find(msg => msg.role === 'user');
     if (firstUserMessage) {
         let content = '';
@@ -1077,6 +1468,73 @@ function getChatTitle(messages) {
         return content.length > 30 ? content.substring(0, 30) + '...' : content;
     }
     return 'New Chat';
+}
+
+// Generate smart title using AI summarization
+async function generateSmartTitle(messages) {
+    try {
+        const apiKey = getApiKey();
+        if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey === 'your-api-key-here') {
+            return;
+        }
+
+        // Create a conversation summary for the title generation
+        const conversationSummary = messages
+            .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+            .slice(0, 6) // Use first 6 messages for context
+            .map(msg => {
+                let content = '';
+                if (typeof msg.content === 'string') {
+                    content = msg.content;
+                } else if (Array.isArray(msg.content)) {
+                    const textContent = msg.content.find(c => c.type === 'text');
+                    content = textContent ? textContent.text : '[Image]';
+                }
+                return `${msg.role}: ${content.substring(0, 150)}`;
+            })
+            .join('\n');
+
+        const titlePrompt = `Based on this conversation, generate a concise, descriptive title (maximum 4 words). Focus on the main topic or task being discussed:
+
+${conversationSummary}
+
+Title:`;
+
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4.1-2025-04-14',
+                messages: [{
+                    role: 'user',
+                    content: titlePrompt
+                }],
+                max_completion_tokens: 20,
+                temperature: 0.3
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const smartTitle = data.choices[0].message.content.trim();
+            
+            // Update the current chat title if it exists
+            if (currentChatId) {
+                const chatIndex = chatHistory.findIndex(chat => chat.id === currentChatId);
+                if (chatIndex !== -1) {
+                    chatHistory[chatIndex].title = smartTitle;
+                    saveChatHistory();
+                    updateHistoryDisplay();
+                }
+            }
+        }
+    } catch (error) {
+        console.log('Smart title generation failed:', error);
+        // Fail silently, keep the default title
+    }
 }
 
 // Save current chat
@@ -2389,22 +2847,21 @@ async function sendMessage() {
     }
 
 
-    // Build messages array: only systemPrompt and current user message for text models
+    // Add user message to conversation history for all models
+    const userMessage = {
+        role: 'user',
+        content: messageContent
+    };
+    conversationHistory.push(userMessage);
+
+    // Build messages array for API call
     let messages;
     if (currentModel === 'gpt-image-1') {
-        // For image model, use legacy conversationHistory logic (should not include systemPrompt)
-        conversationHistory.push({
-            role: 'user',
-            content: messageContent
-        });
+        // For image model, use full conversationHistory (should not include systemPrompt)
         messages = conversationHistory;
     } else {
-        // For text models, only send systemPrompt and current user message
-        const userMessage = {
-            role: 'user',
-            content: messageContent
-        };
-        messages = [systemPrompt, userMessage];
+        // For text models, use systemPrompt + full conversation history
+        messages = buildMessagesWithSystem(conversationHistory);
     }
 
     // Clear selected files after sending
