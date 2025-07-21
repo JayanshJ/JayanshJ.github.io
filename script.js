@@ -32,7 +32,7 @@ function buildMessagesWithSystem(conversationHistory) {
 let conversationHistory = [];
 let selectedImages = []; // Support multiple images
 let selectedFiles = []; // Support multiple files
-let currentModel = 'gpt-4.1-2025-04-14';
+let currentModel = 'chatgpt-4o-latest';
 let currentChatId = null;
 let chatHistory = [];
 let chatFolders = [];
@@ -452,7 +452,7 @@ function updateCreditBalanceWithUsage(inputTokens, outputTokens, model) {
         }
     };
     
-    const pricing = pricingPer1M[model] || pricingPer1M['gpt-4.1-2025-04-14'];
+    const pricing = pricingPer1M[model] || pricingPer1M['chatgpt-4o-latest'];
     
     // Calculate separate costs for input and output tokens
     const inputCost = (inputTokens / 1000000) * pricing.input;
@@ -1517,7 +1517,7 @@ Title:`;
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'gpt-4.1-2025-04-14',
+                model: 'chatgpt-4o-latest',
                 messages: [{
                     role: 'user',
                     content: titlePrompt
@@ -1600,7 +1600,7 @@ function loadChat(chatId) {
     
     currentChatId = chatId;
     conversationHistory = [...chat.messages];
-    currentModel = chat.model || 'gpt-4.1-2025-04-14';
+    currentModel = chat.model || 'chatgpt-4o-latest';
     
     // Determine which folder this chat belongs to
     currentFolderId = null;
