@@ -1992,7 +1992,7 @@ function getModelDisplayName(model) {
 
 function getModelTemperature(model) {
     const temperatures = {
-        'gpt-4.1-2025-04-14': 0.3,
+        'gpt-4.1-2025-04-14': 0.7,
         'gpt-image-1': 0.7
     };
     return temperatures[model] || 0.7; // Default fallback
