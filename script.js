@@ -445,6 +445,10 @@ function updateCreditBalanceWithUsage(inputTokens, outputTokens, model) {
         'gpt-image-1': {
             input: 0.04,    // $0.04 per image (estimated for image generation)
             output: 0.00    // No output tokens for image generation
+        },
+        'chatgpt-4o-latest': {
+            input: 5.00,    // $5.00 per 1M input tokens
+            output: 15.00   // $15.00 per 1M output tokens
         }
     };
     
@@ -2155,7 +2159,8 @@ function updateInputPlaceholder(model) {
     
     const placeholders = {
         'gpt-image-1': 'Describe the image you want to generate... (or upload images to edit)',
-        'gpt-4.1-2025-04-14': 'Message GPT-4.1... (paste/drag multiple images, PDFs, or audio files)'
+        'gpt-4.1-2025-04-14': 'Message GPT-4.1... (paste/drag multiple images, PDFs, or audio files)',
+        'chatgpt-4o-latest': 'Message ChatGPT-4o... (paste/drag multiple images, PDFs, or audio files)'
     };
     
     messageInput.placeholder = placeholders[model] || 'Message ChatGPT... (paste/drag multiple images, PDFs, or audio files)';
@@ -2186,7 +2191,8 @@ function updateWelcomeMessage(model) {
     
     const messages = {
         'gpt-image-1': 'What image would you like me to create?',
-        'gpt-4.1-2025-04-14': 'How can I assist you today?'
+        'gpt-4.1-2025-04-14': 'How can I assist you today?',
+        'chatgpt-4o-latest': 'How can I assist you today?'
     };
     
     welcomeScreen.textContent = messages[model] || 'How can I help you today?';
@@ -2449,7 +2455,8 @@ function loadImageSettings() {
 function getModelDisplayName(model) {
     const names = {
         'gpt-4.1-2025-04-14': 'GPT-4.1',
-        'gpt-image-1': 'Image Gen'
+        'gpt-image-1': 'Image Gen',
+        'chatgpt-4o-latest': 'ChatGPT-4o Latest'
     };
     return names[model] || model;
 }
@@ -2457,13 +2464,14 @@ function getModelDisplayName(model) {
 function getModelTemperature(model) {
     const temperatures = {
         'gpt-4.1-2025-04-14': 0.7,
-        'gpt-image-1': 0.7
+        'gpt-image-1': 0.7,
+        'chatgpt-4o-latest': 1.0
     };
     return temperatures[model] || 0.7; // Default fallback
 }
 
 // Available models for cycling
-const availableModels = ['gpt-4.1-2025-04-14', 'gpt-image-1'];
+const availableModels = ['gpt-4.1-2025-04-14', 'gpt-image-1', 'chatgpt-4o-latest'];
 
 // Function to cycle to next model
 function cycleToNextModel() {
@@ -2629,8 +2637,8 @@ async function sendMessage() {
     }
 
     // Check if model supports vision when images are selected
-    if (selectedImages.length > 0 && !currentModel.includes('gpt-4') && !currentModel.includes('gpt-image-1')) {
-        addMessage('⚠️ Image analysis requires vision-capable models. Please switch to GPT-4.1-2025-04-14 or gpt-image-1.', 'ai', 'error');
+    if (selectedImages.length > 0 && !currentModel.includes('gpt-4') && !currentModel.includes('gpt-image-1') && !currentModel.includes('chatgpt-4o-latest')) {
+        addMessage('⚠️ Image analysis requires vision-capable models. Please switch to GPT-4.1-2025-04-14, gpt-image-1, or chatgpt-4o-latest.', 'ai', 'error');
         return;
     }
 
