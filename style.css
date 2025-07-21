@@ -750,7 +750,9 @@ body {
 .message.ai-message .message-content {
     background-color: transparent;
     padding: 0;
-    max-width: 100%; /* AI messages can use full width */
+    max-width: 85%; /* Limit AI message width like user messages */
+    width: fit-content;
+    min-width: 0;
 }
 
 .message-avatar {
@@ -779,10 +781,10 @@ body {
 }
 
 .message-content {
-    flex: 1;
     line-height: 1.6; 
     font-size: 16px;
     min-width: 0; /* Prevents flex item from overflowing */
+    width: fit-content;
 }
 
 .message-text {
@@ -1014,12 +1016,17 @@ body {
 }
 
 /* Code block styling - ChatGPT Style */
+.code-block-wrapper {
+    position: relative;
+    margin: 16px 0;
+}
+
 .message-text pre {
     background-color: #23272f;
     border: none;
     border-radius: 8px;
     padding: 16px;
-    margin: 16px 0;
+    margin: 0;
     overflow-x: auto;
     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
     font-size: 14px;
@@ -1028,6 +1035,48 @@ body {
     position: relative;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     white-space: pre;
+}
+
+.copy-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 8px;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
+.code-block-wrapper:hover .copy-btn {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.copy-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.9);
+    transform: scale(1.05);
+}
+
+.copy-btn:active {
+    transform: scale(0.95);
+}
+
+.copy-btn svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
 }
 
 /* Remove gradient background for cleaner look */
@@ -1955,6 +2004,38 @@ body {
         margin: 12px 0 !important;
     }
     
+    /* Mobile code block adjustments */
+    .code-block-wrapper {
+        position: relative;
+        margin: 12px auto;
+        max-width: 90%;
+        display: block;
+    }
+    
+    .message-text pre {
+        padding: 12px;
+        font-size: 14px;
+        border-radius: 6px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Always show copy button on mobile */
+    .copy-btn {
+        opacity: 1 !important;
+        transform: translateY(0) !important;
+        background: rgba(255, 255, 255, 0.15) !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        padding: 10px;
+        top: 8px;
+        right: 8px;
+    }
+    
+    .copy-btn:active {
+        background: rgba(255, 255, 255, 0.25) !important;
+        transform: scale(0.9) !important;
+    }
+    
     .sidebar {
         position: fixed;
         left: -280px;
@@ -2163,6 +2244,8 @@ body {
         background-color: transparent;
         padding: 0;
         max-width: 90%;
+        width: fit-content;
+        min-width: 0;
     }
     
     .message-avatar {
@@ -2170,7 +2253,7 @@ body {
     }
     
     .message-content {
-        width: 100%;
+        width: fit-content;
         overflow-x: hidden;
         word-wrap: break-word;
         min-width: 0;
@@ -2223,7 +2306,6 @@ body {
     #messageInput {
         font-size: 16px; /* Prevent zoom on iOS */
         width: 100%;
-        min-height: 20px;
     }
     
     .input-actions {

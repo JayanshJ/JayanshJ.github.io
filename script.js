@@ -1262,7 +1262,7 @@ function processMessageText(text) {
         console.log('Original code:', JSON.stringify(code));
         console.log('Language:', language);
         const highlightedCode = applySyntaxHighlighting(cleanCode, language);
-        codeBlocks.push(`<pre><code>${highlightedCode}</code></pre>`);
+        codeBlocks.push(`<div class="code-block-wrapper"><pre><code>${highlightedCode}</code></pre><button class="copy-btn" onclick="copyToClipboard(this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg></button></div>`);
         return placeholder;
     });
     
@@ -1285,7 +1285,7 @@ function processMessageText(text) {
         
         console.log('Auto-detected language:', detectedLanguage);
         const highlightedCode = applySyntaxHighlighting(cleanCode, detectedLanguage);
-        codeBlocks.push(`<pre><code>${highlightedCode}</code></pre>`);
+        codeBlocks.push(`<div class="code-block-wrapper"><pre><code>${highlightedCode}</code></pre><button class="copy-btn" onclick="copyToClipboard(this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg></button></div>`);
         return placeholder;
     });
     
@@ -4229,3 +4229,37 @@ async function copyImageUrlToClipboard(imageUrl) {
         addMessage('❌ Failed to copy URL to clipboard', 'ai', 'error');
     }
 }
+
+// Copy code block content to clipboard
+async function copyToClipboard(button) {
+    try {
+        const codeWrapper = button.closest('.code-block-wrapper');
+        const codeElement = codeWrapper.querySelector('pre code');
+        const codeText = codeElement.textContent;
+        
+        await navigator.clipboard.writeText(codeText);
+        
+        // Update button appearance temporarily
+        const originalContent = button.innerHTML;
+        button.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>';
+        button.style.color = '#10b981';
+        
+        setTimeout(() => {
+            button.innerHTML = originalContent;
+            button.style.color = '';
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Failed to copy code:', error);
+        // Show error state
+        const originalContent = button.innerHTML;
+        button.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+        button.style.color = '#ef4444';
+        
+        setTimeout(() => {
+            button.innerHTML = originalContent;
+            button.style.color = '';
+        }, 2000);
+    }
+}
+
