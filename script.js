@@ -3354,7 +3354,19 @@ function hideSelectionTooltip() {
     }
 }
 
+// Store selection data globally for the overlay
+let currentSelectionData = null;
+
 function askAboutSelection(selectedText) {
+    const selection = window.getSelection();
+    let selectionRect = null;
+    
+    // Get the position of the selection before clearing it
+    if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        selectionRect = range.getBoundingClientRect();
+    }
+    
     // Clear current selection
     window.getSelection().removeAllRanges();
     
@@ -3368,23 +3380,338 @@ function askAboutSelection(selectedText) {
         prefix = 'Calculate this: ';
     }
     
-    // Store the selected text context
-    selectedTextContext = {
+    // Store selection data for later use
+    currentSelectionData = {
         text: selectedText,
-        prefix: prefix
+        prefix: prefix,
+        rect: selectionRect
     };
     
-    console.log('Set selectedTextContext:', selectedTextContext);
+    // Show overlay with input form
+    showSelectionResponseOverlay(selectedText, prefix, selectionRect);
     
-    // Show preview bubble
-    showSelectionPreview(selectedText, prefix);
+    // Focus on the textarea after a brief delay and add keyboard support
+    setTimeout(() => {
+        const textarea = document.getElementById('additionalContext');
+        if (textarea) {
+            textarea.focus();
+            
+            // Add auto-resize functionality
+            const autoResize = () => {
+                textarea.style.height = 'auto';
+                textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+            };
+            
+            textarea.addEventListener('input', autoResize);
+            
+            // Add keyboard support
+            textarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    // Enter to send (unless Shift is held)
+                    e.preventDefault();
+                    sendSelectionQuery();
+                } else if (e.key === 'Enter' && e.shiftKey) {
+                    // Shift+Enter for new line - let default behavior happen
+                    setTimeout(autoResize, 0); // Resize after new line is added
+                } else if (e.key === 'Escape') {
+                    // Escape to cancel
+                    e.preventDefault();
+                    hideSelectionResponseOverlay();
+                }
+            });
+        }
+    }, 300);
+}
+
+async function sendSelectionQuery() {
+    if (!currentSelectionData) return;
     
-    // Focus on input area
-    const messageInput = document.getElementById('messageInput');
-    if (messageInput) {
-        messageInput.focus();
-        messageInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const additionalContext = document.getElementById('additionalContext').value.trim();
+    
+    // Build the query
+    let query = currentSelectionData.prefix + currentSelectionData.text;
+    if (additionalContext) {
+        query += '\n\nAdditional context: ' + additionalContext;
     }
+    
+    // Hide the input form and show loading
+    showSelectionLoading();
+    
+    // Make API call
+    try {
+        const response = await getSelectionResponse(query);
+        updateSelectionOverlayResponse(response);
+    } catch (error) {
+        updateSelectionOverlayResponse(`Error: ${error.message}`, true);
+    }
+}
+
+function showSelectionLoading() {
+    const querySection = document.querySelector('.selection-query-section');
+    const responseArea = document.querySelector('.selection-response-area');
+    
+    if (querySection) querySection.style.display = 'none';
+    if (responseArea) {
+        responseArea.style.display = 'block';
+        responseArea.innerHTML = `
+            <div class="response-content">
+                <div style="display: flex; align-items: center; gap: 8px; padding: 12px; color: #999; font-size: 14px;">
+                    <div class="spinner"></div>
+                    <span>Getting response...</span>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function showSelectionResponseOverlay(selectedText, prefix, selectionRect) {
+    // Remove any existing overlay
+    hideSelectionResponseOverlay();
+    
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'selectionResponseOverlay';
+    overlay.className = 'selection-response-overlay';
+    
+    overlay.innerHTML = `
+        <div class="selection-response-content">
+            <div class="bubble-content">
+                <div class="selection-query-section">
+                    <div class="selected-text-display">${selectedText}</div>
+                    <div class="quick-input">
+                        <textarea 
+                            id="additionalContext" 
+                            placeholder="Ask about this..."
+                            rows="1"
+                        ></textarea>
+                        <button class="quick-send" onclick="sendSelectionQuery()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="selection-response-area" style="display: none;">
+                    <div class="response-content"></div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    // Position the overlay relative to the selection
+    if (selectionRect) {
+        console.log('Selection rect:', selectionRect);
+        const content = overlay.querySelector('.selection-response-content');
+        if (content) {
+            positionBubbleRelativeToSelection(content, selectionRect);
+        }
+    } else {
+        console.log('No selection rect available');
+    }
+    
+    // Animate in
+    setTimeout(() => {
+        overlay.classList.add('show');
+    }, 10);
+    
+    // Handle escape key and click outside
+    document.addEventListener('keydown', handleOverlayEscape);
+    overlay.addEventListener('click', handleOverlayClickOutside);
+}
+
+function positionBubbleRelativeToSelection(content, selectionRect) {
+    console.log('Positioning bubble with rect:', selectionRect);
+    
+    const bubbleWidth = 320;
+    const margin = 20;
+    
+    // Calculate initial position - try right side first
+    let bubbleLeft = selectionRect.right + margin;
+    let bubbleTop = selectionRect.top;
+    
+    // Check if it fits in viewport horizontally
+    if (bubbleLeft + bubbleWidth > window.innerWidth - margin) {
+        // Try left side
+        bubbleLeft = selectionRect.left - bubbleWidth - margin;
+        
+        if (bubbleLeft < margin) {
+            // No room on sides - position above or below
+            bubbleLeft = Math.max(margin, Math.min(selectionRect.left - bubbleWidth/2, window.innerWidth - bubbleWidth - margin));
+            
+            // Check if there's more room above or below
+            const roomAbove = selectionRect.top;
+            const roomBelow = window.innerHeight - selectionRect.bottom;
+            
+            if (roomBelow > roomAbove) {
+                bubbleTop = selectionRect.bottom + margin;
+            } else {
+                bubbleTop = selectionRect.top - margin;
+            }
+        }
+    }
+    
+    // Apply initial positioning to measure actual size
+    content.style.position = 'fixed';
+    content.style.left = bubbleLeft + 'px';
+    content.style.top = bubbleTop + 'px';
+    content.style.margin = '0';
+    content.style.transform = 'scale(1) translateY(0) !important';
+    
+    // Now get actual dimensions
+    const bubbleHeight = content.offsetHeight;
+    const actualBubbleWidth = content.offsetWidth;
+    
+    // Ensure bubble doesn't go off screen vertically
+    if (bubbleTop + bubbleHeight > window.innerHeight - margin) {
+        bubbleTop = window.innerHeight - bubbleHeight - margin;
+    }
+    if (bubbleTop < margin) {
+        bubbleTop = margin;
+    }
+    
+    // Reapply corrected positioning
+    content.style.top = bubbleTop + 'px';
+    
+    console.log('Calculated position:', { bubbleLeft, bubbleTop, bubbleHeight, actualBubbleWidth });
+}
+
+// Function to reposition when content changes (like when response is loaded)
+function repositionBubbleAfterContentChange() {
+    if (!currentSelectionData?.rect) return;
+    
+    const overlay = document.getElementById('selectionResponseOverlay');
+    if (!overlay) return;
+    
+    const content = overlay.querySelector('.selection-response-content');
+    if (!content) return;
+    
+    // Re-run positioning with updated content size
+    positionBubbleRelativeToSelection(content, currentSelectionData.rect);
+}
+
+function updateSelectionOverlayResponse(response, isError = false) {
+    const overlay = document.getElementById('selectionResponseOverlay');
+    if (!overlay) return;
+    
+    const responseArea = overlay.querySelector('.selection-response-area');
+    const footer = overlay.querySelector('.selection-response-footer');
+    
+    // Show the original query and response
+    const queryDiv = document.createElement('div');
+    queryDiv.className = 'selection-final-query';
+    
+    const additionalContext = document.getElementById('additionalContext')?.value.trim();
+    
+    // Frontend display: Quoted text at top, then user's question below
+    let displayHTML = `<div class="selected-text-quote">${currentSelectionData.text}</div>`;
+    
+    if (additionalContext) {
+        displayHTML += `<div class="user-question">${additionalContext}</div>`;
+    } else {
+        // Use the default question based on the prefix
+        let defaultQuestion = 'Can you explain this?';
+        if (currentSelectionData.prefix.includes('Summarize')) {
+            defaultQuestion = 'Can you summarize this?';
+        } else if (currentSelectionData.prefix.includes('Calculate')) {
+            defaultQuestion = 'Can you calculate this?';
+        } else if (currentSelectionData.prefix.includes('understand')) {
+            defaultQuestion = 'Can you help me understand this?';
+        }
+        displayHTML += `<div class="user-question">${defaultQuestion}</div>`;
+    }
+    
+    queryDiv.innerHTML = displayHTML;
+    
+    const responseDiv = document.createElement('div');
+    responseDiv.className = 'selection-response-text message-text';
+    
+    if (isError) {
+        responseDiv.style.color = '#ef4444';
+        responseDiv.textContent = response;
+    } else {
+        // Format the response with the same formatting as chat messages
+        responseDiv.innerHTML = processMessageText(response);
+    }
+    
+    if (responseArea) {
+        const responseContent = responseArea.querySelector('.response-content');
+        if (responseContent) {
+            responseContent.innerHTML = '';
+            responseContent.appendChild(responseDiv);
+        } else {
+            responseArea.innerHTML = '';
+            responseArea.appendChild(responseDiv);
+        }
+    }
+    
+    // Reposition after content changes to ensure it stays on screen
+    setTimeout(() => repositionBubbleAfterContentChange(), 100);
+    
+    // No footer needed - close button is in top-right corner
+}
+
+function hideSelectionResponseOverlay() {
+    const overlay = document.getElementById('selectionResponseOverlay');
+    if (overlay) {
+        overlay.classList.remove('show');
+        setTimeout(() => {
+            if (overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+            }
+        }, 300);
+    }
+    
+    document.removeEventListener('keydown', handleOverlayEscape);
+}
+
+function handleOverlayEscape(event) {
+    if (event.key === 'Escape') {
+        hideSelectionResponseOverlay();
+    }
+}
+
+function handleOverlayClickOutside(event) {
+    if (event.target === event.currentTarget) {
+        hideSelectionResponseOverlay();
+    }
+}
+
+async function getSelectionResponse(message) {
+    const apiKey = getApiKey();
+    
+    // Validate API key
+    if (apiKey === 'YOUR_API_KEY' || apiKey === 'your-api-key-here' || !apiKey) {
+        throw new Error('Please set your OpenAI API key in the config.js file.');
+    }
+    
+    const messages = [{
+        role: 'user',
+        content: message
+    }];
+    
+    const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: currentModel || 'chatgpt-4o-latest',
+            messages: messages,
+            max_completion_tokens: 2000,
+            temperature: 0.7
+        })
+    });
+    
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`API Error: ${errorData.error?.message || response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.choices[0].message.content;
 }
 
 function showSelectionPreview(selectedText, prefix) {
