@@ -3445,10 +3445,22 @@ async function sendSelectionQuery() {
     
     const additionalContext = document.getElementById('additionalContext').value.trim();
     
-    // Build the query
-    let query = currentSelectionData.prefix + currentSelectionData.text;
+    // Build the query with better context
+    let query = `I selected this text from our conversation: "${currentSelectionData.text}"`;
+    
     if (additionalContext) {
-        query += '\n\nAdditional context: ' + additionalContext;
+        query += `\n\n${additionalContext}`;
+    } else {
+        // Use default based on prefix but make it more contextual
+        if (currentSelectionData.prefix.includes('Summarize')) {
+            query += '\n\nCan you summarize this part in the context of our discussion?';
+        } else if (currentSelectionData.prefix.includes('Calculate')) {
+            query += '\n\nCan you explain or calculate this in detail?';
+        } else if (currentSelectionData.prefix.includes('understand')) {
+            query += '\n\nCan you help me understand this better in the context of our conversation?';
+        } else {
+            query += '\n\nCan you explain this part in more detail, considering our full conversation context?';
+        }
     }
     
     // Hide the input form and show loading
@@ -3703,10 +3715,14 @@ async function getSelectionResponse(message) {
         throw new Error('Please set your OpenAI API key in the config.js file.');
     }
     
-    const messages = [{
+    // Build messages with full conversation context and system prompt
+    let messages = buildMessagesWithSystem(conversationHistory);
+    
+    // Add the selection query as the latest message
+    messages.push({
         role: 'user',
         content: message
-    }];
+    });
     
     const response = await fetch(API_URL, {
         method: 'POST',
