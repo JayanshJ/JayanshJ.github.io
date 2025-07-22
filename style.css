@@ -1012,6 +1012,30 @@ body {
     .message-table td {
         padding: 8px 12px;
     }
+    
+    /* Mobile code block styling */
+    .message-text pre {
+        margin: 12px -16px; /* Extend to container edges */
+        border-radius: 0;
+        padding: 12px 16px;
+        font-size: 13px;
+        overflow-x: auto;
+        max-width: 100vw;
+        box-sizing: border-box;
+    }
+    
+    .code-block-wrapper {
+        margin: 12px -16px; /* Match pre margin */
+        position: relative;
+    }
+    
+    /* Adjust copy button position for mobile */
+    .copy-btn {
+        top: 8px;
+        right: 8px;
+        padding: 6px 8px;
+        font-size: 11px;
+    }
 }
 
 /* LaTeX and Math styling */
