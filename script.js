@@ -3527,6 +3527,7 @@ function showSelectionResponseOverlay(selectedText, prefix, selectionRect) {
                     <div class="response-content"></div>
                 </div>
             </div>
+            <div class="overlay-resize-handle" title="Drag to resize"></div>
         </div>
     `;
     
@@ -3551,6 +3552,9 @@ function showSelectionResponseOverlay(selectedText, prefix, selectionRect) {
     // Handle escape key and click outside
     document.addEventListener('keydown', handleOverlayEscape);
     overlay.addEventListener('click', handleOverlayClickOutside);
+    
+    // Add resize functionality for desktop
+    setupOverlayResize(overlay);
 }
 
 function positionBubbleRelativeToSelection(content, selectionRect) {
@@ -3708,6 +3712,62 @@ function handleOverlayClickOutside(event) {
     if (event.target === event.currentTarget) {
         hideSelectionResponseOverlay();
     }
+}
+
+function setupOverlayResize(overlay) {
+    const content = overlay.querySelector('.selection-response-content');
+    const resizeHandle = overlay.querySelector('.overlay-resize-handle');
+    
+    if (!content || !resizeHandle || window.innerWidth <= 768) {
+        return; // Skip on mobile
+    }
+    
+    let isResizing = false;
+    let startX, startY, startWidth, startHeight;
+    
+    resizeHandle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = parseInt(document.defaultView.getComputedStyle(content).width, 10);
+        startHeight = parseInt(document.defaultView.getComputedStyle(content).height, 10);
+        
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Add body class to prevent text selection during resize
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'nw-resize';
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        
+        const width = startWidth + e.clientX - startX;
+        const height = startHeight + e.clientY - startY;
+        
+        // Apply constraints
+        const minWidth = 280;
+        const maxWidth = Math.min(800, window.innerWidth - 40);
+        const minHeight = 200;
+        const maxHeight = Math.min(600, window.innerHeight - 40);
+        
+        const constrainedWidth = Math.max(minWidth, Math.min(width, maxWidth));
+        const constrainedHeight = Math.max(minHeight, Math.min(height, maxHeight));
+        
+        content.style.width = constrainedWidth + 'px';
+        content.style.height = constrainedHeight + 'px';
+        content.style.maxWidth = 'none';
+        content.style.maxHeight = 'none';
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+        }
+    });
 }
 
 async function getSelectionResponse(message) {

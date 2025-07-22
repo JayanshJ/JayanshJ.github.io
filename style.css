@@ -3385,6 +3385,8 @@ body {
     width: 320px;
     max-width: 90vw;
     max-height: 400px;
+    min-width: 280px;
+    min-height: 200px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.1);
     transform: scale(0.9) translateY(-5px);
@@ -3392,6 +3394,7 @@ body {
     position: relative;
     display: flex;
     flex-direction: column;
+    resize: none; /* We'll handle resize manually */
 }
 
 .selection-response-overlay.show .selection-response-content {
@@ -3399,6 +3402,31 @@ body {
 }
 
 /* Clean bubble without tail */
+
+/* Resize handle for desktop overlay */
+.overlay-resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    cursor: nw-resize;
+    background: linear-gradient(-45deg, transparent 30%, rgba(255, 255, 255, 0.1) 30%, rgba(255, 255, 255, 0.1) 40%, transparent 40%, transparent 60%, rgba(255, 255, 255, 0.1) 60%, rgba(255, 255, 255, 0.1) 70%, transparent 70%);
+    border-bottom-right-radius: 12px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.overlay-resize-handle:hover {
+    opacity: 1;
+}
+
+/* Hide resize handle on mobile */
+@media (max-width: 768px) {
+    .overlay-resize-handle {
+        display: none;
+    }
+}
 
 .bubble-close-btn {
     position: absolute;
