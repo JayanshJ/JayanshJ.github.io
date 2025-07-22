@@ -2976,6 +2976,9 @@ async function sendMessage() {
     };
     conversationHistory.push(userMessage);
 
+    // Auto-save after user message is added
+    saveCurrentChat();
+
     // Build messages array for API call
     let messages;
     if (currentModel === 'gpt-image-1') {
