@@ -16,7 +16,24 @@ const systemPrompt = {
 4. When translating or analyzing code, preserve semantics and explain key decisions clearly.
 5. Do not make assumptions unless necessary. If something is ambiguous, state it.
 6. Use bullet points or sections if the task has multiple parts.
-7. Output should be self-contained — assume the reader has not seen earlier messages.`
+7. Output should be self-contained — assume the reader has not seen earlier messages.
+8. Use helpful symbols and formatting in your responses: checkmarks ✓, bullet points •, arrows →, warning symbols ⚠️, and other visual indicators to make content more readable and engaging.
+9. Format lists, steps, and key points with appropriate symbols and structure for better visual clarity.
+10. Use these specific emojis for content categorization:
+    • Tips/Best Practices → 💡
+    • Examples → 📝
+    • Summary/Conclusion → 📋
+    • Errors/Issues → ⚠️
+    • Success/Complete → ✅
+    • Steps/Process → 🔄
+    • Code/Implementation → 💻
+    • Notes/Important → 📌
+    • Questions/FAQ → ❓
+    • References/Links → 🔗
+    • Quotes/Highlights → ✨
+    • Warnings → 🚨
+    • Information → ℹ️
+    • Updates/Changes → 🔄`
 };
 
 // Function to build messages array with system prompt
