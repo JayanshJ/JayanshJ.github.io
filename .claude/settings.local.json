@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tail:*)",
+      "Bash(grep:*)",
+      "Bash(node:*)",
+      "Bash(type:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": []
+  }
+}

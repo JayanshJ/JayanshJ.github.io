@@ -82,23 +82,51 @@ let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 
-// Load chat history from localStorage
-function loadChatHistory() {
-    const saved = localStorage.getItem('chatgpt_history');
-    if (saved) {
-        try {
+// Load chat history from Firebase or localStorage
+async function loadChatHistory() {
+    try {
+        // Always load from localStorage first as a fallback
+        const saved = localStorage.getItem('chatgpt_history');
+        if (saved) {
             chatHistory = JSON.parse(saved);
-            
-            // Calculate global tokens from existing chats if not already loaded
-            if (globalTokens.total === 0) {
-                globalTokens.total = chatHistory.reduce((total, chat) => {
-                    return total + (chat.tokens ? chat.tokens.total : 0);
-                }, 0);
-                globalTokens.chats = chatHistory.length;
-                saveGlobalTokens();
+            console.log('Loaded chat history from localStorage');
+        }
+        
+        // Then try to load from Firebase if user is authenticated
+        if (typeof window.chatStorage !== 'undefined' && window.chatStorage) {
+            const result = await window.chatStorage.getUserChats();
+            if (result.success && result.chats.length > 0) {
+                // Firebase data takes precedence if available
+                chatHistory = result.chats;
+                console.log(`Loaded ${result.chats.length} chats from Firebase, overriding localStorage`);
+                
+                // Also update localStorage with the Firebase data
+                localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
+            } else if (result.error && result.error !== 'User not authenticated') {
+                console.warn('Firebase error:', result.error);
             }
-        } catch (e) {
-            console.error('Error loading chat history:', e);
+        }
+        
+        // Calculate global tokens from existing chats if not already loaded
+        if (globalTokens.total === 0) {
+            globalTokens.total = chatHistory.reduce((total, chat) => {
+                return total + (chat.tokens ? chat.tokens.total : 0);
+            }, 0);
+            globalTokens.chats = chatHistory.length;
+            saveGlobalTokens();
+        }
+    } catch (e) {
+        console.error('Error loading chat history:', e);
+        // Fallback to localStorage on error
+        const saved = localStorage.getItem('chatgpt_history');
+        if (saved) {
+            try {
+                chatHistory = JSON.parse(saved);
+            } catch (parseError) {
+                console.error('Error parsing localStorage data:', parseError);
+                chatHistory = [];
+            }
+        } else {
             chatHistory = [];
         }
     }
@@ -145,8 +173,8 @@ function createFolder() {
     }
 }
 
-// Delete a folder
-function deleteFolder(folderId) {
+// Delete a folder (async implementation)
+async function deleteFolderAsync(folderId) {
     const folder = chatFolders.find(f => f.id === folderId);
     if (!folder) return;
     
@@ -166,7 +194,7 @@ function deleteFolder(folderId) {
         // Update global token count
         globalTokens.chats = chatHistory.length;
         
-        saveChatHistory();
+        await saveChatHistory();
         saveChatFolders();
         saveGlobalTokens();
         updateHistoryDisplay();
@@ -269,9 +297,28 @@ function startNewChatInFolder(folderId) {
 }
 
 // Save chat history to localStorage
-function saveChatHistory() {
+async function saveChatHistory() {
     try {
+        // Save to localStorage as backup
         localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
+        console.log('Saved chat history to localStorage');
+        
+        // If user is authenticated and Firebase is available, also save to cloud
+        if (typeof window.chatStorage !== 'undefined' && window.chatStorage) {
+            console.log(`Attempting to save ${chatHistory.length} chats to Firebase...`);
+            let savedCount = 0;
+            for (const chat of chatHistory) {
+                const result = await window.chatStorage.saveChat(chat);
+                if (result.success) {
+                    savedCount++;
+                } else {
+                    console.warn(`Failed to save chat ${chat.id}:`, result.error);
+                }
+            }
+            console.log(`Successfully saved ${savedCount}/${chatHistory.length} chats to Firebase`);
+        } else {
+            console.log('Firebase not available, only saved to localStorage');
+        }
     } catch (e) {
         console.error('Error saving chat history:', e);
     }
@@ -1607,7 +1654,7 @@ Title:`;
                 const chatIndex = chatHistory.findIndex(chat => chat.id === currentChatId);
                 if (chatIndex !== -1) {
                     chatHistory[chatIndex].title = smartTitle;
-                    saveChatHistory();
+                    await saveChatHistory();
                     updateHistoryDisplay();
                 }
             }
@@ -1618,8 +1665,15 @@ Title:`;
     }
 }
 
+// Wrapper for HTML onclick handlers
+function deleteFolder(folderId) {
+    deleteFolderAsync(folderId).catch(error => {
+        console.error('Error deleting folder:', error);
+    });
+}
+
 // Save current chat
-function saveCurrentChat() {
+async function saveCurrentChat() {
     if (conversationHistory.length === 0) return;
     
     const chatData = {
@@ -1663,7 +1717,7 @@ function saveCurrentChat() {
         chatHistory = chatHistory.slice(0, 50);
     }
     
-    saveChatHistory();
+    await saveChatHistory();
     updateHistoryDisplay();
 }
 
@@ -1747,8 +1801,8 @@ function loadChat(chatId) {
     updateHistoryDisplay();
 }
 
-// Delete a chat from history
-function deleteChat(chatId) {
+// Delete a chat from history (async implementation)
+async function deleteChatAsync(chatId) {
     const chatToDelete = chatHistory.find(chat => chat.id === chatId);
     
     // DON'T subtract tokens - they were already consumed and billed
@@ -1757,7 +1811,7 @@ function deleteChat(chatId) {
     chatHistory = chatHistory.filter(chat => chat.id !== chatId);
     globalTokens.chats = chatHistory.length;
     
-    saveChatHistory();
+    await saveChatHistory();
     saveGlobalTokens();
     updateHistoryDisplay();
     updateGlobalTokenDisplay();
@@ -1768,14 +1822,95 @@ function deleteChat(chatId) {
     }
 }
 
+// Manual sync function for debugging
+async function syncChatsWithFirebase() {
+    console.log('Manual sync requested...');
+    if (typeof window.chatStorage !== 'undefined' && window.chatStorage) {
+        // First save all current chats to Firebase
+        await saveChatHistory();
+        
+        // Then reload from Firebase
+        await loadChatHistory();
+        updateHistoryDisplay();
+        
+        console.log('Manual sync completed');
+    } else {
+        console.error('Firebase not available for sync');
+    }
+}
+
+// Make sync function available globally for testing
+window.syncChatsWithFirebase = syncChatsWithFirebase;
+
+// Test Firebase connection and permissions
+async function testFirebaseConnection() {
+    console.log('Testing Firebase connection...');
+    
+    if (typeof window.chatStorage === 'undefined') {
+        console.error('Firebase chatStorage not available');
+        return;
+    }
+    
+    if (typeof window.authFunctions === 'undefined') {
+        console.error('Firebase authFunctions not available');
+        return;
+    }
+    
+    const currentUser = window.authFunctions.getCurrentUser();
+    console.log('Current authenticated user:', currentUser);
+    
+    if (!currentUser) {
+        console.log('No user signed in - please sign in first');
+        return;
+    }
+    
+    // Try to save a test chat
+    const testChat = {
+        id: 'test_' + Date.now(),
+        title: 'Test Chat',
+        messages: [{role: 'user', content: 'test'}],
+        timestamp: Date.now(),
+        model: 'test'
+    };
+    
+    console.log('Attempting to save test chat...');
+    const saveResult = await window.chatStorage.saveChat(testChat);
+    console.log('Save result:', saveResult);
+    
+    if (saveResult.success) {
+        console.log('✅ Save successful! Now testing read...');
+        const readResult = await window.chatStorage.getUserChats();
+        console.log('Read result:', readResult);
+        
+        if (readResult.success) {
+            console.log('✅ Read successful! Firebase is working correctly.');
+            console.log(`Found ${readResult.chats.length} chats`);
+        } else {
+            console.log('❌ Read failed:', readResult.error);
+        }
+    } else {
+        console.log('❌ Save failed:', saveResult.error);
+    }
+}
+
+// Make test function available globally
+window.testFirebaseConnection = testFirebaseConnection;
+
+// Wrapper for HTML onclick handlers  
+function deleteChat(chatId) {
+    deleteChatAsync(chatId).catch(error => {
+        console.error('Error deleting chat:', error);
+    });
+}
+
 // Clear all chat history
-function clearAllHistory() {
+async function clearAllHistory() {
     if (confirm('Are you sure you want to delete all chat history? This cannot be undone.\n\nNote: Token usage will remain unchanged as tokens were already consumed.')) {
         chatHistory = [];
         // DON'T reset global tokens - they represent actual API usage that was already billed
         // Only reset the chat count
         globalTokens.chats = 0;
-        saveChatHistory();
+        await saveChatHistory();
         saveGlobalTokens();
         updateHistoryDisplay();
         updateGlobalTokenDisplay();
@@ -2690,7 +2825,7 @@ function closeTokenUsageModal() {
     }
 }
 
-async function sendMessage() {
+async function sendMessageAsync() {
     const input = document.getElementById('messageInput');
     const sendButton = document.getElementById('sendButton');
     
@@ -2905,7 +3040,7 @@ async function sendMessage() {
                     });
 
                     addMessage(aiMessage, 'ai');
-                    saveCurrentChat();
+                    await saveCurrentChat();
                 }
             }
         } catch (error) {
@@ -2977,7 +3112,7 @@ async function sendMessage() {
     conversationHistory.push(userMessage);
 
     // Auto-save after user message is added
-    saveCurrentChat();
+    await saveCurrentChat();
 
     // Build messages array for API call
     let messages;
@@ -3055,7 +3190,7 @@ async function sendMessage() {
         addMessage(aiMessage, 'ai');
 
         // Auto-save chat after successful response
-        saveCurrentChat();
+        await saveCurrentChat();
 
     } catch (error) {
         console.error('Error:', error);
@@ -3073,6 +3208,13 @@ async function sendMessage() {
             selectedTextContext = null;
         }
     }
+}
+
+// Wrapper for HTML onclick handlers
+function sendMessage() {
+    sendMessageAsync().catch(error => {
+        console.error('Error sending message:', error);
+    });
 }
 
 function addMessage(text, sender, type = 'normal', image = null, file = null) {
@@ -3443,7 +3585,7 @@ function askAboutSelection(selectedText) {
     }, 300);
 }
 
-async function sendSelectionQuery() {
+async function sendSelectionQueryAsync() {
     if (!currentSelectionData) return;
     
     const additionalContext = document.getElementById('additionalContext').value.trim();
@@ -3476,6 +3618,13 @@ async function sendSelectionQuery() {
     } catch (error) {
         updateSelectionOverlayResponse(`Error: ${error.message}`, true);
     }
+}
+
+// Wrapper for HTML onclick handlers
+function sendSelectionQuery() {
+    sendSelectionQueryAsync().catch(error => {
+        console.error('Error sending selection query:', error);
+    });
 }
 
 function showSelectionLoading() {
@@ -4164,7 +4313,7 @@ async function regenerateLastResponse() {
         addMessage(aiMessage, 'ai');
         
         // Save the updated chat
-        saveCurrentChat();
+        await saveCurrentChat();
 
     } catch (error) {
         // Remove typing indicator on error
@@ -4722,7 +4871,7 @@ async function transcribeAudioFile(audioFile) {
 }
 
 // Event listeners
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     const fileInput = document.getElementById('fileInput');
     const messageInput = document.getElementById('messageInput');
     const mainContent = document.querySelector('.main-content');
@@ -4731,7 +4880,28 @@ document.addEventListener('DOMContentLoaded', function() {
     const hasApiKey = promptForApiKey();
     
     // Always initialize the app, but show a message if no API key
-    initializeApp();
+    await initializeApp();
+    
+    // Wait for Firebase modules to load, then set up auth listener
+    setTimeout(() => {
+        // Listen for auth state changes to reload chats
+        if (typeof window.authFunctions !== 'undefined' && window.authFunctions) {
+            window.authFunctions.onAuthStateChanged(async (user) => {
+                if (user) {
+                    console.log('User signed in:', user.email);
+                    console.log('Reloading chats from Firebase...');
+                    await loadChatHistory();
+                    updateHistoryDisplay();
+                } else {
+                    console.log('User signed out, using local storage only');
+                    await loadChatHistory();
+                    updateHistoryDisplay();
+                }
+            });
+        } else {
+            console.warn('Firebase authFunctions not available');
+        }
+    }, 1000); // Increased delay to ensure Firebase loads properly
     
     // Initialize URL routing after app is loaded
     setTimeout(() => {
@@ -4827,7 +4997,7 @@ function updateWelcomeScreenForNoApiKey() {
     }
 }
 
-function initializeApp() {
+async function initializeApp() {
     const fileInput = document.getElementById('fileInput');
     const messageInput = document.getElementById('messageInput');
     const mainContent = document.querySelector('.main-content');
@@ -4836,7 +5006,7 @@ function initializeApp() {
     updateApiKeyStatus();
 
     // Load chat history on startup
-    loadChatHistory();
+    await loadChatHistory();
     
     // Load global token data
     loadGlobalTokens();
@@ -4935,7 +5105,35 @@ function initializeApp() {
     // Auto-save current chat when page is about to unload
     window.addEventListener('beforeunload', () => {
         if (isRecording) stopRecording();
-        if (conversationHistory.length > 0) saveCurrentChat();
+        if (conversationHistory.length > 0) {
+            // For beforeunload, we need to save synchronously
+            // Save to localStorage immediately
+            const chatData = {
+                id: currentChatId || generateChatId(),
+                title: getChatTitle(conversationHistory),
+                messages: [...conversationHistory],
+                model: currentModel,
+                tokens: { ...currentChatTokens },
+                timestamp: Date.now(),
+                date: new Date().toLocaleDateString()
+            };
+            
+            // Update or add to chat history
+            const existingIndex = chatHistory.findIndex(chat => chat.id === chatData.id);
+            if (existingIndex !== -1) {
+                chatHistory[existingIndex] = chatData;
+            } else {
+                chatHistory.unshift(chatData);
+                currentChatId = chatData.id;
+            }
+            
+            // Save immediately to localStorage
+            try {
+                localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
+            } catch (e) {
+                console.error('Error saving chat history on unload:', e);
+            }
+        }
     });
 
     // Close sidebar on ESC key
@@ -5099,7 +5297,7 @@ async function handleImageGeneration(prompt) {
                 content: `Generated image: ${prompt}`
             });
             
-            saveCurrentChat();
+            await saveCurrentChat();
         }
 
     } catch (error) {
@@ -5224,7 +5422,7 @@ async function handleImageEditing(prompt, images) {
                 content: `Edited image: ${prompt}`
             });
             
-            saveCurrentChat();
+            await saveCurrentChat();
         }
 
     } catch (error) {
