@@ -1,6 +1,10 @@
 # Sensitive configuration files
 firebase-config.js
 
+# Keep both auth files for now
+# simple-auth.js
+# simple-auth-global.js
+
 # Environment variables
 .env
 .env.local

@@ -201,5 +201,8 @@ export const chatStorage = {
 export { auth, db };
 
 // Make functions available globally for non-module scripts
-window.chatStorage = chatStorage;
-window.authFunctions = authFunctions;
+// Note: This runs in a module context, so we need to ensure global availability
+if (typeof window !== 'undefined') {
+    window.chatStorage = chatStorage;
+    window.authFunctions = authFunctions;
+}
