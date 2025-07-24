@@ -14,7 +14,7 @@ firebase.initializeApp(firebaseConfig);
 class SecureFirebaseClient {
     constructor() {
         // Use Vercel deployment URL for API calls
-        this.apiBase = 'https://jayansh-j-github-io.vercel.app/api';
+        this.apiBase = 'https://jayansh-j-github-io-2.vercel.app/api';
         this.currentUser = null;
         this.authListeners = [];
     }
