@@ -6,9 +6,4 @@
       "runtime": "nodejs18.x"
     }
   },
-  "env": {
-    "FIREBASE_PROJECT_ID": "ai-app-daeda",
-    "FIREBASE_CLIENT_EMAIL": "@FIREBASE_CLIENT_EMAIL",
-    "FIREBASE_PRIVATE_KEY": "@FIREBASE_PRIVATE_KEY"
-  }
 }
