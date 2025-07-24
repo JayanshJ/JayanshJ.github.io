@@ -1,5 +1,5 @@
 // Vercel serverless function for Firebase auth
-import admin from 'firebase-admin';
+const admin = require('firebase-admin');
 
 // Initialize Firebase Admin (server-side only)
 if (!admin.apps.length) {
@@ -12,7 +12,7 @@ if (!admin.apps.length) {
   });
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
