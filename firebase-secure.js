@@ -67,7 +67,19 @@ class SecureFirebaseClient {
             console.log('Starting Google sign in...');
             const auth = firebase.auth();
             const provider = new firebase.auth.GoogleAuthProvider();
-            const result = await auth.signInWithPopup(provider);
+            
+            // Use redirect for mobile devices, popup for desktop
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+            
+            let result;
+            if (isMobile) {
+                console.log('Mobile detected, using redirect...');
+                await auth.signInWithRedirect(provider);
+                return { success: true, pending: true }; // Will complete on redirect
+            } else {
+                console.log('Desktop detected, using popup...');
+                result = await auth.signInWithPopup(provider);
+            }
             
             console.log('Google sign in result:', result);
             console.log('User object:', result.user);
@@ -108,7 +120,18 @@ class SecureFirebaseClient {
             provider.addScope('email');
             provider.addScope('name');
             
-            const result = await auth.signInWithPopup(provider);
+            // Use redirect for mobile devices, popup for desktop
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+            
+            let result;
+            if (isMobile) {
+                console.log('Mobile detected, using redirect...');
+                await auth.signInWithRedirect(provider);
+                return { success: true, pending: true }; // Will complete on redirect
+            } else {
+                console.log('Desktop detected, using popup...');
+                result = await auth.signInWithPopup(provider);
+            }
             
             console.log('Apple sign in result:', result);
             console.log('User object:', result.user);
@@ -155,8 +178,44 @@ class SecureFirebaseClient {
         return this.currentUser;
     }
 
+    async handleRedirectResult() {
+        try {
+            const auth = firebase.auth();
+            const result = await auth.getRedirectResult();
+            
+            if (result && result.user) {
+                console.log('Redirect authentication successful:', result);
+                const idToken = await result.user.getIdToken();
+                localStorage.setItem('firebase_token', idToken);
+                
+                const email = result.user.email || '';
+                const displayName = result.user.displayName || (email ? email.split('@')[0] : 'User');
+                
+                this.currentUser = {
+                    uid: result.user.uid,
+                    email: email,
+                    displayName: displayName
+                };
+                
+                this.notifyAuthListeners(this.currentUser);
+                return { success: true, user: this.currentUser };
+            }
+            return { success: false, error: 'No redirect result' };
+        } catch (error) {
+            console.error('Redirect result error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
     onAuthStateChanged(callback) {
         this.authListeners.push(callback);
+        
+        // Handle redirect result on page load for mobile OAuth
+        this.handleRedirectResult().then(result => {
+            if (result.success) {
+                console.log('Authenticated via redirect');
+            }
+        });
         
         // Set up Firebase auth state listener
         firebase.auth().onAuthStateChanged(async (user) => {
