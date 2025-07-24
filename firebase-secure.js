@@ -65,9 +65,25 @@ class SecureFirebaseClient {
 
     async signInWithGoogle() {
         try {
-            console.log('Starting Google sign in...');
+            console.log('🔐 Starting Google sign in...');
+            console.log('🌐 Current URL:', window.location.href);
+            console.log('🏠 Current domain:', window.location.hostname);
+            console.log('🔗 Current origin:', window.location.origin);
+            console.log('📱 User agent:', navigator.userAgent);
+            
+            // Check if domain is authorized
+            if (!window.location.hostname.includes('github.io') && !window.location.hostname.includes('vercel.app') && window.location.hostname !== 'localhost') {
+                console.warn('⚠️ Domain mismatch! Current domain may not be authorized in Firebase Console');
+                console.warn('💡 Add this domain to Firebase Console → Authentication → Settings → Authorized domains:');
+                console.warn('📝 Domain to add:', window.location.hostname);
+            }
+            
             const auth = firebase.auth();
             const provider = new firebase.auth.GoogleAuthProvider();
+            
+            // Add scopes for better user info
+            provider.addScope('profile');
+            provider.addScope('email');
             
             // Use redirect for mobile devices, popup for desktop
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
@@ -75,13 +91,26 @@ class SecureFirebaseClient {
                              ('ontouchstart' in window) || 
                              (navigator.maxTouchPoints > 0);
             
+            console.log('📱 Is mobile device:', isMobile);
+            console.log('📏 Window width:', window.innerWidth);
+            console.log('👆 Touch support:', 'ontouchstart' in window);
+            console.log('🔢 Max touch points:', navigator.maxTouchPoints);
+            
             let result;
             if (isMobile) {
                 console.log('📱 Mobile detected, using redirect...');
                 console.log('🔄 Starting signInWithRedirect...');
-                await auth.signInWithRedirect(provider);
-                console.log('✅ Redirect initiated, page will reload...');
-                return { success: true, pending: true }; // Will complete on redirect
+                
+                // Check if redirect is supported
+                if (typeof auth.signInWithRedirect === 'function') {
+                    console.log('✅ signInWithRedirect is available');
+                    await auth.signInWithRedirect(provider);
+                    console.log('✅ Redirect initiated, page will reload...');
+                    return { success: true, pending: true }; // Will complete on redirect
+                } else {
+                    console.error('❌ signInWithRedirect not available');
+                    throw new Error('signInWithRedirect not supported');
+                }
             } else {
                 console.log('💻 Desktop detected, using popup...');
                 result = await auth.signInWithPopup(provider);
@@ -277,21 +306,18 @@ class SecureFirebaseClient {
     onAuthStateChanged(callback) {
         this.authListeners.push(callback);
         
-        // Handle redirect result immediately if not already handled
-        if (!this.redirectHandled) {
-            this.redirectHandled = true;
-            this.handleInitialRedirectResult().then(result => {
-                if (result.success) {
-                    console.log('🎉 Authenticated via mobile redirect');
-                }
-            });
-        }
-        
-        // Set up Firebase auth state listener
+        // Set up Firebase auth state listener - this will automatically handle redirect results
         firebase.auth().onAuthStateChanged(async (user) => {
             console.log('🔄 Firebase auth state changed:', user ? 'User signed in' : 'User signed out');
             
             if (user) {
+                console.log('📱 User details:', {
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName,
+                    providerData: user.providerData
+                });
+                
                 const idToken = await user.getIdToken();
                 localStorage.setItem('firebase_token', idToken);
                 
@@ -302,6 +328,7 @@ class SecureFirebaseClient {
                 };
                 
                 console.log('👤 Current user updated from auth state:', this.currentUser);
+                console.log('✅ Mobile sign-in successful!');
             } else {
                 this.currentUser = null;
                 localStorage.removeItem('firebase_token');
