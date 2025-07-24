@@ -6,8 +6,11 @@ let currentUser = null;
 
 // Initialize auth state when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    // Wait for Firebase modules to load, then initialize
-    setTimeout(() => {
+    // Retry mechanism to wait for Firebase modules to load
+    let retryCount = 0;
+    const maxRetries = 10;
+    
+    function initializeFirebaseAuth() {
         if (typeof window.authFunctions !== 'undefined' && window.authFunctions) {
             // Listen for Firebase auth state changes
             window.authFunctions.onAuthStateChanged((user) => {
@@ -27,15 +30,49 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             console.log('Firebase auth initialized - listening for auth state changes');
         } else {
-            console.warn('Firebase authFunctions not available');
+            retryCount++;
+            if (retryCount < maxRetries) {
+                console.log(`Firebase not ready yet, retrying... (${retryCount}/${maxRetries})`);
+                setTimeout(initializeFirebaseAuth, 500);
+            } else {
+                console.warn('Firebase authFunctions not available after maximum retries');
+                console.warn('Authentication features will be disabled');
+                // Update UI to show that auth is not available
+                updateSettingsAuthUI();
+            }
         }
-    }, 1500); // Increased delay for GitHub Pages
+    }
+    
+    // Start trying to initialize Firebase auth
+    setTimeout(initializeFirebaseAuth, 100);
 });
 
 // Global functions for HTML onclick handlers
 window.showAuthModal = function() {
     const modal = document.getElementById('authModal');
     if (modal) {
+        // Check if Firebase is available and update modal content accordingly
+        if (typeof window.authFunctions === 'undefined' || !window.authFunctions) {
+            // Show message about Firebase not being configured
+            const authError = document.getElementById('authError');
+            if (authError) {
+                authError.innerHTML = 'Authentication requires Firebase configuration. Please see README.md for setup instructions.';
+                authError.style.display = 'block';
+            }
+            // Disable auth buttons
+            const submitBtn = document.getElementById('authSubmitBtn');
+            const googleBtn = document.querySelector('.social-btn.google');
+            if (submitBtn) submitBtn.disabled = true;
+            if (googleBtn) googleBtn.disabled = true;
+        } else {
+            // Firebase is available, enable buttons
+            const submitBtn = document.getElementById('authSubmitBtn');
+            const googleBtn = document.querySelector('.social-btn.google');
+            if (submitBtn) submitBtn.disabled = false;
+            if (googleBtn) googleBtn.disabled = false;
+            clearAuthError();
+        }
+        
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
     }

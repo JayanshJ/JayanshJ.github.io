@@ -487,9 +487,17 @@
     </div>
     
     <script src="config.js"></script>
-    <script type="module" src="firebase-config.js"></script>
     <script src="script.js"></script>
-    <script src="simple-auth-global.js"></script>
+    <!-- Load Firebase module first, then auth functions -->
+    <script type="module" src="firebase-config.js"></script>
+    <script>
+        // Small delay to help ensure Firebase module loads
+        setTimeout(() => {
+            const script = document.createElement('script');
+            script.src = 'simple-auth-global.js';
+            document.head.appendChild(script);
+        }, 200);
+    </script>
 </body>
 
 </html>
