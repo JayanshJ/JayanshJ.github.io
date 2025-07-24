@@ -52,7 +52,7 @@ class SecureFirebaseClient {
             this.currentUser = {
                 uid: userCredential.user.uid,
                 email: userCredential.user.email,
-                displayName: userCredential.user.displayName || email.split('@')[0]
+                displayName: userCredential.user.displayName || (email ? email.split('@')[0] : 'User')
             };
             
             this.notifyAuthListeners(this.currentUser);
@@ -74,7 +74,7 @@ class SecureFirebaseClient {
             this.currentUser = {
                 uid: result.user.uid,
                 email: result.user.email,
-                displayName: result.user.displayName || result.user.email.split('@')[0]
+                displayName: result.user.displayName || (result.user.email ? result.user.email.split('@')[0] : 'User')
             };
             
             this.notifyAuthListeners(this.currentUser);
@@ -112,7 +112,7 @@ class SecureFirebaseClient {
                 this.currentUser = {
                     uid: user.uid,
                     email: user.email,
-                    displayName: user.displayName || user.email.split('@')[0]
+                    displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'User')
                 };
             } else {
                 this.currentUser = null;
