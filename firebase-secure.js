@@ -17,9 +17,7 @@ class SecureFirebaseClient {
         this.apiBase = 'https://jgpteasy.vercel.app/api';
         this.currentUser = null;
         this.authListeners = [];
-        
-        // Handle redirect result immediately on page load for mobile OAuth
-        this.handleInitialRedirectResult();
+        this.redirectHandled = false;
     }
 
     // Authentication functions
@@ -79,11 +77,13 @@ class SecureFirebaseClient {
             
             let result;
             if (isMobile) {
-                console.log('Mobile detected, using redirect...');
+                console.log('📱 Mobile detected, using redirect...');
+                console.log('🔄 Starting signInWithRedirect...');
                 await auth.signInWithRedirect(provider);
+                console.log('✅ Redirect initiated, page will reload...');
                 return { success: true, pending: true }; // Will complete on redirect
             } else {
-                console.log('Desktop detected, using popup...');
+                console.log('💻 Desktop detected, using popup...');
                 result = await auth.signInWithPopup(provider);
             }
             
@@ -134,11 +134,13 @@ class SecureFirebaseClient {
             
             let result;
             if (isMobile) {
-                console.log('Mobile detected, using redirect...');
+                console.log('📱 Mobile detected, using redirect...');
+                console.log('🔄 Starting signInWithRedirect...');
                 await auth.signInWithRedirect(provider);
+                console.log('✅ Redirect initiated, page will reload...');
                 return { success: true, pending: true }; // Will complete on redirect
             } else {
-                console.log('Desktop detected, using popup...');
+                console.log('💻 Desktop detected, using popup...');
                 result = await auth.signInWithPopup(provider);
             }
             
@@ -189,13 +191,18 @@ class SecureFirebaseClient {
 
     async handleInitialRedirectResult() {
         try {
+            console.log('🔄 Checking for mobile redirect result on page load...');
+            
             // Wait for Firebase to initialize
             await new Promise(resolve => {
                 if (firebase.auth) {
+                    console.log('✅ Firebase auth is ready');
                     resolve();
                 } else {
+                    console.log('⏳ Waiting for Firebase auth to load...');
                     const checkFirebase = () => {
                         if (firebase.auth) {
+                            console.log('✅ Firebase auth loaded');
                             resolve();
                         } else {
                             setTimeout(checkFirebase, 100);
@@ -206,10 +213,13 @@ class SecureFirebaseClient {
             });
 
             const auth = firebase.auth();
+            console.log('🔍 Getting redirect result...');
             const result = await auth.getRedirectResult();
             
+            console.log('📱 Redirect result:', result);
+            
             if (result && result.user) {
-                console.log('Mobile redirect authentication successful:', result);
+                console.log('🎉 Mobile redirect authentication successful!', result);
                 const idToken = await result.user.getIdToken();
                 localStorage.setItem('firebase_token', idToken);
                 
@@ -222,12 +232,15 @@ class SecureFirebaseClient {
                     displayName: displayName
                 };
                 
+                console.log('👤 Current user set:', this.currentUser);
                 this.notifyAuthListeners(this.currentUser);
                 return { success: true, user: this.currentUser };
+            } else {
+                console.log('❌ No redirect result found');
             }
             return { success: false, error: 'No redirect result' };
         } catch (error) {
-            console.error('Initial redirect result error:', error);
+            console.error('❌ Initial redirect result error:', error);
             return { success: false, error: error.message };
         }
     }
@@ -264,15 +277,20 @@ class SecureFirebaseClient {
     onAuthStateChanged(callback) {
         this.authListeners.push(callback);
         
-        // Handle redirect result on page load for mobile OAuth
-        this.handleRedirectResult().then(result => {
-            if (result.success) {
-                console.log('Authenticated via redirect');
-            }
-        });
+        // Handle redirect result immediately if not already handled
+        if (!this.redirectHandled) {
+            this.redirectHandled = true;
+            this.handleInitialRedirectResult().then(result => {
+                if (result.success) {
+                    console.log('🎉 Authenticated via mobile redirect');
+                }
+            });
+        }
         
         // Set up Firebase auth state listener
         firebase.auth().onAuthStateChanged(async (user) => {
+            console.log('🔄 Firebase auth state changed:', user ? 'User signed in' : 'User signed out');
+            
             if (user) {
                 const idToken = await user.getIdToken();
                 localStorage.setItem('firebase_token', idToken);
@@ -282,9 +300,12 @@ class SecureFirebaseClient {
                     email: user.email,
                     displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'User')
                 };
+                
+                console.log('👤 Current user updated from auth state:', this.currentUser);
             } else {
                 this.currentUser = null;
                 localStorage.removeItem('firebase_token');
+                console.log('👤 User signed out');
             }
             
             this.notifyAuthListeners(this.currentUser);
