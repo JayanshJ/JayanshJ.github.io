@@ -488,15 +488,33 @@
     
     <script src="config.js"></script>
     <script src="script.js"></script>
-    <!-- Load Firebase module first, then auth functions -->
-    <script type="module" src="firebase-config.js"></script>
+    <!-- Load Firebase module if it exists -->
     <script>
-        // Small delay to help ensure Firebase module loads
-        setTimeout(() => {
-            const script = document.createElement('script');
-            script.src = 'simple-auth-global.js';
-            document.head.appendChild(script);
-        }, 200);
+        // Check if firebase-config.js exists before trying to load it
+        fetch('firebase-config.js')
+            .then(response => {
+                if (response.ok) {
+                    // Firebase config exists, load it
+                    console.log('Loading Firebase configuration...');
+                    const firebaseScript = document.createElement('script');
+                    firebaseScript.type = 'module';
+                    firebaseScript.src = 'firebase-config.js';
+                    document.head.appendChild(firebaseScript);
+                } else {
+                    console.log('Firebase configuration not found - running in local-only mode');
+                }
+            })
+            .catch(() => {
+                console.log('Firebase configuration not available - running in local-only mode');
+            })
+            .finally(() => {
+                // Always load auth functions (they handle Firebase unavailability gracefully)
+                setTimeout(() => {
+                    const authScript = document.createElement('script');
+                    authScript.src = 'simple-auth-global.js';
+                    document.head.appendChild(authScript);
+                }, 300);
+            });
     </script>
 </body>
 

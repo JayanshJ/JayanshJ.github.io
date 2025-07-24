@@ -4883,8 +4883,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     await initializeApp();
     
     // Wait for Firebase modules to load, then set up auth listener
-    setTimeout(() => {
-        // Listen for auth state changes to reload chats
+    let firebaseRetryCount = 0;
+    const maxFirebaseRetries = 10;
+    
+    function setupFirebaseAuthListener() {
         if (typeof window.authFunctions !== 'undefined' && window.authFunctions) {
             window.authFunctions.onAuthStateChanged(async (user) => {
                 if (user) {
@@ -4898,10 +4900,21 @@ document.addEventListener('DOMContentLoaded', async function() {
                     updateHistoryDisplay();
                 }
             });
+            console.log('Firebase auth listener established');
         } else {
-            console.warn('Firebase authFunctions not available');
+            firebaseRetryCount++;
+            if (firebaseRetryCount < maxFirebaseRetries) {
+                console.log(`Waiting for Firebase... (${firebaseRetryCount}/${maxFirebaseRetries})`);
+                setTimeout(setupFirebaseAuthListener, 500);
+            } else {
+                console.log('Firebase not available - running in local-only mode');
+                // App will work with localStorage only
+            }
         }
-    }, 1000); // Increased delay to ensure Firebase loads properly
+    }
+    
+    // Start trying to set up Firebase
+    setTimeout(setupFirebaseAuthListener, 500);
     
     // Initialize URL routing after app is loaded
     setTimeout(() => {
