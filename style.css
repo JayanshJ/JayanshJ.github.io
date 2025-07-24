@@ -192,7 +192,6 @@ body {
     padding-top: 4px;
 }
 
-/* Add staggered animation for history items */
 .history-item {
     padding: 8px 12px;
     border-radius: 6px;
@@ -207,30 +206,8 @@ body {
     background: transparent;
     border: none;
     transform: none;
-    animation: historyItemSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
     margin-bottom: 2px;
 }
-
-@keyframes historyItemSlideIn {
-    from {
-        opacity: 0;
-        transform: translateX(-12px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-/* Stagger the animation for multiple items */
-.history-item:nth-child(1) { animation-delay: 0.05s; }
-.history-item:nth-child(2) { animation-delay: 0.1s; }
-.history-item:nth-child(3) { animation-delay: 0.15s; }
-.history-item:nth-child(4) { animation-delay: 0.2s; }
-.history-item:nth-child(5) { animation-delay: 0.25s; }
-.history-item:nth-child(6) { animation-delay: 0.3s; }
-.history-item:nth-child(7) { animation-delay: 0.35s; }
-.history-item:nth-child(8) { animation-delay: 0.4s; }
 
 .history-item:hover {
     background-color: rgba(255, 255, 255, 0.08);
