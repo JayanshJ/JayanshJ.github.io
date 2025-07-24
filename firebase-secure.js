@@ -215,6 +215,7 @@ class SecureFirebaseClient {
     }
 
     getCurrentUser() {
+        console.log('🔍 getCurrentUser called, returning:', this.currentUser);
         return this.currentUser;
     }
 
@@ -345,10 +346,24 @@ class SecureFirebaseClient {
 
     // Chat storage functions that use secure API
     async saveChat(chatData) {
+        console.log('💾 saveChat called for chat:', chatData.id);
+        console.log('👤 Current user:', this.currentUser);
+        
         const token = localStorage.getItem('firebase_token');
-        if (!token) return { success: false, error: 'Not authenticated' };
+        console.log('🔑 Firebase token exists:', !!token);
+        
+        if (!token) {
+            console.warn('❌ No authentication token found');
+            return { success: false, error: 'Not authenticated' };
+        }
+        
+        if (!this.currentUser) {
+            console.warn('❌ No current user found');
+            return { success: false, error: 'User not authenticated' };
+        }
 
         try {
+            console.log('📤 Sending chat to API:', this.apiBase + '/chats');
             const response = await fetch(`${this.apiBase}/chats`, {
                 method: 'POST',
                 headers: {
@@ -358,25 +373,45 @@ class SecureFirebaseClient {
                 body: JSON.stringify(chatData)
             });
             
-            return await response.json();
+            const result = await response.json();
+            console.log('📥 API response:', result);
+            return result;
         } catch (error) {
+            console.error('💥 saveChat error:', error);
             return { success: false, error: error.message };
         }
     }
 
     async getUserChats() {
+        console.log('📂 getUserChats called');
+        console.log('👤 Current user:', this.currentUser);
+        
         const token = localStorage.getItem('firebase_token');
-        if (!token) return { success: false, error: 'Not authenticated' };
+        console.log('🔑 Firebase token exists:', !!token);
+        
+        if (!token) {
+            console.warn('❌ No authentication token for getUserChats');
+            return { success: false, error: 'Not authenticated' };
+        }
+        
+        if (!this.currentUser) {
+            console.warn('❌ No current user for getUserChats');
+            return { success: false, error: 'User not authenticated' };
+        }
 
         try {
+            console.log('📥 Fetching chats from API:', this.apiBase + '/chats');
             const response = await fetch(`${this.apiBase}/chats`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
             
-            return await response.json();
+            const result = await response.json();
+            console.log('📊 getUserChats API response:', result);
+            return result;
         } catch (error) {
+            console.error('💥 getUserChats error:', error);
             return { success: false, error: error.message };
         }
     }
