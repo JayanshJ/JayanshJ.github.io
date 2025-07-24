@@ -5,7 +5,10 @@
       "Bash(grep:*)",
       "Bash(node:*)",
       "Bash(type:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "WebFetch(domain:jayanshj.github.io)",
+      "Bash(vercel ls:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
