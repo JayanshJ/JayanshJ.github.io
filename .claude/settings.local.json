@@ -8,7 +8,11 @@
       "Bash(cat:*)",
       "WebFetch(domain:jayanshj.github.io)",
       "Bash(vercel ls:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:jayansh-j-github-io.vercel.app)",
+      "WebFetch(domain:jayansh-j-github-io-2.vercel.app)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }
