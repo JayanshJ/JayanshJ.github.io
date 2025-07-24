@@ -113,6 +113,10 @@ async function loadChatHistory() {
                 localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
             } else if (result.error && result.error !== 'User not authenticated') {
                 console.warn('Firebase sync error:', result.error);
+                if (result.fallback) {
+                    console.log('🔄 Using localStorage fallback due to API issues');
+                    // Continue with localStorage data - app still works offline
+                }
             }
         } else {
             console.log('User not authenticated, using localStorage only');

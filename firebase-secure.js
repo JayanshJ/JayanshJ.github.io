@@ -373,12 +373,32 @@ class SecureFirebaseClient {
                 body: JSON.stringify(chatData)
             });
             
+            console.log('📡 Save API response status:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Save API returned error:', response.status, errorText);
+                
+                // Still return success for localStorage fallback
+                console.log('🔄 API failed but localStorage will handle storage');
+                return { 
+                    success: false, 
+                    error: `API error: ${response.status}`, 
+                    fallback: true 
+                };
+            }
+            
             const result = await response.json();
             console.log('📥 API response:', result);
             return result;
         } catch (error) {
             console.error('💥 saveChat error:', error);
-            return { success: false, error: error.message };
+            console.log('🔄 API failed but localStorage will handle storage');
+            return { 
+                success: false, 
+                error: error.message, 
+                fallback: true 
+            };
         }
     }
 
@@ -407,12 +427,32 @@ class SecureFirebaseClient {
                 }
             });
             
+            console.log('📡 API response status:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ API returned error:', response.status, errorText);
+                
+                // Fallback to localStorage if API fails
+                console.log('🔄 Falling back to localStorage only');
+                return { 
+                    success: false, 
+                    error: `API error: ${response.status}`, 
+                    fallback: true 
+                };
+            }
+            
             const result = await response.json();
             console.log('📊 getUserChats API response:', result);
             return result;
         } catch (error) {
             console.error('💥 getUserChats error:', error);
-            return { success: false, error: error.message };
+            console.log('🔄 Falling back to localStorage only');
+            return { 
+                success: false, 
+                error: error.message, 
+                fallback: true 
+            };
         }
     }
 

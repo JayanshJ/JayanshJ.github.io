@@ -3,13 +3,27 @@ const admin = require('firebase-admin');
 
 // Initialize Firebase Admin (server-side only)
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    }),
-  });
+  try {
+    // Check if required environment variables exist
+    const requiredEnvVars = ['FIREBASE_PROJECT_ID', 'FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY'];
+    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+    
+    if (missingVars.length > 0) {
+      throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+    }
+    
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      }),
+    });
+    console.log('Firebase Admin initialized successfully');
+  } catch (error) {
+    console.error('Firebase Admin initialization failed:', error.message);
+    throw error;
+  }
 }
 
 const db = admin.firestore();
@@ -73,6 +87,21 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ success: false, error: 'Method not allowed' });
   } catch (error) {
     console.error('Chats API error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    
+    // Provide more specific error information
+    let errorMessage = error.message;
+    if (error.message.includes('Missing required environment variables')) {
+      errorMessage = 'Server configuration error: Firebase environment variables not set';
+    } else if (error.code === 'auth/id-token-expired') {
+      errorMessage = 'Authentication token expired';
+    } else if (error.code === 'auth/invalid-id-token') {
+      errorMessage = 'Invalid authentication token';
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
