@@ -1,9 +1,13 @@
-# Sensitive configuration files
+# Secure Firebase - hide original config since we use serverless functions
 firebase-config.js
 
-# Keep both auth files for now
-# simple-auth.js
-# simple-auth-global.js
+# Node modules for Vercel functions  
+node_modules/
+.vercel/
+
+# Environment variables (these go in Vercel dashboard)
+.env
+.env.local
 
 # Environment variables
 .env

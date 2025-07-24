@@ -1,0 +1,17 @@
+{
+  "name": "ai-chat-app",
+  "version": "1.0.0",
+  "description": "AI Chat Application with secure Firebase backend",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static site - no build needed'",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.0.0"
+  }
+}

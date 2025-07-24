@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "api/*.js": {
+      "runtime": "@vercel/node@3.0.0"
+    }
+  },
+  "env": {
+    "FIREBASE_PROJECT_ID": "ai-app-daeda",
+    "FIREBASE_CLIENT_EMAIL": "@firebase_client_email",
+    "FIREBASE_PRIVATE_KEY": "@firebase_private_key"
+  }
+}
