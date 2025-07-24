@@ -14,7 +14,9 @@
       "WebFetch(domain:jayansh-j-github-io-2.vercel.app)",
       "Bash(git commit:*)",
       "WebFetch(domain:new-gpt-taupe.vercel.app)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(git mv:*)",
+      "Bash(git rm:*)"
     ],
     "deny": []
   }

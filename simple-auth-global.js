@@ -18,8 +18,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     isAuthenticated = true;
                     currentUser = {
                         email: user.email,
-                        provider: user.providerData[0]?.providerId === 'google.com' ? 'Google' : 'Email/Password',
-                        displayName: user.displayName || user.email.split('@')[0],
+                        provider: user.providerData?.[0]?.providerId === 'google.com' ? 'Google' : 'Email/Password',
+                        displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'User'),
                         uid: user.uid
                     };
                 } else {
@@ -218,7 +218,7 @@ function updateSettingsAuthUI() {
         
         // Update user info in settings
         if (userNameInSettings) {
-            userNameInSettings.textContent = currentUser.displayName || currentUser.email.split('@')[0];
+            userNameInSettings.textContent = currentUser.displayName || (currentUser.email ? currentUser.email.split('@')[0] : 'User');
         }
         if (userEmailInSettings) {
             userEmailInSettings.textContent = currentUser.email;
