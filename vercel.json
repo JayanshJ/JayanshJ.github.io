@@ -5,5 +5,8 @@
     "api/**/*.js": {
       "runtime": "@vercel/node@3.0.25"
     }
+  },
+  "engines": {
+    "node": "20.x"
   }
 }
