@@ -1463,25 +1463,22 @@ body {
 .model-selector-btn {
     display: flex;
     align-items: center;
-    gap: 4px;
-    background: none;
+    gap: 6px;
+    background: #2f2f2f;
     border: 1px solid #565869;
-    border-radius: 12px;
-    padding: 4px 8px;
+    border-radius: 8px;
+    padding: 6px 10px;
     color: #ececf1;
     cursor: pointer;
     font-size: 11px;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
     white-space: nowrap;
-    min-width: 60px;
-    transform: translateY(0);
+    min-width: 80px;
 }
 
 .model-selector-btn:hover {
-    background-color: #404040;
-    border-color: #6b7280;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background: #404040;
+    border-color: #6366f1;
 }
 
 .model-selector-btn svg {
@@ -1497,15 +1494,16 @@ body {
     position: absolute;
     bottom: calc(100% + 8px);
     left: 0;
-    background-color: #2f2f2f;
+    background: #2f2f2f;
     border: 1px solid #404040;
     border-radius: 12px;
     display: none;
     z-index: 1000;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    min-width: 200px;
+    min-width: 260px;
     animation: dropdownSlideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     transform-origin: bottom left;
+    overflow: hidden;
 }
 
 @keyframes dropdownSlideIn {
@@ -1526,11 +1524,15 @@ body {
 }
 
 .model-option {
-    padding: 12px;
+    padding: 14px 16px;
     cursor: pointer;
     border-bottom: 1px solid #404040;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    transform: translateX(0);
+    transition: all 0.2s ease;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    background: transparent;
 }
 
 .model-option:first-child {
@@ -1545,22 +1547,67 @@ body {
 }
 
 .model-option:hover {
-    background-color: #404040;
-    transform: translateX(4px);
+    background: rgba(99, 102, 241, 0.1);
+    border-left: 2px solid #6366f1;
+    padding-left: 14px;
 }
 
 .model-option.selected {
-    background-color: #0969da;
+    background: rgba(99, 102, 241, 0.15);
+    border-left: 3px solid #6366f1;
+    padding-left: 13px;
 }
 
 .model-name {
-    font-weight: 500;
-    margin-bottom: 2px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    font-size: 14px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .model-desc {
-    font-size: 11px;
-    color: #9ca3af;
+    font-size: 12px;
+    color: #a0a0a0;
+    line-height: 1.4;
+    margin: 0;
+    opacity: 0.9;
+}
+
+.model-icon {
+    font-size: 16px;
+    display: inline-block;
+    margin-right: 2px;
+}
+
+.model-badge {
+    background: #6366f1;
+    color: white;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.model-option:hover .model-desc {
+    color: #d1d5db;
+}
+
+.model-option:hover .model-badge {
+    background: #7c3aed;
+}
+
+.model-option.selected .model-desc {
+    color: #e0e7ff;
+}
+
+.model-option.selected .model-badge {
+    background: #8b5cf6;
 }
 
 .input-wrapper:focus-within {

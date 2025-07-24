@@ -570,6 +570,10 @@ function updateCreditBalanceWithUsage(inputTokens, outputTokens, model) {
         'chatgpt-4o-latest': {
             input: 5.00,    // $5.00 per 1M input tokens
             output: 15.00   // $15.00 per 1M output tokens
+        },
+        'gpt-4o-search-preview-2025-03-11': {
+            input: 5.00,    // $5.00 per 1M input tokens (estimated, same as 4o)
+            output: 15.00   // $15.00 per 1M output tokens (estimated, same as 4o)
         }
     };
     
@@ -1436,6 +1440,11 @@ function processMessageText(text) {
     
     // Convert *italic* to <em>
     text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    
+    // Convert URLs to clickable links
+    // Match URLs that start with http://, https://, or www.
+    text = text.replace(/(https?:\/\/[^\s<>"]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+    text = text.replace(/(^|[^\/])(www\.[^\s<>"]+)/g, '$1<a href="http://$2" target="_blank" rel="noopener noreferrer">$2</a>');
     
     // Split into paragraphs by double newlines
     const sections = text.split(/\n\s*\n/);
@@ -2430,12 +2439,13 @@ function updateInputPlaceholder(model) {
     if (!messageInput) return;
     
     const placeholders = {
-        'gpt-image-1': 'Describe the image you want to generate... (or upload images to edit)',
-        'gpt-4.1-2025-04-14': 'Message GPT-4.1... (paste/drag multiple images, PDFs, or audio files)',
-        'chatgpt-4o-latest': 'Message ChatGPT-4o... (paste/drag multiple images, PDFs, or audio files)'
+        'gpt-image-1': 'Describe the image you want to generate...',
+        'gpt-4.1-2025-04-14': 'Message GPT-4.1...',
+        'chatgpt-4o-latest': 'Message ChatGPT-4o...',
+        'gpt-4o-search-preview-2025-03-11': 'Message GPT-4o Search Preview...'
     };
     
-    messageInput.placeholder = placeholders[model] || 'Message ChatGPT... (paste/drag multiple images, PDFs, or audio files)';
+    messageInput.placeholder = placeholders[model] || 'Message ChatGPT...';
 }
 
 // Update UI based on selected model (show/hide image generation features)
@@ -2728,7 +2738,8 @@ function getModelDisplayName(model) {
     const names = {
         'gpt-4.1-2025-04-14': 'GPT-4.1',
         'gpt-image-1': 'Image Gen',
-        'chatgpt-4o-latest': 'ChatGPT-4o Latest'
+        'chatgpt-4o-latest': 'ChatGPT-4o Latest',
+        'gpt-4o-search-preview-2025-03-11': 'GPT-4o Search Preview'
     };
     return names[model] || model;
 }
@@ -2737,13 +2748,14 @@ function getModelTemperature(model) {
     const temperatures = {
         'gpt-4.1-2025-04-14': 0.7,
         'gpt-image-1': 0.7,
-        'chatgpt-4o-latest': 1.0
+        'chatgpt-4o-latest': 1.0,
+        'gpt-4o-search-preview-2025-03-11': 0.7
     };
     return temperatures[model] || 0.7; // Default fallback
 }
 
 // Available models for cycling
-const availableModels = ['gpt-4.1-2025-04-14', 'gpt-image-1', 'chatgpt-4o-latest'];
+const availableModels = ['gpt-4.1-2025-04-14', 'gpt-image-1', 'chatgpt-4o-latest', 'gpt-4o-search-preview-2025-03-11'];
 
 // Function to cycle to next model
 function cycleToNextModel() {
@@ -2935,8 +2947,8 @@ async function sendMessageAsync() {
     }
 
     // Check if model supports vision when images are selected
-    if (selectedImages.length > 0 && !currentModel.includes('gpt-4') && !currentModel.includes('gpt-image-1') && !currentModel.includes('chatgpt-4o-latest')) {
-        addMessage('⚠️ Image analysis requires vision-capable models. Please switch to GPT-4.1-2025-04-14, gpt-image-1, or chatgpt-4o-latest.', 'ai', 'error');
+    if (selectedImages.length > 0 && !currentModel.includes('gpt-4') && !currentModel.includes('gpt-image-1') && !currentModel.includes('chatgpt-4o-latest') && !currentModel.includes('gpt-4o-search-preview')) {
+        addMessage('⚠️ Image analysis requires vision-capable models. Please switch to GPT-4.1-2025-04-14, gpt-image-1, chatgpt-4o-latest, or gpt-4o-search-preview-2025-03-11.', 'ai', 'error');
         return;
     }
 
@@ -3053,7 +3065,7 @@ async function sendMessageAsync() {
                             model: currentModel,
                             messages: buildMessagesWithSystem(conversationHistory),
                             max_completion_tokens: 1000,
-                            temperature: getModelTemperature(currentModel)
+                            ...(currentModel !== 'gpt-4o-search-preview-2025-03-11' && { temperature: getModelTemperature(currentModel) })
                         })
                     });
 
@@ -3198,7 +3210,7 @@ async function sendMessageAsync() {
                 model: currentModel,
                 messages: messages,
                 max_completion_tokens: 10000,
-                temperature: getModelTemperature(currentModel)
+                ...(currentModel !== 'gpt-4o-search-preview-2025-03-11' && { temperature: getModelTemperature(currentModel) })
             })
         });
 
@@ -4337,7 +4349,7 @@ async function regenerateLastResponse() {
                 model: currentModel,
                 messages: messages,
                 max_completion_tokens: 10000,
-                temperature: getModelTemperature(currentModel)
+                ...(currentModel !== 'gpt-4o-search-preview-2025-03-11' && { temperature: getModelTemperature(currentModel) })
             })
         });
 
@@ -4595,7 +4607,7 @@ function handleDrop(event) {
             const fileTypeText = fileTypes.join(', ');
             input.placeholder = `${validFiles} file(s) dropped (${fileTypeText})! Add a message or press Enter to send...`;
             setTimeout(() => {
-                input.placeholder = 'Message ChatGPT... (paste/drag multiple images, PDFs, or audio files)';
+                input.placeholder = 'Message ChatGPT...';
             }, 3000);
         }
     }
@@ -4773,7 +4785,7 @@ function stopRecording() {
         
         // Reset input placeholder
         const input = document.getElementById('messageInput');
-        input.placeholder = 'Message ChatGPT... (paste/drag images, PDFs, or audio)';
+        input.placeholder = 'Message ChatGPT...';
     }
 }
 
