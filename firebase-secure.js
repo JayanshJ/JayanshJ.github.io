@@ -98,6 +98,47 @@ class SecureFirebaseClient {
         }
     }
 
+    async signInWithApple() {
+        try {
+            console.log('Starting Apple sign in...');
+            const auth = firebase.auth();
+            const provider = new firebase.auth.OAuthProvider('apple.com');
+            
+            // Request additional scopes
+            provider.addScope('email');
+            provider.addScope('name');
+            
+            const result = await auth.signInWithPopup(provider);
+            
+            console.log('Apple sign in result:', result);
+            console.log('User object:', result.user);
+            
+            if (!result || !result.user) {
+                throw new Error('No user returned from Apple sign in');
+            }
+            
+            const idToken = await result.user.getIdToken();
+            localStorage.setItem('firebase_token', idToken);
+            
+            // Safely extract email and displayName
+            const email = result.user.email || '';
+            const displayName = result.user.displayName || (email ? email.split('@')[0] : 'User');
+            
+            this.currentUser = {
+                uid: result.user.uid,
+                email: email,
+                displayName: displayName
+            };
+            
+            console.log('Created user object:', this.currentUser);
+            this.notifyAuthListeners(this.currentUser);
+            return { success: true, user: this.currentUser };
+        } catch (error) {
+            console.error('Apple sign in error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
     async signOut() {
         try {
             await firebase.auth().signOut();

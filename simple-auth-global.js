@@ -18,7 +18,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     isAuthenticated = true;
                     currentUser = {
                         email: user.email,
-                        provider: user.providerData?.[0]?.providerId === 'google.com' ? 'Google' : 'Email/Password',
+                        provider: user.providerData?.[0]?.providerId === 'google.com' ? 'Google' : 
+                                 user.providerData?.[0]?.providerId === 'apple.com' ? 'Apple' : 'Email/Password',
                         displayName: user.displayName || (user.email ? user.email.split('@')[0] : 'User'),
                         uid: user.uid
                     };
@@ -160,6 +161,26 @@ window.handleGoogleAuth = async function() {
     } catch (error) {
         showAuthError('Google sign-in failed. Please try again.');
         console.error('Google auth error:', error);
+    }
+};
+
+window.handleAppleAuth = async function() {
+    try {
+        if (typeof window.authFunctions !== 'undefined' && window.authFunctions) {
+            const result = await window.authFunctions.signInWithApple();
+            
+            if (result.success) {
+                closeAuthModal();
+                console.log('Apple authentication successful');
+            } else {
+                showAuthError(result.error);
+            }
+        } else {
+            showAuthError('Authentication system not available');
+        }
+    } catch (error) {
+        showAuthError('Apple sign-in failed. Please try again.');
+        console.error('Apple auth error:', error);
     }
 };
 
