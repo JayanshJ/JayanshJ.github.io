@@ -54,14 +54,16 @@ module.exports = async function handler(req, res) {
       
       if (type === 'folders') {
         // Get user's folders
+        console.log('Fetching folders for userId:', userId);
         const foldersRef = db.collection('folders').where('userId', '==', userId);
-        const snapshot = await foldersRef.orderBy('createdAt', 'asc').get();
+        const snapshot = await foldersRef.get();
         
         const folders = [];
         snapshot.forEach(doc => {
           folders.push({ id: doc.id, ...doc.data() });
         });
 
+        console.log(`Found ${folders.length} folders for user ${userId}`);
         return res.json({ success: true, folders });
       } else {
         // Get user's chats (default behavior)
@@ -83,6 +85,7 @@ module.exports = async function handler(req, res) {
       if (type === 'folders') {
         // Save folders
         const foldersData = req.body;
+        console.log('Saving folders for userId:', userId, 'folders:', Array.isArray(foldersData) ? foldersData.length : 1);
         
         if (Array.isArray(foldersData)) {
           // Save multiple folders
