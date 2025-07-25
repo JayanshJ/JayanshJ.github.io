@@ -237,7 +237,7 @@ async function deleteFolderAsync(folderId) {
         // Update global token count
         globalTokens.chats = chatHistory.length;
         
-        await saveChatHistory();
+        debouncedSave();
         saveChatFolders();
         saveGlobalTokens();
         updateHistoryDisplay();
@@ -340,44 +340,113 @@ function startNewChatInFolder(folderId) {
 }
 
 // Save chat history to localStorage
+let savingInProgress = false;
+let saveTimeout = null;
+
+// Debounced save function to prevent too frequent saves
+function debouncedSave() {
+    if (saveTimeout) {
+        clearTimeout(saveTimeout);
+    }
+    saveTimeout = setTimeout(() => {
+        saveChatHistory();
+    }, 1000); // Wait 1 second after last change
+}
+
+// Immediate save for critical operations
+async function immediateSave() {
+    if (saveTimeout) {
+        clearTimeout(saveTimeout);
+        saveTimeout = null;
+    }
+    await saveChatHistory();
+}
+
+// Sync with Firebase when coming back online
+async function syncChatsWithFirebase() {
+    if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
+        console.log('🔄 Syncing chats with Firebase...');
+        await saveChatHistory(); // This will sync all local changes
+    }
+}
 async function saveChatHistory() {
+    // Prevent concurrent saves
+    if (savingInProgress) {
+        console.log('Save already in progress, skipping...');
+        return;
+    }
+    
+    savingInProgress = true;
     try {
-        // Save to localStorage as backup
+        // First, update all chats with current timestamp
+        const currentTime = Date.now();
+        chatHistory.forEach(chat => {
+            if (!chat.lastUpdated || chat.lastUpdated < currentTime - 1000) {
+                chat.lastUpdated = currentTime;
+            }
+        });
+        
+        // Save to localStorage immediately
         localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
         console.log('Saved chat history to localStorage');
         
         // If user is authenticated and Firebase is available, also save to cloud
         if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
             console.log(`Attempting to save ${chatHistory.length} chats to Firebase...`);
-            let savedCount = 0;
-            for (const chat of chatHistory) {
-                // Add/update lastUpdated timestamp for proper sync
-                const chatWithTimestamp = {
-                    ...chat,
-                    lastUpdated: Date.now()
-                };
-                
-                const result = await window.chatStorage.saveChat(chatWithTimestamp);
-                if (result.success) {
-                    savedCount++;
-                    // Update local copy with timestamp
-                    const localIndex = chatHistory.findIndex(c => c.id === chat.id);
-                    if (localIndex !== -1) {
-                        chatHistory[localIndex].lastUpdated = chatWithTimestamp.lastUpdated;
-                    }
-                } else {
-                    console.warn(`Failed to save chat ${chat.id}:`, result.error);
-                }
-            }
-            console.log(`Successfully saved ${savedCount}/${chatHistory.length} chats to Firebase`);
             
-            // Update localStorage with the timestamped data
-            localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
+            // Save chats in parallel with retry logic
+            const savePromises = chatHistory.map(async (chat) => {
+                const maxRetries = 3;
+                let retryCount = 0;
+                
+                while (retryCount < maxRetries) {
+                    try {
+                        const result = await window.chatStorage.saveChat(chat);
+                        if (result.success) {
+                            return { success: true, chatId: chat.id };
+                        } else if (result.error && result.error.includes('token')) {
+                            // Token expired, try to refresh
+                            console.log('Token expired for chat', chat.id, 'attempting refresh...');
+                            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+                            retryCount++;
+                        } else {
+                            console.warn(`Failed to save chat ${chat.id}:`, result.error);
+                            return { success: false, chatId: chat.id, error: result.error };
+                        }
+                    } catch (error) {
+                        console.warn(`Error saving chat ${chat.id}, attempt ${retryCount + 1}:`, error);
+                        retryCount++;
+                        if (retryCount < maxRetries) {
+                            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+                        }
+                    }
+                }
+                return { success: false, chatId: chat.id, error: 'Max retries exceeded' };
+            });
+            
+            const results = await Promise.allSettled(savePromises);
+            const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+            
+            console.log(`Successfully saved ${successCount}/${chatHistory.length} chats to Firebase`);
+            
+            // Check for any failures and log them
+            const failures = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success));
+            if (failures.length > 0) {
+                console.warn(`${failures.length} chats failed to save to Firebase - they remain in localStorage`);
+            }
         } else {
             console.log('User not authenticated or Firebase not available, only saved to localStorage');
         }
     } catch (e) {
         console.error('Error saving chat history:', e);
+        // Ensure localStorage is still updated even if Firebase fails
+        try {
+            localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
+        } catch (localError) {
+            console.error('Critical: Failed to save to localStorage:', localError);
+        }
+    } finally {
+        savingInProgress = false;
     }
 }
 
@@ -1720,7 +1789,7 @@ Title:`;
                 const chatIndex = chatHistory.findIndex(chat => chat.id === currentChatId);
                 if (chatIndex !== -1) {
                     chatHistory[chatIndex].title = smartTitle;
-                    await saveChatHistory();
+                    debouncedSave();
                     updateHistoryDisplay();
                 }
             }
@@ -1783,7 +1852,7 @@ async function saveCurrentChat() {
         chatHistory = chatHistory.slice(0, 50);
     }
     
-    await saveChatHistory();
+    debouncedSave();
     updateHistoryDisplay();
 }
 
@@ -1877,7 +1946,7 @@ async function deleteChatAsync(chatId) {
     chatHistory = chatHistory.filter(chat => chat.id !== chatId);
     globalTokens.chats = chatHistory.length;
     
-    await saveChatHistory();
+    debouncedSave();
     saveGlobalTokens();
     updateHistoryDisplay();
     updateGlobalTokenDisplay();
@@ -1893,7 +1962,7 @@ async function syncChatsWithFirebase() {
     console.log('Manual sync requested...');
     if (typeof window.chatStorage !== 'undefined' && window.chatStorage) {
         // First save all current chats to Firebase
-        await saveChatHistory();
+        debouncedSave();
         
         // Then reload from Firebase
         await loadChatHistory();
@@ -1976,7 +2045,7 @@ async function clearAllHistory() {
         // DON'T reset global tokens - they represent actual API usage that was already billed
         // Only reset the chat count
         globalTokens.chats = 0;
-        await saveChatHistory();
+        debouncedSave();
         saveGlobalTokens();
         updateHistoryDisplay();
         updateGlobalTokenDisplay();
@@ -3463,6 +3532,23 @@ let previewBubble = null;
 // Initialize text selection listener
 document.addEventListener('DOMContentLoaded', function() {
     initializeSelectionTooltip();
+    
+    // Add online/offline event listeners for chat sync
+    window.addEventListener('online', () => {
+        console.log('📶 Back online, syncing chats...');
+        syncChatsWithFirebase();
+    });
+    
+    window.addEventListener('offline', () => {
+        console.log('📴 Gone offline, will sync when back online');
+    });
+    
+    // Save immediately when page is about to unload
+    window.addEventListener('beforeunload', () => {
+        // Use sendBeacon for reliable delivery during page unload
+        const dataToSave = JSON.stringify(chatHistory);
+        localStorage.setItem('chatgpt_history', dataToSave);
+    });
 });
 
 function initializeSelectionTooltip() {

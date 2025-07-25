@@ -67,12 +67,20 @@ module.exports = async function handler(req, res) {
       const chatData = req.body;
       const chatRef = db.collection('chats').doc(chatData.id);
       
-      await chatRef.set({
+      // Check if this is a new chat or an update
+      const existingDoc = await chatRef.get();
+      const updateData = {
         ...chatData,
         userId,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
+      };
+      
+      // Only set createdAt for new chats
+      if (!existingDoc.exists) {
+        updateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+      
+      await chatRef.set(updateData, { merge: true });
 
       return res.json({ success: true, id: chatData.id });
     }

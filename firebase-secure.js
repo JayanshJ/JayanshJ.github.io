@@ -344,12 +344,29 @@ class SecureFirebaseClient {
         this.authListeners.forEach(callback => callback(user));
     }
 
+    // Token refresh helper
+    async refreshToken() {
+        try {
+            const auth = firebase.auth();
+            const user = auth.currentUser;
+            if (user) {
+                const newToken = await user.getIdToken(true); // force refresh
+                localStorage.setItem('firebase_token', newToken);
+                console.log('🔄 Token refreshed successfully');
+                return newToken;
+            }
+        } catch (error) {
+            console.error('Failed to refresh token:', error);
+        }
+        return null;
+    }
+
     // Chat storage functions that use secure API
     async saveChat(chatData) {
         console.log('💾 saveChat called for chat:', chatData.id);
         console.log('👤 Current user:', this.currentUser);
         
-        const token = localStorage.getItem('firebase_token');
+        let token = localStorage.getItem('firebase_token');
         console.log('🔑 Firebase token exists:', !!token);
         
         if (!token) {
@@ -362,43 +379,57 @@ class SecureFirebaseClient {
             return { success: false, error: 'User not authenticated' };
         }
 
-        try {
-            console.log('📤 Sending chat to API:', this.apiBase + '/chats');
-            const response = await fetch(`${this.apiBase}/chats`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(chatData)
-            });
-            
-            console.log('📡 Save API response status:', response.status);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ Save API returned error:', response.status, errorText);
+        // Try the request, and if it fails with auth error, refresh token and retry
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                console.log('📤 Sending chat to API:', this.apiBase + '/chats');
+                const response = await fetch(`${this.apiBase}/chats`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(chatData)
+                });
                 
-                // Still return success for localStorage fallback
-                console.log('🔄 API failed but localStorage will handle storage');
-                return { 
-                    success: false, 
-                    error: `API error: ${response.status}`, 
-                    fallback: true 
-                };
+                console.log('📡 Save API response status:', response.status);
+                
+                if (response.status === 401 && attempt === 0) {
+                    // Token expired, try to refresh
+                    console.log('🔄 Token expired, refreshing...');
+                    token = await this.refreshToken();
+                    if (token) {
+                        console.log('✅ Token refreshed, retrying request...');
+                        continue; // Retry with new token
+                    } else {
+                        return { success: false, error: 'Authentication token expired and refresh failed' };
+                    }
+                }
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Save API returned error:', response.status, errorText);
+                    
+                    return { 
+                        success: false, 
+                        error: `API error: ${response.status} - ${errorText}`, 
+                        fallback: true 
+                    };
+                }
+                
+                const result = await response.json();
+                console.log('📥 API response:', result);
+                return result;
+            } catch (error) {
+                console.error('💥 saveChat error:', error);
+                if (attempt === 1) { // Last attempt
+                    return { 
+                        success: false, 
+                        error: error.message, 
+                        fallback: true 
+                    };
+                }
             }
-            
-            const result = await response.json();
-            console.log('📥 API response:', result);
-            return result;
-        } catch (error) {
-            console.error('💥 saveChat error:', error);
-            console.log('🔄 API failed but localStorage will handle storage');
-            return { 
-                success: false, 
-                error: error.message, 
-                fallback: true 
-            };
         }
     }
 
