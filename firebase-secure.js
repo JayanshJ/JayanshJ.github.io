@@ -504,6 +504,127 @@ class SecureFirebaseClient {
             return { success: false, error: error.message };
         }
     }
+
+    // Folder sync methods
+    async saveFolders(foldersData) {
+        console.log('📁 saveFolders called with:', foldersData.length, 'folders');
+        
+        let token = localStorage.getItem('firebase_token');
+        if (!token || !this.currentUser) {
+            return { success: false, error: 'Not authenticated' };
+        }
+
+        // Try the request, and if it fails with auth error, refresh token and retry
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const response = await fetch(`${this.apiBase}/chats?type=folders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(foldersData)
+                });
+                
+                if (response.status === 401 && attempt === 0) {
+                    token = await this.refreshToken();
+                    if (token) {
+                        continue;
+                    } else {
+                        return { success: false, error: 'Authentication token expired and refresh failed' };
+                    }
+                }
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    return { 
+                        success: false, 
+                        error: `API error: ${response.status} - ${errorText}`, 
+                        fallback: true 
+                    };
+                }
+                
+                const result = await response.json();
+                console.log('📁 Folders saved successfully:', result);
+                return result;
+            } catch (error) {
+                if (attempt === 1) {
+                    return { 
+                        success: false, 
+                        error: error.message, 
+                        fallback: true 
+                    };
+                }
+            }
+        }
+    }
+
+    async getUserFolders() {
+        console.log('📂 getUserFolders called');
+        
+        let token = localStorage.getItem('firebase_token');
+        if (!token || !this.currentUser) {
+            return { success: false, error: 'Not authenticated' };
+        }
+
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const response = await fetch(`${this.apiBase}/chats?type=folders`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.status === 401 && attempt === 0) {
+                    token = await this.refreshToken();
+                    if (token) {
+                        continue;
+                    } else {
+                        return { success: false, error: 'Authentication token expired and refresh failed', fallback: true };
+                    }
+                }
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    return { 
+                        success: false, 
+                        error: `API error: ${response.status} - ${errorText}`, 
+                        fallback: true 
+                    };
+                }
+                
+                const result = await response.json();
+                console.log('📂 getUserFolders API response:', result);
+                return result;
+            } catch (error) {
+                if (attempt === 1) {
+                    return { 
+                        success: false, 
+                        error: error.message, 
+                        fallback: true 
+                    };
+                }
+            }
+        }
+    }
+
+    async deleteFolder(folderId) {
+        const token = localStorage.getItem('firebase_token');
+        if (!token) return { success: false, error: 'Not authenticated' };
+
+        try {
+            const response = await fetch(`${this.apiBase}/chats?type=folder&folderId=${folderId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            return await response.json();
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
 }
 
 // Initialize the secure client

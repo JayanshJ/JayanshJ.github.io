@@ -145,7 +145,7 @@ async function loadChatHistory() {
             chatHistory = [];
         }
     }
-    loadChatFolders();
+    await loadChatFolders();
     updateHistoryDisplay();
 }
 
@@ -178,29 +178,129 @@ function mergeChats(localChats, remoteChats) {
 }
 
 // Load chat folders from localStorage
-function loadChatFolders() {
-    const saved = localStorage.getItem('chatgpt_folders');
-    if (saved) {
-        try {
+// Load chat folders from Firebase or localStorage
+async function loadChatFolders() {
+    try {
+        // Always load from localStorage first as a fallback
+        const saved = localStorage.getItem('chatgpt_folders');
+        if (saved) {
             chatFolders = JSON.parse(saved);
-        } catch (e) {
-            console.error('Error loading chat folders:', e);
+            console.log('Loaded folders from localStorage');
+        }
+        
+        // Then try to load from Firebase if user is authenticated
+        if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
+            console.log('User authenticated, attempting to sync folders with Firebase...');
+            const result = await window.chatStorage.getUserFolders();
+            if (result.success && result.folders && result.folders.length > 0) {
+                // Merge Firebase data with localStorage, keeping the most recent
+                const mergedFolders = mergeFolders(chatFolders, result.folders);
+                chatFolders = mergedFolders;
+                console.log(`Synced ${result.folders.length} folders from Firebase`);
+                
+                // Update localStorage with merged data
+                localStorage.setItem('chatgpt_folders', JSON.stringify(chatFolders));
+            } else if (result.error && result.error !== 'User not authenticated') {
+                console.warn('Firebase folder sync error:', result.error);
+                if (result.fallback) {
+                    console.log('🔄 Using localStorage fallback for folders');
+                }
+            }
+        } else {
+            console.log('User not authenticated, using localStorage folders only');
+        }
+    } catch (e) {
+        console.error('Error loading chat folders:', e);
+        // Fallback to localStorage on error
+        const saved = localStorage.getItem('chatgpt_folders');
+        if (saved) {
+            try {
+                chatFolders = JSON.parse(saved);
+            } catch (parseError) {
+                console.error('Error parsing localStorage folder data:', parseError);
+                chatFolders = [];
+            }
+        } else {
             chatFolders = [];
         }
     }
 }
 
-// Save chat folders to localStorage
-function saveChatFolders() {
+// Merge folders from different sources, keeping the most recent version
+function mergeFolders(localFolders, remoteFolders) {
+    const merged = {};
+    
+    // Add all local folders
+    localFolders.forEach(folder => {
+        if (folder.id) {
+            merged[folder.id] = folder;
+        }
+    });
+    
+    // Add remote folders, overwriting if they're newer
+    remoteFolders.forEach(folder => {
+        if (folder.id) {
+            const local = merged[folder.id];
+            if (!local || !local.lastUpdated || (folder.lastUpdated && folder.lastUpdated > local.lastUpdated)) {
+                merged[folder.id] = folder;
+            }
+        }
+    });
+    
+    // Convert back to array and sort by creation date
+    return Object.values(merged).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+}
+
+// Save chat folders to localStorage and Firebase
+let folderSavingInProgress = false;
+async function saveChatFolders() {
+    if (folderSavingInProgress) {
+        console.log('Folder save already in progress, skipping...');
+        return;
+    }
+    
+    folderSavingInProgress = true;
     try {
+        // First, update all folders with current timestamp
+        const currentTime = Date.now();
+        chatFolders.forEach(folder => {
+            if (!folder.lastUpdated || folder.lastUpdated < currentTime - 1000) {
+                folder.lastUpdated = currentTime;
+            }
+        });
+        
+        // Save to localStorage immediately
         localStorage.setItem('chatgpt_folders', JSON.stringify(chatFolders));
+        console.log('Saved folders to localStorage');
+        
+        // If user is authenticated and Firebase is available, also save to cloud
+        if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
+            console.log(`Attempting to save ${chatFolders.length} folders to Firebase...`);
+            
+            const result = await window.chatStorage.saveFolders(chatFolders);
+            if (result.success) {
+                console.log('Successfully saved folders to Firebase');
+            } else {
+                console.warn('Failed to save folders to Firebase:', result.error);
+            }
+        } else {
+            console.log('User not authenticated or Firebase not available, only saved folders to localStorage');
+        }
     } catch (e) {
         console.error('Error saving chat folders:', e);
+        // Ensure localStorage is still updated even if Firebase fails
+        try {
+            localStorage.setItem('chatgpt_folders', JSON.stringify(chatFolders));
+        } catch (localError) {
+            console.error('Critical: Failed to save folders to localStorage:', localError);
+        }
+    } finally {
+        folderSavingInProgress = false;
     }
 }
 
 // Create a new folder
-function createFolder() {
+async function createFolder() {
     const folderName = prompt('Enter folder name:');
     if (folderName && folderName.trim()) {
         const newFolder = {
@@ -211,7 +311,7 @@ function createFolder() {
             createdAt: Date.now()
         };
         chatFolders.push(newFolder);
-        saveChatFolders();
+        await saveChatFolders();
         updateHistoryDisplay();
     }
 }
@@ -238,7 +338,7 @@ async function deleteFolderAsync(folderId) {
         globalTokens.chats = chatHistory.length;
         
         debouncedSave();
-        saveChatFolders();
+        await saveChatFolders();
         saveGlobalTokens();
         updateHistoryDisplay();
         updateGlobalTokenDisplay();
@@ -283,7 +383,7 @@ function closeRenameFolderModal() {
     }
 }
 
-function saveFolderName() {
+async function saveFolderName() {
     const input = document.getElementById('folderNameInput');
     const newName = input.value.trim();
     
@@ -296,7 +396,7 @@ function saveFolderName() {
         const folder = chatFolders.find(f => f.id === currentRenamingFolderId);
         if (folder && newName !== folder.name) {
             folder.name = newName;
-            saveChatFolders();
+            await saveChatFolders();
             updateHistoryDisplay();
         }
     }
@@ -305,17 +405,17 @@ function saveFolderName() {
 }
 
 // Toggle folder expanded/collapsed state
-function toggleFolder(folderId) {
+async function toggleFolder(folderId) {
     const folder = chatFolders.find(f => f.id === folderId);
     if (folder) {
         folder.expanded = !folder.expanded;
-        saveChatFolders();
+        await saveChatFolders();
         updateHistoryDisplay();
     }
 }
 
 // Move chat to folder
-function moveChatToFolder(chatId, targetFolderId) {
+async function moveChatToFolder(chatId, targetFolderId) {
     // Remove chat from any existing folder
     chatFolders.forEach(folder => {
         folder.chats = folder.chats.filter(id => id !== chatId);
@@ -329,7 +429,7 @@ function moveChatToFolder(chatId, targetFolderId) {
         }
     }
     
-    saveChatFolders();
+    await saveChatFolders();
     updateHistoryDisplay();
 }
 
@@ -365,8 +465,9 @@ async function immediateSave() {
 // Sync with Firebase when coming back online
 async function syncChatsWithFirebase() {
     if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
-        console.log('🔄 Syncing chats with Firebase...');
+        console.log('🔄 Syncing chats and folders with Firebase...');
         await saveChatHistory(); // This will sync all local changes
+        await saveChatFolders(); // Also sync folders
     }
 }
 async function saveChatHistory() {
@@ -1837,7 +1938,7 @@ async function saveCurrentChat() {
             const folder = chatFolders.find(f => f.id === currentFolderId);
             if (folder && !folder.chats.includes(chatData.id)) {
                 folder.chats.unshift(chatData.id);
-                saveChatFolders();
+                await saveChatFolders();
             }
         }
         

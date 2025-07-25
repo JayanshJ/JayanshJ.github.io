@@ -50,46 +50,120 @@ module.exports = async function handler(req, res) {
     const userId = decodedToken.uid;
 
     if (req.method === 'GET') {
-      // Get user's chats
-      const chatsRef = db.collection('chats').where('userId', '==', userId);
-      const snapshot = await chatsRef.orderBy('updatedAt', 'desc').get();
+      const { type } = req.query;
       
-      const chats = [];
-      snapshot.forEach(doc => {
-        chats.push({ id: doc.id, ...doc.data() });
-      });
+      if (type === 'folders') {
+        // Get user's folders
+        const foldersRef = db.collection('folders').where('userId', '==', userId);
+        const snapshot = await foldersRef.orderBy('createdAt', 'asc').get();
+        
+        const folders = [];
+        snapshot.forEach(doc => {
+          folders.push({ id: doc.id, ...doc.data() });
+        });
 
-      return res.json({ success: true, chats });
+        return res.json({ success: true, folders });
+      } else {
+        // Get user's chats (default behavior)
+        const chatsRef = db.collection('chats').where('userId', '==', userId);
+        const snapshot = await chatsRef.orderBy('updatedAt', 'desc').get();
+        
+        const chats = [];
+        snapshot.forEach(doc => {
+          chats.push({ id: doc.id, ...doc.data() });
+        });
+
+        return res.json({ success: true, chats });
+      }
     }
 
     if (req.method === 'POST') {
-      // Save a chat
-      const chatData = req.body;
-      const chatRef = db.collection('chats').doc(chatData.id);
+      const { type } = req.query;
       
-      // Check if this is a new chat or an update
-      const existingDoc = await chatRef.get();
-      const updateData = {
-        ...chatData,
-        userId,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      };
-      
-      // Only set createdAt for new chats
-      if (!existingDoc.exists) {
-        updateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
-      }
-      
-      await chatRef.set(updateData, { merge: true });
+      if (type === 'folders') {
+        // Save folders
+        const foldersData = req.body;
+        
+        if (Array.isArray(foldersData)) {
+          // Save multiple folders
+          const batch = db.batch();
+          
+          for (const folder of foldersData) {
+            const folderRef = db.collection('folders').doc(folder.id);
+            const updateData = {
+              ...folder,
+              userId,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            };
+            
+            // Check if this is a new folder
+            const existingDoc = await folderRef.get();
+            if (!existingDoc.exists) {
+              updateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+            }
+            
+            batch.set(folderRef, updateData, { merge: true });
+          }
+          
+          await batch.commit();
+          return res.json({ success: true, count: foldersData.length });
+        } else {
+          // Save single folder
+          const folderData = foldersData;
+          const folderRef = db.collection('folders').doc(folderData.id);
+          
+          const existingDoc = await folderRef.get();
+          const updateData = {
+            ...folderData,
+            userId,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          };
+          
+          if (!existingDoc.exists) {
+            updateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+          }
+          
+          await folderRef.set(updateData, { merge: true });
+          return res.json({ success: true, id: folderData.id });
+        }
+      } else {
+        // Save a chat (default behavior)
+        const chatData = req.body;
+        const chatRef = db.collection('chats').doc(chatData.id);
+        
+        // Check if this is a new chat or an update
+        const existingDoc = await chatRef.get();
+        const updateData = {
+          ...chatData,
+          userId,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        
+        // Only set createdAt for new chats
+        if (!existingDoc.exists) {
+          updateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+        }
+        
+        await chatRef.set(updateData, { merge: true });
 
-      return res.json({ success: true, id: chatData.id });
+        return res.json({ success: true, id: chatData.id });
+      }
     }
 
     if (req.method === 'DELETE') {
-      // Delete a chat
-      const { chatId } = req.query;
-      await db.collection('chats').doc(chatId).delete();
-      return res.json({ success: true });
+      const { chatId, folderId, type } = req.query;
+      
+      if (type === 'folder' && folderId) {
+        // Delete a folder
+        await db.collection('folders').doc(folderId).delete();
+        return res.json({ success: true });
+      } else if (chatId) {
+        // Delete a chat
+        await db.collection('chats').doc(chatId).delete();
+        return res.json({ success: true });
+      } else {
+        return res.status(400).json({ success: false, error: 'Missing required parameters' });
+      }
     }
 
     res.status(405).json({ success: false, error: 'Method not allowed' });
