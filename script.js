@@ -82,6 +82,38 @@ let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 
+// Migrate existing chats to add userId when user authenticates
+function migrateChatsWithUserId(userId) {
+    let migrated = false;
+    chatHistory.forEach(chat => {
+        if (!chat.userId) {
+            chat.userId = userId;
+            migrated = true;
+        }
+    });
+    
+    if (migrated) {
+        console.log('🔄 Migrated existing chats to include userId');
+        localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
+    }
+}
+
+// Migrate existing folders to add userId when user authenticates
+function migrateFoldersWithUserId(userId) {
+    let migrated = false;
+    chatFolders.forEach(folder => {
+        if (!folder.userId) {
+            folder.userId = userId;
+            migrated = true;
+        }
+    });
+    
+    if (migrated) {
+        console.log('🔄 Migrated existing folders to include userId');
+        localStorage.setItem('chatgpt_folders', JSON.stringify(chatFolders));
+    }
+}
+
 // Load chat history from Firebase or localStorage
 async function loadChatHistory() {
     try {
@@ -102,6 +134,13 @@ async function loadChatHistory() {
         // Then try to load from Firebase if user is authenticated
         if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
             console.log('User authenticated, attempting to sync with Firebase...');
+            
+            // Migrate existing chats to include userId
+            const currentUser = window.chatStorage.getCurrentUser();
+            if (currentUser && currentUser.uid) {
+                migrateChatsWithUserId(currentUser.uid);
+            }
+            
             const result = await window.chatStorage.getUserChats();
             if (result.success && result.chats && result.chats.length > 0) {
                 // Merge Firebase data with localStorage, keeping the most recent
@@ -191,6 +230,13 @@ async function loadChatFolders() {
         // Then try to load from Firebase if user is authenticated
         if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
             console.log('User authenticated, attempting to sync folders with Firebase...');
+            
+            // Migrate existing folders to include userId
+            const currentUser = window.chatStorage.getCurrentUser();
+            if (currentUser && currentUser.uid) {
+                migrateFoldersWithUserId(currentUser.uid);
+            }
+            
             const result = await window.chatStorage.getUserFolders();
             if (result.success && result.folders && result.folders.length > 0) {
                 // Merge Firebase data with localStorage, keeping the most recent
@@ -310,6 +356,11 @@ async function createFolder() {
             expanded: true,
             createdAt: Date.now()
         };
+        
+        // Add userId if user is authenticated
+        if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
+            newFolder.userId = window.chatStorage.getCurrentUser().uid;
+        }
         chatFolders.push(newFolder);
         await saveChatFolders();
         updateHistoryDisplay();
@@ -1921,6 +1972,11 @@ async function saveCurrentChat() {
         timestamp: Date.now(),
         date: new Date().toLocaleDateString()
     };
+    
+    // Add userId if user is authenticated
+    if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
+        chatData.userId = window.chatStorage.getCurrentUser().uid;
+    }
     
     // Find existing chat or add new one
     const existingIndex = chatHistory.findIndex(chat => chat.id === chatData.id);
