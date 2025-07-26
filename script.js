@@ -82,83 +82,53 @@ let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 
-// Migrate existing chats to add userId when user authenticates
-function migrateChatsWithUserId(userId) {
-    let migrated = false;
-    chatHistory.forEach(chat => {
-        if (!chat.userId) {
-            chat.userId = userId;
-            migrated = true;
-        }
-    });
-    
-    if (migrated) {
-        console.log('🔄 Migrated existing chats to include userId');
-        localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
-    }
-}
 
-// Migrate existing folders to add userId when user authenticates
-function migrateFoldersWithUserId(userId) {
-    let migrated = false;
-    chatFolders.forEach(folder => {
-        if (!folder.userId) {
-            folder.userId = userId;
-            migrated = true;
-        }
-    });
-    
-    if (migrated) {
-        console.log('🔄 Migrated existing folders to include userId');
-        localStorage.setItem('chatgpt_folders', JSON.stringify(chatFolders));
-    }
-}
 
-// Load chat history from Firebase or localStorage
+// Load chat history from Firebase only
 async function loadChatHistory() {
     try {
-        // Always load from localStorage first as a fallback
-        const saved = localStorage.getItem('chatgpt_history');
-        if (saved) {
-            chatHistory = JSON.parse(saved);
-            console.log('Loaded chat history from localStorage');
-        }
-        
-        // Wait for authentication to complete on mobile devices
+        // Wait for Firebase and authentication to complete
         let authRetries = 0;
-        while ((!window.chatStorage || !window.chatStorage.getCurrentUser()) && authRetries < 10) {
+        const maxRetries = 20; // Increased from 10 to 20 (10 seconds total)
+        while ((!window.chatStorage || !window.chatStorage.getCurrentUser()) && authRetries < maxRetries) {
+            console.log(`Waiting for authentication... (${authRetries + 1}/${maxRetries})`);
             await new Promise(resolve => setTimeout(resolve, 500));
             authRetries++;
         }
         
-        // Then try to load from Firebase if user is authenticated
+        // Load from Firebase only if user is authenticated
         if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
-            console.log('User authenticated, attempting to sync with Firebase...');
-            
-            // Migrate existing chats to include userId
-            const currentUser = window.chatStorage.getCurrentUser();
-            if (currentUser && currentUser.uid) {
-                migrateChatsWithUserId(currentUser.uid);
-            }
+            console.log('User authenticated, loading chats from Firebase...');
             
             const result = await window.chatStorage.getUserChats();
-            if (result.success && result.chats && result.chats.length > 0) {
-                // Merge Firebase data with localStorage, keeping the most recent
-                const mergedChats = mergeChats(chatHistory, result.chats);
-                chatHistory = mergedChats;
-                console.log(`Synced ${result.chats.length} chats from Firebase`);
-                
-                // Update localStorage with merged data
-                localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
+            if (result.success && result.chats) {
+                chatHistory = result.chats;
+                console.log(`Loaded ${result.chats.length} chats from Firebase`);
             } else if (result.error && result.error !== 'User not authenticated') {
-                console.warn('Firebase sync error:', result.error);
-                if (result.fallback) {
-                    console.log('🔄 Using localStorage fallback due to API issues');
-                    // Continue with localStorage data - app still works offline
-                }
+                console.warn('Firebase load error:', result.error);
+                chatHistory = []; // Start with empty history on error
             }
         } else {
-            console.log('User not authenticated, using localStorage only');
+            console.log('User not authenticated, chat history requires login');
+            
+            // In development, try to load from localStorage fallback
+            if (isLocalDevelopment()) {
+                console.log('💾 Development mode: trying localStorage fallback');
+                try {
+                    const saved = localStorage.getItem('chatgpt_history_dev');
+                    if (saved) {
+                        chatHistory = JSON.parse(saved);
+                        console.log(`✅ Loaded ${chatHistory.length} chats from localStorage (development fallback)`);
+                    } else {
+                        chatHistory = [];
+                    }
+                } catch (devError) {
+                    console.warn('Failed to load from localStorage:', devError);
+                    chatHistory = [];
+                }
+            } else {
+                chatHistory = []; // Empty history when not authenticated in production
+            }
         }
         
         // Calculate global tokens from existing chats if not already loaded
@@ -171,133 +141,68 @@ async function loadChatHistory() {
         }
     } catch (e) {
         console.error('Error loading chat history:', e);
-        // Fallback to localStorage on error
-        const saved = localStorage.getItem('chatgpt_history');
-        if (saved) {
+        
+        // In development, try localStorage fallback on any error
+        if (isLocalDevelopment()) {
+            console.log('💾 Error loading from Firebase, trying localStorage fallback');
             try {
-                chatHistory = JSON.parse(saved);
-            } catch (parseError) {
-                console.error('Error parsing localStorage data:', parseError);
+                const saved = localStorage.getItem('chatgpt_history_dev');
+                if (saved) {
+                    chatHistory = JSON.parse(saved);
+                    console.log(`✅ Loaded ${chatHistory.length} chats from localStorage (error fallback)`);
+                } else {
+                    chatHistory = [];
+                }
+            } catch (devError) {
+                console.warn('Failed to load from localStorage:', devError);
                 chatHistory = [];
             }
         } else {
-            chatHistory = [];
+            chatHistory = []; // Start with empty history on any error in production
         }
     }
     await loadChatFolders();
     updateHistoryDisplay();
 }
 
-// Merge chats from different sources, keeping the most recent version
-function mergeChats(localChats, remoteChats) {
-    const merged = {};
-    
-    // Add all local chats
-    localChats.forEach(chat => {
-        if (chat.id) {
-            merged[chat.id] = chat;
-        }
-    });
-    
-    // Add/update with remote chats (Firebase data takes precedence if newer)
-    remoteChats.forEach(remoteChat => {
-        if (remoteChat.id) {
-            const localChat = merged[remoteChat.id];
-            if (!localChat || (remoteChat.lastUpdated && localChat.lastUpdated && remoteChat.lastUpdated > localChat.lastUpdated)) {
-                merged[remoteChat.id] = remoteChat;
-            }
-        }
-    });
-    
-    return Object.values(merged).sort((a, b) => {
-        const aTime = a.lastUpdated || a.timestamp || 0;
-        const bTime = b.lastUpdated || b.timestamp || 0;
-        return bTime - aTime;
-    });
-}
 
-// Load chat folders from localStorage
-// Load chat folders from Firebase or localStorage
+// Load chat folders from Firebase only
 async function loadChatFolders() {
     try {
-        // Always load from localStorage first as a fallback
-        const saved = localStorage.getItem('chatgpt_folders');
-        if (saved) {
-            chatFolders = JSON.parse(saved);
-            console.log('Loaded folders from localStorage');
+        // Wait for Firebase and authentication to complete (folders don't need as long)
+        let authRetries = 0;
+        const maxRetries = 10; // 5 seconds should be enough for folders
+        while ((!window.chatStorage || !window.chatStorage.getCurrentUser()) && authRetries < maxRetries) {
+            console.log(`Waiting for authentication for folders... (${authRetries + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            authRetries++;
         }
         
-        // Then try to load from Firebase if user is authenticated
+        // Load from Firebase only if user is authenticated
         if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
-            console.log('User authenticated, attempting to sync folders with Firebase...');
-            
-            // Migrate existing folders to include userId
-            const currentUser = window.chatStorage.getCurrentUser();
-            if (currentUser && currentUser.uid) {
-                migrateFoldersWithUserId(currentUser.uid);
-            }
+            console.log('User authenticated, loading folders from Firebase...');
             
             const result = await window.chatStorage.getUserFolders();
-            if (result.success && result.folders && result.folders.length > 0) {
-                // Merge Firebase data with localStorage, keeping the most recent
-                const mergedFolders = mergeFolders(chatFolders, result.folders);
-                chatFolders = mergedFolders;
-                console.log(`Synced ${result.folders.length} folders from Firebase`);
-                
-                // Update localStorage with merged data
-                localStorage.setItem('chatgpt_folders', JSON.stringify(chatFolders));
+            if (result.success && result.folders) {
+                chatFolders = result.folders;
+                console.log(`Loaded ${result.folders.length} folders from Firebase`);
             } else if (result.error && result.error !== 'User not authenticated') {
-                console.warn('Firebase folder sync error:', result.error);
-                if (result.fallback) {
-                    console.log('🔄 Using localStorage fallback for folders');
-                }
+                console.warn('Firebase folder load error:', result.error);
+                chatFolders = []; // Start with empty folders on error
             }
         } else {
-            console.log('User not authenticated, using localStorage folders only');
+            console.log('User not authenticated, folders require login');
+            chatFolders = []; // Empty folders when not authenticated
         }
     } catch (e) {
         console.error('Error loading chat folders:', e);
-        // Fallback to localStorage on error
-        const saved = localStorage.getItem('chatgpt_folders');
-        if (saved) {
-            try {
-                chatFolders = JSON.parse(saved);
-            } catch (parseError) {
-                console.error('Error parsing localStorage folder data:', parseError);
-                chatFolders = [];
-            }
-        } else {
-            chatFolders = [];
-        }
+        chatFolders = []; // Start with empty folders on any error
     }
 }
 
 // Merge folders from different sources, keeping the most recent version
-function mergeFolders(localFolders, remoteFolders) {
-    const merged = {};
-    
-    // Add all local folders
-    localFolders.forEach(folder => {
-        if (folder.id) {
-            merged[folder.id] = folder;
-        }
-    });
-    
-    // Add remote folders, overwriting if they're newer
-    remoteFolders.forEach(folder => {
-        if (folder.id) {
-            const local = merged[folder.id];
-            if (!local || !local.lastUpdated || (folder.lastUpdated && folder.lastUpdated > local.lastUpdated)) {
-                merged[folder.id] = folder;
-            }
-        }
-    });
-    
-    // Convert back to array and sort by creation date
-    return Object.values(merged).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-}
 
-// Save chat folders to localStorage and Firebase
+// Save chat folders to Firebase only
 let folderSavingInProgress = false;
 async function saveChatFolders() {
     if (folderSavingInProgress) {
@@ -315,11 +220,7 @@ async function saveChatFolders() {
             }
         });
         
-        // Save to localStorage immediately
-        localStorage.setItem('chatgpt_folders', JSON.stringify(chatFolders));
-        console.log('Saved folders to localStorage');
-        
-        // If user is authenticated and Firebase is available, also save to cloud
+        // Save to Firebase only if user is authenticated
         if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
             console.log(`Attempting to save ${chatFolders.length} folders to Firebase...`);
             
@@ -330,16 +231,10 @@ async function saveChatFolders() {
                 console.warn('Failed to save folders to Firebase:', result.error);
             }
         } else {
-            console.log('User not authenticated or Firebase not available, only saved folders to localStorage');
+            console.log('User not authenticated, folders not saved');
         }
     } catch (e) {
         console.error('Error saving chat folders:', e);
-        // Ensure localStorage is still updated even if Firebase fails
-        try {
-            localStorage.setItem('chatgpt_folders', JSON.stringify(chatFolders));
-        } catch (localError) {
-            console.error('Critical: Failed to save folders to localStorage:', localError);
-        }
     } finally {
         folderSavingInProgress = false;
     }
@@ -490,9 +385,16 @@ function startNewChatInFolder(folderId) {
     startNewChat(true); // Pass true to preserve folder context
 }
 
-// Save chat history to localStorage
+// Save chat history to Firebase (with localStorage fallback for development)
 let savingInProgress = false;
 let saveTimeout = null;
+
+// Development fallback - detect if we're running locally
+function isLocalDevelopment() {
+    return window.location.hostname === '127.0.0.1' || 
+           window.location.hostname === 'localhost' || 
+           window.location.protocol === 'file:';
+}
 
 // Debounced save function to prevent too frequent saves
 function debouncedSave() {
@@ -538,13 +440,14 @@ async function saveChatHistory() {
             }
         });
         
-        // Save to localStorage immediately
-        localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
-        console.log('Saved chat history to localStorage');
-        
-        // If user is authenticated and Firebase is available, also save to cloud
+        // Save to Firebase only if user is authenticated
         if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
             console.log(`Attempting to save ${chatHistory.length} chats to Firebase...`);
+            
+            // Check if we're in development and warn about CORS
+            if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+                console.warn('⚠️ Running in development mode - CORS issues may occur with Firebase API');
+            }
             
             // Save chats in parallel with retry logic
             const savePromises = chatHistory.map(async (chat) => {
@@ -584,18 +487,39 @@ async function saveChatHistory() {
             // Check for any failures and log them
             const failures = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success));
             if (failures.length > 0) {
-                console.warn(`${failures.length} chats failed to save to Firebase - they remain in localStorage`);
+                console.warn(`${failures.length} chats failed to save to Firebase`);
             }
         } else {
-            console.log('User not authenticated or Firebase not available, only saved to localStorage');
+            console.log('User not authenticated, chats not saved');
+            
+            // In development, save to localStorage as fallback
+            if (isLocalDevelopment()) {
+                console.log('💾 Development mode: saving to localStorage as fallback');
+                try {
+                    localStorage.setItem('chatgpt_history_dev', JSON.stringify(chatHistory));
+                    console.log('✅ Saved to localStorage (development fallback)');
+                } catch (devError) {
+                    console.warn('Failed to save to localStorage:', devError);
+                }
+            }
         }
     } catch (e) {
         console.error('Error saving chat history:', e);
-        // Ensure localStorage is still updated even if Firebase fails
-        try {
-            localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
-        } catch (localError) {
-            console.error('Critical: Failed to save to localStorage:', localError);
+        
+        // In development, use localStorage as fallback on any Firebase error
+        if (isLocalDevelopment()) {
+            console.log('💾 Firebase failed, using localStorage fallback for development');
+            try {
+                localStorage.setItem('chatgpt_history_dev', JSON.stringify(chatHistory));
+                console.log('✅ Saved to localStorage (development fallback)');
+            } catch (devError) {
+                console.warn('Failed to save to localStorage:', devError);
+            }
+        }
+        
+        // Special handling for CORS errors
+        if (e.message && (e.message.includes('CORS') || e.message.includes('Failed to fetch'))) {
+            console.warn('💡 Network error - this is expected in development. Chats saved locally.');
         }
     } finally {
         savingInProgress = false;
@@ -1961,7 +1885,12 @@ function deleteFolder(folderId) {
 
 // Save current chat
 async function saveCurrentChat() {
-    if (conversationHistory.length === 0) return;
+    if (conversationHistory.length === 0) {
+        console.log('No conversation history to save');
+        return;
+    }
+    
+    console.log('Saving current chat with', conversationHistory.length, 'messages');
     
     const chatData = {
         id: currentChatId || generateChatId(),
@@ -1976,6 +1905,9 @@ async function saveCurrentChat() {
     // Add userId if user is authenticated
     if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
         chatData.userId = window.chatStorage.getCurrentUser().uid;
+        console.log('User authenticated, adding userId to chat');
+    } else {
+        console.log('User not authenticated, chat will be local only');
     }
     
     // Find existing chat or add new one
@@ -2009,6 +1941,7 @@ async function saveCurrentChat() {
         chatHistory = chatHistory.slice(0, 50);
     }
     
+    console.log('✅ Chat added to history');
     debouncedSave();
     updateHistoryDisplay();
 }
@@ -3121,6 +3054,7 @@ function closeTokenUsageModal() {
 }
 
 async function sendMessageAsync() {
+    console.log('📤 sendMessageAsync() called');
     const input = document.getElementById('messageInput');
     const sendButton = document.getElementById('sendButton');
     
@@ -3485,7 +3419,13 @@ async function sendMessageAsync() {
         addMessage(aiMessage, 'ai');
 
         // Auto-save chat after successful response
-        await saveCurrentChat();
+        try {
+            await saveCurrentChat();
+            console.log('✅ Chat saved successfully');
+        } catch (saveError) {
+            console.warn('⚠️ Failed to save chat:', saveError);
+            // Continue anyway - the chat is still visible in the UI
+        }
 
     } catch (error) {
         console.error('Error:', error);
@@ -3507,6 +3447,7 @@ async function sendMessageAsync() {
 
 // Wrapper for HTML onclick handlers
 function sendMessage() {
+    console.log('🚀 Send button clicked!');
     sendMessageAsync().catch(error => {
         console.error('Error sending message:', error);
     });
@@ -3700,11 +3641,19 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('📴 Gone offline, will sync when back online');
     });
     
-    // Save immediately when page is about to unload
-    window.addEventListener('beforeunload', () => {
-        // Use sendBeacon for reliable delivery during page unload
-        const dataToSave = JSON.stringify(chatHistory);
-        localStorage.setItem('chatgpt_history', dataToSave);
+    // Auto-save chats when page is about to unload (Firebase only)
+    window.addEventListener('beforeunload', async () => {
+        if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
+            // Use sendBeacon for reliable delivery during page unload
+            if (chatHistory.length > 0) {
+                try {
+                    // Save to Firebase only - no localStorage
+                    await saveChatHistory();
+                } catch (e) {
+                    console.warn('Failed to save chat history on unload:', e);
+                }
+            }
+        }
     });
 });
 
@@ -5198,7 +5147,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     let firebaseRetryCount = 0;
     const maxFirebaseRetries = 10;
     
-    function setupFirebaseAuthListener() {
+    async function setupFirebaseAuthListener() {
         if (typeof window.authFunctions !== 'undefined' && window.authFunctions) {
             window.authFunctions.onAuthStateChanged(async (user) => {
                 if (user) {
@@ -5207,20 +5156,32 @@ document.addEventListener('DOMContentLoaded', async function() {
                     await loadChatHistory();
                     updateHistoryDisplay();
                 } else {
-                    console.log('User signed out, using local storage only');
-                    await loadChatHistory();
+                    console.log('User signed out, clearing chat data');
+                    chatHistory = [];
+                    chatFolders = [];
                     updateHistoryDisplay();
                 }
             });
             console.log('Firebase auth listener established');
+            
+            // Also check current auth state immediately for already signed-in users
+            const currentUser = window.authFunctions.getCurrentUser();
+            if (currentUser) {
+                console.log('User already authenticated on page load:', currentUser.email);
+                await loadChatHistory();
+                updateHistoryDisplay();
+            }
         } else {
             firebaseRetryCount++;
             if (firebaseRetryCount < maxFirebaseRetries) {
                 console.log(`Waiting for Firebase... (${firebaseRetryCount}/${maxFirebaseRetries})`);
                 setTimeout(setupFirebaseAuthListener, 500);
             } else {
-                console.log('Firebase not available - running in local-only mode');
-                // App will work with localStorage only
+                console.log('Firebase not available - authentication required for chat storage');
+                // App requires authentication for chat and folder storage
+                // Load empty state to show login requirement
+                await loadChatHistory();
+                updateHistoryDisplay();
             }
         }
     }
@@ -5330,8 +5291,7 @@ async function initializeApp() {
     // Update UI to show API key status
     updateApiKeyStatus();
 
-    // Load chat history on startup
-    await loadChatHistory();
+    // Chat history will be loaded after Firebase auth is established
     
     // Load global token data
     loadGlobalTokens();
@@ -5430,9 +5390,8 @@ async function initializeApp() {
     // Auto-save current chat when page is about to unload
     window.addEventListener('beforeunload', () => {
         if (isRecording) stopRecording();
-        if (conversationHistory.length > 0) {
-            // For beforeunload, we need to save synchronously
-            // Save to localStorage immediately
+        if (conversationHistory.length > 0 && typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
+            // Save current chat to Firebase only if authenticated
             const chatData = {
                 id: currentChatId || generateChatId(),
                 title: getChatTitle(conversationHistory),
@@ -5452,11 +5411,11 @@ async function initializeApp() {
                 currentChatId = chatData.id;
             }
             
-            // Save immediately to localStorage
+            // Save to Firebase only
             try {
-                localStorage.setItem('chatgpt_history', JSON.stringify(chatHistory));
+                window.chatStorage.saveChat(chatData);
             } catch (e) {
-                console.error('Error saving chat history on unload:', e);
+                console.error('Error saving chat to Firebase on unload:', e);
             }
         }
     });

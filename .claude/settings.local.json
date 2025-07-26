@@ -16,7 +16,8 @@
       "WebFetch(domain:new-gpt-taupe.vercel.app)",
       "Bash(git pull:*)",
       "Bash(git mv:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": []
   }
