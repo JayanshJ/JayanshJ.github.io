@@ -2032,13 +2032,37 @@ function loadChat(chatId) {
 async function deleteChatAsync(chatId) {
     const chatToDelete = chatHistory.find(chat => chat.id === chatId);
     
-    // DON'T subtract tokens - they were already consumed and billed
-    // Token usage represents actual API consumption, not current chat tokens
+    // First, delete from Firebase if user is authenticated
+    if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
+        console.log('🗑️ Deleting chat from Firebase:', chatId);
+        try {
+            const result = await window.chatStorage.deleteChat(chatId);
+            if (result.success) {
+                console.log('✅ Chat deleted from Firebase successfully');
+            } else {
+                console.warn('⚠️ Failed to delete chat from Firebase:', result.error);
+            }
+        } catch (error) {
+            console.error('❌ Error deleting chat from Firebase:', error);
+        }
+    } else {
+        console.log('User not authenticated, only deleting locally');
+    }
     
+    // Then delete from local storage
     chatHistory = chatHistory.filter(chat => chat.id !== chatId);
     globalTokens.chats = chatHistory.length;
     
-    debouncedSave();
+    // Update localStorage if in development
+    if (isLocalDevelopment()) {
+        try {
+            localStorage.setItem('chatgpt_history_dev', JSON.stringify(chatHistory));
+            console.log('✅ Updated localStorage after delete');
+        } catch (devError) {
+            console.warn('Failed to update localStorage:', devError);
+        }
+    }
+    
     saveGlobalTokens();
     updateHistoryDisplay();
     updateGlobalTokenDisplay();
