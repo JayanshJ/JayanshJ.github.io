@@ -10,10 +10,11 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     margin: 0;
     padding: 0;
-    background-color: #212121;
-    color: #ececf1;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    color: #f0f0f0;
     height: 100vh;
     overflow: hidden;
+    line-height: 1.6;
 }
 
 .app-container {
@@ -24,21 +25,23 @@ body {
 
 /* Sidebar Styles */
 .sidebar {
-    width: 260px;
-    background-color: #171717;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    width: 280px;
+    background: linear-gradient(180deg, rgba(20, 20, 20, 0.95) 0%, rgba(15, 15, 15, 0.98) 100%);
+    backdrop-filter: blur(20px) saturate(180%);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     flex-direction: column;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     left: 0;
     transform: none;
-    backdrop-filter: blur(8px);
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
 }
 
 .sidebar-header {
-    padding: 24px 20px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 32px 24px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.02);
 }
 
 .logo {
@@ -50,10 +53,13 @@ body {
 }
 
 .logo span {
-    font-size: 20px;
-    font-weight: 600;
-    color: #ffffff;
-    letter-spacing: -0.02em;
+    font-size: 24px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.03em;
 }
 
 .header-actions {
@@ -97,50 +103,53 @@ body {
 .new-chat-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
     width: 100%;
-    background: none;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 10px 14px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 12px;
+    padding: 14px 18px;
     color: #ffffff;
     cursor: pointer;
     font-size: 14px;
-    font-weight: 500;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
-    min-height: 36px;
-    max-height: 36px;
+    font-weight: 600;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    min-height: 48px;
     transform: none;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
 }
 
 .settings-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: none;
-    border: none;
-    border-radius: 8px;
-    padding: 10px;
-    color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 12px;
+    color: rgba(255, 255, 255, 0.8);
     cursor: pointer;
-    transition: background-color 0.15s ease, color 0.15s ease;
-    min-width: 36px;
-    min-height: 36px;
-    max-width: 36px;
-    max-height: 36px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 48px;
+    min-height: 48px;
+    max-width: 48px;
+    max-height: 48px;
     transform: none;
 }
 
 .new-chat-btn:hover {
-    background-color: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.2);
-    transform: none;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%);
+    border-color: rgba(59, 130, 246, 0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.2);
 }
 
 .settings-btn:hover {
-    background-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
     color: #ffffff;
-    transform: none;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .new-chat-btn svg,
@@ -673,14 +682,14 @@ body {
 .message {
     display: flex;
     gap: 0;
-    padding: 12px 24px;
-    max-width: 48rem; /* Match input area width */
-    margin: 0 auto 16px auto;
+    padding: 16px 32px;
+    max-width: 52rem;
+    margin: 0 auto 20px auto;
     border-bottom: none;
     position: relative;
-    animation: messageSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: messageSlideIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(12px);
     animation-fill-mode: forwards;
     align-items: flex-start;
 }
@@ -702,16 +711,19 @@ body {
     flex-direction: row;
     margin-left: auto;
     margin-right: auto;
-    max-width: 48rem; /* Match input area width */
-    padding: 12px 24px;
+    max-width: 52rem;
+    padding: 16px 32px;
     justify-content: flex-end;
 }
 
 .message.user-message .message-content {
-    background-color: #2f2f2f;
-    border-radius: 18px;
-    padding: 12px 16px;
-    max-width: 70%; /* Allow some breathing room within the container */
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 20px;
+    padding: 16px 20px;
+    max-width: 75%;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .message.ai-message {
@@ -719,17 +731,20 @@ body {
     flex-direction: row;
     margin-left: auto;
     margin-right: auto;
-    max-width: 48rem; /* Match input area width */
-    padding: 12px 24px;
+    max-width: 52rem;
+    padding: 16px 32px;
     justify-content: flex-start;
 }
 
 .message.ai-message .message-content {
-    background-color: transparent;
-    padding: 0;
-    max-width: 85%; /* Limit AI message width like user messages */
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 16px 20px;
+    max-width: 85%;
     width: fit-content;
     min-width: 0;
+    backdrop-filter: blur(5px);
 }
 
 .message-avatar {
@@ -758,10 +773,12 @@ body {
 }
 
 .message-content {
-    line-height: 1.6; 
+    line-height: 1.7;
     font-size: 16px;
-    min-width: 0; /* Prevents flex item from overflowing */
+    min-width: 0;
     width: fit-content;
+    font-weight: 400;
+    color: #f5f5f5;
 }
 
 .quoted-context {
@@ -840,18 +857,24 @@ body {
 }
 
 .message-text li {
-    margin: 12px 0;
-    line-height: 1.6;
+    margin: 16px 0;
+    line-height: 1.75;
     padding-left: 0;
     position: relative;
     list-style: none;
+    color: #e5e5e5;
+    font-weight: 400;
 }
 
-/* Step-by-step styling for mathematical content */
+/* Enhanced step-by-step styling */
 .message-text ol li {
     padding-left: 0;
-    margin: 24px 0;
+    margin: 28px 0;
     counter-increment: step-counter;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    padding: 20px;
+    border-left: 4px solid #3b82f6;
 }
 
 .message-text ol {
@@ -859,32 +882,47 @@ body {
 }
 
 .message-text ol li::before {
-    content: "Step " counter(step-counter) ": ";
-    font-weight: 600;
-    color: #ececf1;
-    display: block;
-    margin-bottom: 8px;
-    font-size: 16px;
+    content: "Step " counter(step-counter);
+    font-weight: 700;
+    color: #3b82f6;
+    display: inline-block;
+    margin-bottom: 12px;
+    font-size: 14px;
+    background: rgba(59, 130, 246, 0.1);
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-/* Regular unordered lists */
+/* Enhanced unordered lists */
 .message-text ul li {
-    padding-left: 20px;
+    padding-left: 28px;
+    margin: 12px 0;
+    background: rgba(255, 255, 255, 0.01);
+    border-radius: 8px;
+    padding: 12px 12px 12px 28px;
 }
 
 .message-text ul li::before {
-    content: "•";
-    color: #8e8ea0;
+    content: "▸";
+    color: #3b82f6;
     font-weight: bold;
     position: absolute;
-    left: 0;
-    top: 0;
+    left: 12px;
+    top: 12px;
+    font-size: 1.1em;
+    line-height: 1.75;
 }
 
-/* Nested lists */
+/* Enhanced nested lists */
 .message-text ul ul, .message-text ol ol, .message-text ul ol, .message-text ol ul {
-    margin: 8px 0;
+    margin: 12px 0;
+    padding-left: 32px;
+    border-left: 2px solid rgba(59, 130, 246, 0.2);
     padding-left: 24px;
+    margin-left: 8px;
 }
 
 /* Enhanced step content styling */
@@ -910,15 +948,19 @@ body {
     text-align: center;
 }
 
-/* Block quotes for important content */
+/* Enhanced blockquotes */
 .message-text blockquote {
-    border-left: 4px solid #404040;
-    padding: 16px 20px;
-    margin: 20px 0;
-    background-color: rgba(255, 255, 255, 0.02);
-    border-radius: 0 8px 8px 0;
+    border-left: 4px solid #3b82f6;
+    padding: 20px 24px;
+    margin: 24px 0;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(99, 102, 241, 0.05) 100%);
+    border-radius: 0 12px 12px 0;
     font-style: italic;
-    color: #d1d5db;
+    color: #e5e5e5;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    position: relative;
 }
 
 /* Emphasis styling */
@@ -1037,19 +1079,20 @@ body {
 }
 
 .message-text pre {
-    background-color: #23272f;
-    border: none;
-    border-radius: 8px;
-    padding: 16px;
-    margin: 0;
+    background: linear-gradient(135deg, #1a1d23 0%, #23272f 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
     overflow-x: auto;
-    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
     font-size: 14px;
-    line-height: 1.6;
+    line-height: 1.7;
     color: #f8f8f2;
     position: relative;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
     white-space: pre;
+    backdrop-filter: blur(10px);
 }
 
 .copy-btn {
@@ -1340,19 +1383,137 @@ body {
     border-left: 4px solid #22c55e;
 }
 
-/* Blockquotes */
-.message-text blockquote {
-    border-left: 3px solid #565869;
-    padding-left: 16px;
+
+/* Enhanced paragraph styling */
+.message-text p {
     margin: 16px 0;
-    color: #d1d5db;
-    font-style: italic;
+    line-height: 1.75;
+    color: #e5e5e5;
+    font-weight: 400;
 }
 
-/* Links */
+.message-text p:first-child {
+    margin-top: 0;
+}
+
+.message-text p:last-child {
+    margin-bottom: 0;
+}
+
+/* Enhanced inline code */
+.message-text code {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-size: 13px;
+    color: #ffffff;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.message-text pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    color: inherit;
+    font-size: inherit;
+}
+
+/* Enhanced links */
 .message-text a {
     color: #60a5fa;
     text-decoration: none;
+    border-bottom: 1px solid rgba(96, 165, 250, 0.3);
+    transition: all 0.3s ease;
+    padding: 1px 2px;
+    border-radius: 3px;
+}
+
+.message-text a:hover {
+    color: #93c5fd;
+    background: rgba(96, 165, 250, 0.1);
+    border-bottom-color: #93c5fd;
+}
+
+/* Enhanced table styling */
+.message-text table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message-text th,
+.message-text td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message-text th {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+    font-weight: 600;
+    color: #ffffff;
+    border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+}
+
+.message-text tr:last-child td {
+    border-bottom: none;
+}
+
+.message-text tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Enhanced horizontal rules */
+.message-text hr {
+    border: none;
+    height: 2px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(99, 102, 241, 0.3) 100%);
+    margin: 32px 0;
+    border-radius: 1px;
+}
+
+/* Enhanced mathematical expressions */
+.message-text .MathJax,
+.message-text mjx-container {
+    margin: 8px 0;
+    padding: 4px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Enhanced number formatting in lists */
+.message-text ol.decimal li::before {
+    content: counter(step-counter) ".";
+    background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    margin-right: 12px;
+}
+
+/* Enhanced message text container */
+.message-text {
+    line-height: 1.75;
+    font-size: 16px;
+    color: #e5e5e5;
+    font-weight: 400;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .message-text a:hover {
@@ -1760,27 +1921,32 @@ body {
 }
 
 .send-btn:hover:not(:disabled) {
-    background-color: #d1d5db;
+    background: linear-gradient(135deg, #2563eb 0%, #5b21b6 100%);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    border-color: rgba(59, 130, 246, 0.7);
 }
 
 .send-btn:disabled {
-    background-color: #404040;
-    color: #6b7280;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.3);
     cursor: not-allowed;
+    border-color: rgba(255, 255, 255, 0.05);
+    box-shadow: none;
 }
 
 .file-preview {
-    margin-top: 8px;
-    padding: 8px;
-    background-color: #2f2f2f;
-    border-radius: 8px;
-    border: 1px solid #404040;
+    margin-top: 12px;
+    padding: 16px;
+    background: linear-gradient(135deg, rgba(40, 40, 40, 0.9) 0%, rgba(30, 30, 30, 0.9) 100%);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     display: none;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
     animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 @keyframes slideUp {
@@ -2014,20 +2180,22 @@ body {
 
 /* Scrollbar */
 .messages-container::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
 }
 
 .messages-container::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 3px;
 }
 
 .messages-container::-webkit-scrollbar-thumb {
-    background: #404040;
-    border-radius: 4px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .messages-container::-webkit-scrollbar-thumb:hover {
-    background: #565869;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 100%);
 }
 
 /* Mobile responsiveness */
@@ -4064,4 +4232,45 @@ body {
     height: 1px;
     background: rgba(255, 255, 255, 0.1);
     margin: 16px 0;
+}
+
+/* Welcome Screen */
+.welcome-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+.welcome-icon {
+    font-size: 48px;
+    margin-bottom: 24px;
+    opacity: 0.9;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+.welcome-screen h2 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #f0f0f0;
+    margin: 0;
+    line-height: 1.4;
+    background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
