@@ -129,9 +129,6 @@
                     </div>
                 </div>
                 
-                <div class="global-tokens" id="globalTokens">
-                    <!-- Token display will be updated by JavaScript -->
-                </div>
             </div>
             
             <div class="messages-container" id="messages">
@@ -253,20 +250,6 @@
                             <span class="option-description">Change your OpenAI API key</span>
                         </div>
                     </button>
-                    <button class="settings-option" onclick="showTokenUsageInfo()">
-                        <span class="option-icon">📊</span>
-                        <div class="option-content">
-                            <span class="option-title">View Token Usage</span>
-                            <span class="option-description">Check current token consumption</span>
-                        </div>
-                    </button>
-                    <button class="settings-option" onclick="setCreditBalance()">
-                        <span class="option-icon">💰</span>
-                        <div class="option-content">
-                            <span class="option-title">Set Credit Balance</span>
-                            <span class="option-description">Update your account balance</span>
-                        </div>
-                    </button>
                     <button id="clearApiKeyBtn" class="settings-option danger" onclick="clearSavedApiKey()" style="display: none;">
                         <span class="option-icon">🗑️</span>
                         <div class="option-content">
@@ -309,86 +292,6 @@
         <div class="modal-backdrop" onclick="closeApiKeyModal()"></div>
     </div>
     
-    <!-- Token Usage Modal -->
-    <div id="tokenUsageModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>📊 Token Usage</h3>
-                <button class="modal-close" onclick="closeTokenUsageModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="token-stats">
-                    <div class="stat-section">
-                        <h4>Current Chat</h4>
-                        <div class="stat-grid">
-                            <div class="stat-item">
-                                <span class="stat-label">Total</span>
-                                <span class="stat-value" id="currentChatTotal">0</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Input</span>
-                                <span class="stat-value" id="currentChatInput">0</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Output</span>
-                                <span class="stat-value" id="currentChatOutput">0</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Requests</span>
-                                <span class="stat-value" id="currentChatRequests">0</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="stat-section">
-                        <h4>Global Stats</h4>
-                        <div class="stat-grid">
-                            <div class="stat-item">
-                                <span class="stat-label">All Time</span>
-                                <span class="stat-value" id="globalTokenTotal">0</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Total Chats</span>
-                                <span class="stat-value" id="globalChatCount">0</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="token-info">
-                        💡 Tokens are used for both input and output. Longer conversations use more tokens.
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="modal-backdrop" onclick="closeTokenUsageModal()"></div>
-    </div>
-    
-    <!-- Credit Balance Modal -->
-    <div id="creditBalanceModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>💰 Set Credit Balance</h3>
-                <button class="modal-close" onclick="closeCreditBalanceModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="input-group">
-                    <label for="creditBalanceInput">Enter your OpenAI credit balance:</label>
-                    <input type="number" id="creditBalanceInput" class="modal-input" placeholder="15.50" step="0.01" min="0">
-                    <div class="input-help">
-                        <p>💡 To find your balance:</p>
-                        <ol>
-                            <li>Go to <a href="https://platform.openai.com/usage" target="_blank">platform.openai.com/usage</a></li>
-                            <li>Look for "Credits" or "Balance" section</li>
-                            <li>Enter the amount here (e.g., 15.50)</li>
-                        </ol>
-                    </div>
-                </div>
-                <div class="modal-actions">
-                    <button class="modal-btn secondary" onclick="closeCreditBalanceModal()">Cancel</button>
-                    <button class="modal-btn primary" onclick="saveCreditBalance()">Save Balance</button>
-                </div>
-            </div>
-        </div>
-        <div class="modal-backdrop" onclick="closeCreditBalanceModal()"></div>
-    </div>
     
     <!-- Confirmation Modal -->
     <div id="confirmationModal" class="modal" style="display: none;">

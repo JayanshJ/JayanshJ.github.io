@@ -2,8 +2,6 @@
 // The API key and settings are loaded from config.js
 const API_URL = 'https://api.openai.com/v1/chat/completions';
 const WHISPER_URL = 'https://api.openai.com/v1/audio/transcriptions';
-const BILLING_URL = 'https://api.openai.com/v1/dashboard/billing/usage';
-const SUBSCRIPTION_URL = 'https://api.openai.com/v1/dashboard/billing/subscription';
 
 // System prompt for enhanced technical assistance
 const systemPrompt = {
@@ -55,27 +53,8 @@ let chatHistory = [];
 let chatFolders = [];
 let currentFolderId = null;
 
-// Credit balance tracking
-let creditBalance = {
-    total: 0,
-    used: 0,
-    remaining: 0,
-    lastUpdated: null
-};
 
-// Token usage tracking
-let currentChatTokens = {
-    total: 0,
-    prompt: 0,
-    completion: 0,
-    requests: 0
-};
 
-// Global token usage across all chats
-let globalTokens = {
-    total: 0,
-    chats: 0
-};
 
 // Voice recording variables - Using MediaRecorder for GPT-4o-transcribe
 let mediaRecorder = null;
@@ -134,14 +113,6 @@ async function loadChatHistory() {
             }
         }
         
-        // Calculate global tokens from existing chats if not already loaded
-        if (globalTokens.total === 0) {
-            globalTokens.total = chatHistory.reduce((total, chat) => {
-                return total + (chat.tokens ? chat.tokens.total : 0);
-            }, 0);
-            globalTokens.chats = chatHistory.length;
-            saveGlobalTokens();
-        }
     } catch (e) {
         console.error('Error loading chat history:', e);
         
@@ -283,14 +254,9 @@ async function deleteFolderAsync(folderId) {
         // Remove the folder
         chatFolders = chatFolders.filter(f => f.id !== folderId);
         
-        // Update global token count
-        globalTokens.chats = chatHistory.length;
-        
         debouncedSave();
         await saveChatFolders();
-        saveGlobalTokens();
         updateHistoryDisplay();
-        updateGlobalTokenDisplay();
         
         // If current chat was in this folder, start new chat
         if (currentFolderId === folderId) {
@@ -529,140 +495,10 @@ async function saveChatHistory() {
     }
 }
 
-// Update token usage display
-function updateTokenDisplay() {
-    const tokenElement = document.getElementById('tokenUsage');
-    if (tokenElement) {
-        tokenElement.innerHTML = `
-            <div class="token-info">
-                <span class="token-total">${currentChatTokens.total} tokens</span>
-                <span class="token-details">${currentChatTokens.prompt}+${currentChatTokens.completion} • ${currentChatTokens.requests} requests</span>
-            </div>
-        `;
-    }
-}
 
-// Load global token usage from localStorage
-function loadGlobalTokens() {
-    const saved = localStorage.getItem('chatgpt_global_tokens');
-    if (saved) {
-        try {
-            globalTokens = JSON.parse(saved);
-        } catch (e) {
-            console.error('Error loading global tokens:', e);
-            globalTokens = { total: 0, chats: 0 };
-        }
-    }
-    updateGlobalTokenDisplay();
-}
 
-// Save global token usage to localStorage
-function saveGlobalTokens() {
-    try {
-        localStorage.setItem('chatgpt_global_tokens', JSON.stringify(globalTokens));
-    } catch (e) {
-        console.error('Error saving global tokens:', e);
-    }
-}
 
-// Update global token usage display
-function updateGlobalTokenDisplay() {
-    const globalElement = document.getElementById('globalTokens');
-    const globalSidebarElement = document.getElementById('globalTokensSidebar');
-    
-    const tokenContent = `
-        <div class="global-token-total">${globalTokens.total.toLocaleString()} tokens</div>
-        <div class="global-token-subtitle">${globalTokens.chats} chats total</div>
-    `;
-    
-    // Show credit balance based on available data
-    let creditContent = '';
-    if (creditBalance.remaining > 0) {
-        const source = creditBalance.automatic ? ' (auto)' : creditBalance.manual ? ' (manual)' : '';
-        const lastUpdated = creditBalance.lastUpdated ? new Date(creditBalance.lastUpdated).toLocaleTimeString() : '';
-        const tooltip = creditBalance.manual 
-            ? 'Manual balance - click to update' 
-            : `Auto-fetched balance at ${lastUpdated} - click for manual entry`;
-        
-        creditContent = `<div class="credit-balance" onclick="setCreditBalance()" style="cursor: pointer;" title="${tooltip}">$${creditBalance.remaining.toFixed(2)} remaining${source}</div>`;
-    } else if (creditBalance.usageOnly && creditBalance.used > 0) {
-        creditContent = `<div class="credit-balance" onclick="setCreditBalance()" style="cursor: pointer; color: #f59e0b;" title="Usage data only - click to set balance">$${creditBalance.used.toFixed(2)} used (set balance)</div>`;
-    } else if (creditBalance.lastUpdated === null && !globalTokens.total) {
-        // Still loading on first run - only show in sidebar, not in mobile header
-        creditContent = `<div class="credit-balance" style="color: #f59e0b;">Checking balance... ⏳</div>`;
-    } else {
-        // Show manual entry option with helpful message
-        creditContent = `<div class="credit-balance" onclick="setCreditBalance()" style="cursor: pointer; color: #10b981;" title="Click to set your credit balance manually">Click to set balance 💰</div>`;
-    }
-    
-    // For the main header (mobile), hide token/credit display - available in settings
-    if (globalElement) {
-        globalElement.innerHTML = '';
-    }
-    
-    // For sidebar, keep the original order with both tokens and credits
-    if (globalSidebarElement) {
-        globalSidebarElement.innerHTML = tokenContent + creditContent;
-    }
-}
 
-// Manual credit balance setting
-function setCreditBalance() {
-    closeSettingsModal(); // Close the settings modal first
-    
-    // Show the credit balance modal
-    const modal = document.getElementById('creditBalanceModal');
-    const input = document.getElementById('creditBalanceInput');
-    
-    if (modal && input) {
-        // Pre-fill current balance if available
-        const currentBalance = creditBalance.remaining > 0 ? creditBalance.remaining.toFixed(2) : '';
-        input.value = currentBalance;
-        modal.style.display = 'flex';
-        input.focus();
-        document.body.style.overflow = 'hidden';
-    }
-}
-
-function closeCreditBalanceModal() {
-    const modal = document.getElementById('creditBalanceModal');
-    if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = 'auto';
-    }
-}
-
-function saveCreditBalance() {
-    const input = document.getElementById('creditBalanceInput');
-    const newBalance = input.value.trim();
-    
-    if (newBalance !== '' && newBalance !== null) {
-        const balanceNumber = parseFloat(newBalance);
-        if (!isNaN(balanceNumber) && balanceNumber >= 0) {
-            creditBalance = {
-                total: balanceNumber,
-                used: 0,
-                remaining: balanceNumber,
-                lastUpdated: new Date().toISOString(),
-                manual: true,
-                initialBalance: balanceNumber // Track starting balance
-            };
-            
-            // Save to localStorage
-            localStorage.setItem('chatgpt_credit_balance', JSON.stringify(creditBalance));
-            
-            // Update display
-            updateGlobalTokenDisplay();
-            
-            closeCreditBalanceModal();
-            console.log('✅ Manual credit balance set to:', `$${balanceNumber.toFixed(2)}`);
-            console.log('💾 Balance saved to localStorage');
-            alert(`✅ Credit balance set to $${balanceNumber.toFixed(2)}`);
-        } else {
-            alert('❌ Please enter a valid positive number (e.g., 15.50)');
-        }
-    }
-}
 
 // Confirmation modal utility functions
 let confirmationCallback = null;
@@ -699,249 +535,6 @@ function confirmAction() {
     }
 }
 
-// Estimate and deduct API costs from credit balance
-function updateCreditBalanceWithUsage(inputTokens, outputTokens, model) {
-    if (!creditBalance.manual || creditBalance.remaining <= 0) {
-        return; // Only update if manually set balance exists
-    }
-    
-    // Current pricing per 1M tokens (July 2025 - from OpenAI API pricing page)
-    const pricingPer1M = {
-        'gpt-4.1-2025-04-14': {
-            input: 2.00,    // $2.00 per 1M input tokens
-            output: 8.00    // $8.00 per 1M output tokens
-        },
-        'gpt-image-1': {
-            input: 0.04,    // $0.04 per image (estimated for image generation)
-            output: 0.00    // No output tokens for image generation
-        },
-        'chatgpt-4o-latest': {
-            input: 5.00,    // $5.00 per 1M input tokens
-            output: 15.00   // $15.00 per 1M output tokens
-        },
-        'gpt-4o-search-preview-2025-03-11': {
-            input: 5.00,    // $5.00 per 1M input tokens (estimated, same as 4o)
-            output: 15.00   // $15.00 per 1M output tokens (estimated, same as 4o)
-        }
-    };
-    
-    const pricing = pricingPer1M[model] || pricingPer1M['chatgpt-4o-latest'];
-    
-    // Calculate separate costs for input and output tokens
-    const inputCost = (inputTokens / 1000000) * pricing.input;
-    const outputCost = (outputTokens / 1000000) * pricing.output;
-    const totalCost = inputCost + outputCost;
-    
-    // Deduct from remaining balance
-    creditBalance.remaining = Math.max(0, creditBalance.remaining - totalCost);
-    creditBalance.used += totalCost;
-    creditBalance.lastUpdated = new Date().toISOString();
-    
-    // Save updated balance
-    localStorage.setItem('chatgpt_credit_balance', JSON.stringify(creditBalance));
-    
-    // Update display
-    updateGlobalTokenDisplay();
-    
-    console.log(`Estimated cost: $${totalCost.toFixed(6)} (Input: $${inputCost.toFixed(6)}, Output: $${outputCost.toFixed(6)}) for ${inputTokens + outputTokens} tokens (${model})`);
-}
-
-// Fetch OpenAI account credit balance
-async function fetchCreditBalance() {
-    try {
-        const apiKey = getApiKey();
-        
-        if (apiKey === 'YOUR_API_KEY' || apiKey === 'your-api-key-here' || !apiKey) {
-            console.log('❌ No valid API key found for credit balance');
-            return false;
-        }
-        
-        console.log('🔍 Attempting to fetch credit balance from OpenAI...');
-        console.log('ℹ️  Note: OpenAI billing endpoints may not be accessible from browser due to CORS restrictions');
-        
-        // Show user-friendly message about attempting auto-fetch
-        const globalElement = document.getElementById('globalTokens');
-        if (globalElement) {
-            const currentContent = globalElement.innerHTML;
-            globalElement.innerHTML = `
-                <div class="credit-balance" style="color: #f59e0b;">Checking balance... ⏳</div>
-                ${currentContent.includes('tokens') ? currentContent.match(/<div class="global-token.*?<\/div>/s)?.[0] || '' : ''}
-            `;
-        }
-        
-        // Try multiple endpoints that might work with your API key
-        const endpoints = [
-            'https://api.openai.com/v1/dashboard/billing/subscription',
-            'https://api.openai.com/v1/dashboard/billing/credit_grants', 
-            'https://api.openai.com/v1/dashboard/billing/usage'
-        ];
-        
-        for (const endpoint of endpoints) {
-            try {
-                console.log(`🔄 Trying endpoint: ${endpoint}`);
-                
-                const response = await fetch(endpoint, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                console.log(`📊 Response status for ${endpoint}:`, response.status);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log(`📋 Data from ${endpoint}:`, data);
-                    
-                    // Handle subscription endpoint
-                    if (endpoint.includes('subscription') && data.hard_limit_usd !== undefined) {
-                        const remaining = data.hard_limit_usd;
-                        creditBalance = {
-                            total: data.system_hard_limit_usd || remaining,
-                            used: (data.system_hard_limit_usd || remaining) - remaining,
-                            remaining: remaining,
-                            lastUpdated: new Date().toISOString(),
-                            automatic: true
-                        };
-                        
-                        console.log('✅ Successfully fetched balance from subscription endpoint:', creditBalance);
-                        localStorage.setItem('chatgpt_credit_balance', JSON.stringify(creditBalance));
-                        updateGlobalTokenDisplay();
-                        return true;
-                    }
-                    
-                    // Handle credit grants endpoint
-                    if (endpoint.includes('credit_grants') && data.data && data.data.length > 0) {
-                        const grant = data.data[0];
-                        creditBalance = {
-                            total: grant.grant_amount || 0,
-                            used: grant.used_amount || 0,
-                            remaining: (grant.grant_amount || 0) - (grant.used_amount || 0),
-                            lastUpdated: new Date().toISOString(),
-                            automatic: true
-                        };
-                        
-                        console.log('✅ Successfully fetched balance from credit grants endpoint:', creditBalance);
-                        localStorage.setItem('chatgpt_credit_balance', JSON.stringify(creditBalance));
-                        updateGlobalTokenDisplay();
-                        return true;
-                    }
-                    
-                    // Handle usage endpoint (shows spending but not remaining balance)
-                    if (endpoint.includes('usage') && data.total_usage !== undefined) {
-                        creditBalance = {
-                            total: 0,
-                            used: data.total_usage / 100, // Convert cents to dollars
-                            remaining: 0,
-                            lastUpdated: new Date().toISOString(),
-                            usageOnly: true,
-                            automatic: true
-                        };
-                        
-                        console.log('✅ Got usage data (no balance info available):', creditBalance);
-                        localStorage.setItem('chatgpt_credit_balance', JSON.stringify(creditBalance));
-                        updateGlobalTokenDisplay();
-                        return true;
-                    }
-                } else {
-                    const errorText = await response.text();
-                    console.log(`❌ Error from ${endpoint}:`, response.status, errorText);
-                    
-                    // Special handling for common errors
-                    if (response.status === 403 || response.status === 401) {
-                        console.log('🔒 API key lacks permission for billing endpoints (this is normal for most API keys)');
-                    } else if (response.status === 404) {
-                        console.log('🔍 Billing endpoint not found or deprecated');
-                    }
-                }
-            } catch (endpointError) {
-                console.log(`❌ Network error for ${endpoint}:`, endpointError.message);
-                
-                // Check for CORS errors
-                if (endpointError.message.includes('CORS') || endpointError.message.includes('fetch')) {
-                    console.log('🚫 CORS restriction detected - billing endpoints not accessible from browser');
-                }
-            }
-        }
-        
-        console.log('⚠️  Automatic balance fetch failed - this is normal for browser-based apps');
-        console.log('💡 Reason: OpenAI billing endpoints require server-side access or special permissions');
-        console.log('✋ Please use manual balance entry by clicking the balance display');
-        return false;
-        
-    } catch (error) {
-        console.warn('❌ Error fetching credit balance:', error);
-        return false;
-    }
-}
-
-// Load credit balance - try automatic first, then manual
-async function loadCreditBalance() {
-    console.log('🚀 Initializing credit balance system...');
-    
-    const saved = localStorage.getItem('chatgpt_credit_balance');
-    if (saved) {
-        try {
-            const savedBalance = JSON.parse(saved);
-            console.log('💾 Found saved balance data:', savedBalance);
-            
-            // If we have automatic data that's less than 1 hour old, use it
-            if (savedBalance.automatic && savedBalance.lastUpdated) {
-                const lastUpdated = new Date(savedBalance.lastUpdated);
-                const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-                
-                if (lastUpdated > oneHourAgo) {
-                    creditBalance = savedBalance;
-                    updateGlobalTokenDisplay();
-                    console.log('✅ Using cached automatic balance data (less than 1 hour old)');
-                    return;
-                } else {
-                    console.log('⏰ Cached automatic data is older than 1 hour, will try to refresh');
-                }
-            } else if (savedBalance.manual) {
-                // Keep manual data permanently
-                creditBalance = savedBalance;
-                updateGlobalTokenDisplay();
-                console.log('✅ Using manual balance data');
-                
-                // Still try to fetch automatic data in background for comparison
-                console.log('🔄 Attempting background automatic fetch for comparison...');
-                setTimeout(() => fetchCreditBalance(), 1000);
-                return;
-            }
-        } catch (e) {
-            console.error('❌ Error loading saved credit balance:', e);
-        }
-    } else {
-        console.log('📭 No saved balance data found');
-    }
-    
-    // Show fetching state
-    updateGlobalTokenDisplay();
-    
-    // Try to fetch automatically
-    console.log('🔍 Attempting automatic balance fetch...');
-    const success = await fetchCreditBalance();
-    
-    if (!success) {
-        console.log('ℹ️  Automatic fetch failed (this is expected for browser-based apps)');
-        console.log('💡 OpenAI billing endpoints are typically restricted for security reasons');
-        console.log('✋ Manual balance entry is the recommended approach');
-        
-        // Reset to show manual entry option
-        creditBalance = { total: 0, used: 0, remaining: 0, lastUpdated: null };
-        updateGlobalTokenDisplay();
-        
-        // Show helpful message to user
-        setTimeout(() => {
-            const globalElement = document.getElementById('globalTokens');
-            if (globalElement && !creditBalance.manual) {
-                console.log('💬 Showing user guidance for manual balance entry');
-            }
-        }, 2000);
-    }
-}
 
 // Process and format text with LaTeX rendering
 // Formatting assistant function to clean up AI responses
@@ -1901,7 +1494,6 @@ async function saveCurrentChat() {
         title: getChatTitle(conversationHistory),
         messages: [...conversationHistory],
         model: currentModel,
-        tokens: { ...currentChatTokens },
         timestamp: currentTime,
         lastUpdated: currentTime,
         date: new Date().toLocaleDateString()
@@ -1935,11 +1527,7 @@ async function saveCurrentChat() {
             }
         }
         
-        // Update global chat count for new chats
-        globalTokens.chats = chatHistory.length;
-        saveGlobalTokens();
-        updateGlobalTokenDisplay();
-    }
+        }
     
     // Keep only last 50 chats
     if (chatHistory.length > 50) {
@@ -1975,18 +1563,6 @@ function loadChat(chatId) {
         }
     }
     
-    // Restore token usage data if available
-    if (chat.tokens) {
-        currentChatTokens = { ...chat.tokens };
-    } else {
-        currentChatTokens = {
-            total: 0,
-            prompt: 0,
-            completion: 0,
-            requests: 0
-        };
-    }
-    updateTokenDisplay();
     
     // Update model selector
     selectModel(currentModel);
@@ -2064,7 +1640,6 @@ async function deleteChatAsync(chatId) {
     
     // Then delete from local storage
     chatHistory = chatHistory.filter(chat => chat.id !== chatId);
-    globalTokens.chats = chatHistory.length;
     
     // Update localStorage if in development
     if (isLocalDevelopment()) {
@@ -2076,9 +1651,7 @@ async function deleteChatAsync(chatId) {
         }
     }
     
-    saveGlobalTokens();
     updateHistoryDisplay();
-    updateGlobalTokenDisplay();
     
     // If deleted chat was current, start new chat
     if (currentChatId === chatId) {
@@ -2169,23 +1742,18 @@ function deleteChat(chatId) {
 
 // Clear all chat history
 async function clearAllHistory() {
-    if (confirm('Are you sure you want to delete all chat history? This cannot be undone.\n\nNote: Token usage will remain unchanged as tokens were already consumed.')) {
+    if (confirm('Are you sure you want to delete all chat history? This cannot be undone.')) {
         chatHistory = [];
-        // DON'T reset global tokens - they represent actual API usage that was already billed
         // Only reset the chat count
-        globalTokens.chats = 0;
         debouncedSave();
-        saveGlobalTokens();
-        updateHistoryDisplay();
-        updateGlobalTokenDisplay();
-        startNewChat();
+            updateHistoryDisplay();
+            startNewChat();
     }
 }
 
 // Start a new chat
 function startNewChat(preserveFolder = false) {
     // Clear any pending requests when starting a new chat (since currentChatId will be null)
-    // But preserve tokens for other existing chats
     console.log('🗑️ Starting new chat, existing requests for other chats will be preserved');
     
     currentChatId = null;
@@ -2193,14 +1761,6 @@ function startNewChat(preserveFolder = false) {
         currentFolderId = null; // Reset folder when starting new chat normally
     }
     clearChat();
-    // Reset token counters for new chat
-    currentChatTokens = {
-        total: 0,
-        prompt: 0,
-        completion: 0,
-        requests: 0
-    };
-    updateTokenDisplay();
     updateHistoryDisplay();
     
     // Update URL to reflect new chat
@@ -2748,7 +2308,7 @@ function createImageSettingsModal() {
                     <div class="image-settings-options">
                         <div class="setting-group">
                             <label for="qualitySetting">Quality:</label>
-                            <select id="qualitySetting" class="setting-select" onchange="updatePricingDisplay()">
+                            <select id="qualitySetting" class="setting-select">
                                 <option value="auto">Auto (Recommended)</option>
                                 <option value="high">High</option>
                                 <option value="medium">Medium</option>
@@ -2758,7 +2318,7 @@ function createImageSettingsModal() {
                         
                         <div class="setting-group">
                             <label for="sizeSetting">Size:</label>
-                            <select id="sizeSetting" class="setting-select" onchange="updatePricingDisplay()">
+                            <select id="sizeSetting" class="setting-select">
                                 <option value="auto">Auto (Recommended)</option>
                                 <option value="1024x1024">Square (1024x1024)</option>
                                 <option value="1024x1536">Portrait (1024x1536)</option>
@@ -2785,17 +2345,6 @@ function createImageSettingsModal() {
                         </div>
                     </div>
                     
-                    <div class="pricing-section">
-                        <h4>💰 Pricing Information</h4>
-                        <div class="pricing-grid" id="pricingGrid">
-                            <!-- Pricing will be populated dynamically -->
-                        </div>
-                        <div class="current-price">
-                            <div class="price-label">Current Selection:</div>
-                            <div class="price-value" id="currentPrice">$0.042 per image</div>
-                        </div>
-                    </div>
-                    
                     <div class="modal-actions">
                         <button class="modal-btn secondary" onclick="resetImageSettings()">Reset to Default</button>
                         <button class="modal-btn primary" onclick="saveImageSettings()">Save Settings</button>
@@ -2809,80 +2358,7 @@ function createImageSettingsModal() {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 }
 
-// Image pricing data based on quality and size
-const imagePricing = {
-    'low': {
-        '1024x1024': 0.011,
-        '1024x1536': 0.016,
-        '1536x1024': 0.016
-    },
-    'medium': {
-        '1024x1024': 0.042,
-        '1024x1536': 0.063,
-        '1536x1024': 0.063
-    },
-    'high': {
-        '1024x1024': 0.167,
-        '1024x1536': 0.25,
-        '1536x1024': 0.25
-    }
-};
 
-// Update pricing display based on current selections
-function updatePricingDisplay() {
-    const quality = document.getElementById('qualitySetting').value;
-    const size = document.getElementById('sizeSetting').value;
-    const pricingGrid = document.getElementById('pricingGrid');
-    const currentPriceElement = document.getElementById('currentPrice');
-    
-    if (!pricingGrid || !currentPriceElement) return;
-    
-    // Generate pricing grid
-    let gridHTML = '';
-    const qualities = ['low', 'medium', 'high'];
-    const sizes = ['1024x1024', '1024x1536', '1536x1024'];
-    const sizeLabels = {
-        '1024x1024': 'Square',
-        '1024x1536': 'Portrait', 
-        '1536x1024': 'Landscape'
-    };
-    
-    qualities.forEach(q => {
-        gridHTML += `<div class="pricing-quality-section">`;
-        gridHTML += `<div class="pricing-quality-header">${q.charAt(0).toUpperCase() + q.slice(1)} Quality</div>`;
-        gridHTML += `<div class="pricing-row">`;
-        
-        sizes.forEach(s => {
-            const price = imagePricing[q][s];
-            const isSelected = (quality === q || quality === 'auto') && (size === s || size === 'auto');
-            gridHTML += `
-                <div class="pricing-item ${isSelected ? 'selected' : ''}">
-                    <div class="pricing-size">${sizeLabels[s]}</div>
-                    <div class="pricing-dimensions">${s}</div>
-                    <div class="pricing-cost">$${price.toFixed(3)}</div>
-                </div>
-            `;
-        });
-        
-        gridHTML += `</div></div>`;
-    });
-    
-    pricingGrid.innerHTML = gridHTML;
-    
-    // Update current price
-    let currentPrice = 0.042; // Default medium quality
-    if (quality !== 'auto' && size !== 'auto' && imagePricing[quality] && imagePricing[quality][size]) {
-        currentPrice = imagePricing[quality][size];
-    } else if (quality !== 'auto' && imagePricing[quality]) {
-        // Use default size (1024x1024) for the quality
-        currentPrice = imagePricing[quality]['1024x1024'];
-    } else if (size !== 'auto') {
-        // Use medium quality for the size
-        currentPrice = imagePricing['medium'][size] || 0.042;
-    }
-    
-    currentPriceElement.textContent = `$${currentPrice.toFixed(3)} per image`;
-}
 
 // Update image settings modal with current values
 function updateImageSettingsModal() {
@@ -2891,8 +2367,6 @@ function updateImageSettingsModal() {
     document.getElementById('backgroundSetting').value = imageSettings.background;
     document.getElementById('formatSetting').value = imageSettings.outputFormat;
     
-    // Update pricing display
-    setTimeout(() => updatePricingDisplay(), 100);
 }
 
 // Save image settings
@@ -3025,7 +2499,7 @@ function closeSettingsModal() {
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         // Check for any open modal and close it
-        const modals = ['settingsModal', 'apiKeyModal', 'tokenUsageModal', 'creditBalanceModal', 'confirmationModal', 'renameFolderModal', 'moveChatModal'];
+        const modals = ['settingsModal', 'apiKeyModal', 'confirmationModal', 'renameFolderModal', 'moveChatModal'];
         
         for (const modalId of modals) {
             const modal = document.getElementById(modalId);
@@ -3039,12 +2513,6 @@ document.addEventListener('keydown', function(event) {
                         break;
                     case 'apiKeyModal':
                         closeApiKeyModal();
-                        break;
-                    case 'tokenUsageModal':
-                        closeTokenUsageModal();
-                        break;
-                    case 'creditBalanceModal':
-                        closeCreditBalanceModal();
                         break;
                     case 'confirmationModal':
                         closeConfirmationModal();
@@ -3074,32 +2542,6 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
-function showTokenUsageInfo() {
-    closeSettingsModal(); // Close the settings modal first
-    
-    // Update token display values
-    document.getElementById('currentChatTotal').textContent = currentChatTokens.total.toLocaleString();
-    document.getElementById('currentChatInput').textContent = currentChatTokens.prompt.toLocaleString();
-    document.getElementById('currentChatOutput').textContent = currentChatTokens.completion.toLocaleString();
-    document.getElementById('currentChatRequests').textContent = currentChatTokens.requests;
-    document.getElementById('globalTokenTotal').textContent = globalTokens.total.toLocaleString();
-    document.getElementById('globalChatCount').textContent = globalTokens.chats;
-    
-    // Show the token usage modal
-    const modal = document.getElementById('tokenUsageModal');
-    if (modal) {
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-    }
-}
-
-function closeTokenUsageModal() {
-    const modal = document.getElementById('tokenUsageModal');
-    if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = 'auto';
-    }
-}
 
 async function sendMessageAsync() {
     console.log('📤 sendMessageAsync() called');
@@ -3298,26 +2740,6 @@ async function sendMessageAsync() {
                     // Apply formatting rules to AI response
                     aiMessage = formatAIResponse(aiMessage);
 
-                    // Track token usage for audio transcription responses
-                    if (data.usage) {
-                        const newTokens = data.usage.total_tokens || 0;
-                        const inputTokens = data.usage.prompt_tokens || 0;
-                        const outputTokens = data.usage.completion_tokens || 0;
-                        currentChatTokens.prompt += inputTokens;
-                        currentChatTokens.completion += outputTokens;
-                        currentChatTokens.total += newTokens;
-                        currentChatTokens.requests += 1;
-                        
-                        // Update global token count
-                        globalTokens.total += newTokens;
-                        saveGlobalTokens();
-                        
-                        // Update credit balance with estimated cost
-                        updateCreditBalanceWithUsage(inputTokens, outputTokens, currentModel);
-                        
-                        updateTokenDisplay();
-                        updateGlobalTokenDisplay();
-                    }
 
                     conversationHistory.push({
                         role: 'assistant',
@@ -3447,26 +2869,6 @@ async function sendMessageAsync() {
         // Apply formatting rules to AI response
         aiMessage = formatAIResponse(aiMessage);
 
-        // Track token usage
-        if (data.usage) {
-            const newTokens = data.usage.total_tokens || 0;
-            const inputTokens = data.usage.prompt_tokens || 0;
-            const outputTokens = data.usage.completion_tokens || 0;
-            currentChatTokens.prompt += inputTokens;
-            currentChatTokens.completion += outputTokens;
-            currentChatTokens.total += newTokens;
-            currentChatTokens.requests += 1;
-            
-            // Update global token count
-            globalTokens.total += newTokens;
-            saveGlobalTokens();
-            
-            // Update credit balance with estimated cost
-            updateCreditBalanceWithUsage(inputTokens, outputTokens, currentModel);
-            
-            updateTokenDisplay();
-            updateGlobalTokenDisplay();
-        }
 
         // Check if this is a valid request for the original chat
         const currentActiveToken = activeRequestTokens.get(requestChatId);
@@ -4669,13 +4071,6 @@ async function regenerateLastResponse() {
         const data = await response.json();
         const aiMessage = data.choices[0].message.content;
         
-        // Update token usage
-        if (data.usage) {
-            currentChatTokens.input += data.usage.prompt_tokens;
-            currentChatTokens.output += data.usage.completion_tokens;
-            currentChatTokens.total += data.usage.total_tokens;
-            updateTokenDisplay();
-        }
 
         // Add new AI response to conversation history
         conversationHistory.push({
@@ -5406,17 +4801,10 @@ async function initializeApp() {
 
     // Chat history will be loaded after Firebase auth is established
     
-    // Load global token data
-    loadGlobalTokens();
-    
-    // Load credit balance
-    loadCreditBalance();
     
     // Load image generation settings
     loadImageSettings();
     
-    // Initialize token display
-    updateTokenDisplay();
     
     // Ensure input is enabled on page load
     if (messageInput) {
@@ -5511,8 +4899,7 @@ async function initializeApp() {
                 title: getChatTitle(conversationHistory),
                 messages: [...conversationHistory],
                 model: currentModel,
-                tokens: { ...currentChatTokens },
-                timestamp: currentTime,
+                        timestamp: currentTime,
                 lastUpdated: currentTime,
                 date: new Date().toLocaleDateString()
             };
@@ -5671,20 +5058,6 @@ async function handleImageGeneration(prompt) {
                 throw new Error('Unknown image response format');
             }
             
-            // Track token usage if available
-            if (data.usage) {
-                currentChatTokens.prompt += data.usage.prompt_tokens || 0;
-                currentChatTokens.completion += data.usage.completion_tokens || 0;
-                currentChatTokens.total = currentChatTokens.prompt + currentChatTokens.completion;
-                currentChatTokens.requests += 1;
-                
-                globalTokens.total += (data.usage.prompt_tokens || 0) + (data.usage.completion_tokens || 0);
-                
-                updateTokenDisplay();
-                updateGlobalTokenDisplay();
-                saveGlobalTokens();
-                updateCreditBalanceWithUsage(data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0, currentModel);
-            }
             
             // Save the conversation
             conversationHistory.push({
@@ -5793,20 +5166,6 @@ async function handleImageEditing(prompt, images) {
                 throw new Error('Unknown image response format');
             }
             
-            // Track token usage if available
-            if (data.usage) {
-                currentChatTokens.prompt += data.usage.prompt_tokens || 0;
-                currentChatTokens.completion += data.usage.completion_tokens || 0;
-                currentChatTokens.total = currentChatTokens.prompt + currentChatTokens.completion;
-                currentChatTokens.requests += 1;
-                
-                globalTokens.total += (data.usage.prompt_tokens || 0) + (data.usage.completion_tokens || 0);
-                
-                updateTokenDisplay();
-                updateGlobalTokenDisplay();
-                saveGlobalTokens();
-                updateCreditBalanceWithUsage(data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0, currentModel);
-            }
             
             // Save the conversation
             conversationHistory.push({

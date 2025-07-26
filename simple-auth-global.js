@@ -12,6 +12,25 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function initializeFirebaseAuth() {
         if (typeof window.authFunctions !== 'undefined' && window.authFunctions) {
+            // Check for mobile redirect result immediately
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                             window.innerWidth <= 768 || 
+                             ('ontouchstart' in window) || 
+                             (navigator.maxTouchPoints > 0);
+            
+            if (isMobile) {
+                console.log('📱 Mobile detected - checking for redirect result...');
+                window.authFunctions.handleInitialRedirectResult()
+                    .then(result => {
+                        if (result && result.success) {
+                            console.log('✅ Mobile redirect authentication successful');
+                        }
+                    })
+                    .catch(error => {
+                        console.warn('Mobile redirect check failed:', error);
+                    });
+            }
+            
             // Listen for Firebase auth state changes
             window.authFunctions.onAuthStateChanged((user) => {
                 if (user) {

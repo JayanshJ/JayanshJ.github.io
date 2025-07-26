@@ -72,10 +72,16 @@ class SecureFirebaseClient {
             console.log('📱 User agent:', navigator.userAgent);
             
             // Check if domain is authorized
-            if (!window.location.hostname.includes('github.io') && !window.location.hostname.includes('vercel.app') && window.location.hostname !== 'localhost') {
+            const authorizedDomains = ['github.io', 'vercel.app', 'localhost', '127.0.0.1'];
+            const isAuthorizedDomain = authorizedDomains.some(domain => 
+                window.location.hostname.includes(domain) || window.location.hostname === domain
+            );
+            
+            if (!isAuthorizedDomain) {
                 console.warn('⚠️ Domain mismatch! Current domain may not be authorized in Firebase Console');
                 console.warn('💡 Add this domain to Firebase Console → Authentication → Settings → Authorized domains:');
                 console.warn('📝 Domain to add:', window.location.hostname);
+                return { success: false, error: `Domain ${window.location.hostname} not authorized. Please add it to Firebase Console.` };
             }
             
             const auth = firebase.auth();
@@ -104,12 +110,19 @@ class SecureFirebaseClient {
                 // Check if redirect is supported
                 if (typeof auth.signInWithRedirect === 'function') {
                     console.log('✅ signInWithRedirect is available');
-                    await auth.signInWithRedirect(provider);
-                    console.log('✅ Redirect initiated, page will reload...');
-                    return { success: true, pending: true }; // Will complete on redirect
+                    try {
+                        await auth.signInWithRedirect(provider);
+                        console.log('✅ Redirect initiated, page will reload...');
+                        return { success: true, pending: true }; // Will complete on redirect
+                    } catch (redirectError) {
+                        console.error('❌ signInWithRedirect failed:', redirectError);
+                        console.log('🔄 Falling back to popup method...');
+                        // Fallback to popup on mobile if redirect fails
+                        result = await auth.signInWithPopup(provider);
+                    }
                 } else {
-                    console.error('❌ signInWithRedirect not available');
-                    throw new Error('signInWithRedirect not supported');
+                    console.error('❌ signInWithRedirect not available, using popup instead');
+                    result = await auth.signInWithPopup(provider);
                 }
             } else {
                 console.log('💻 Desktop detected, using popup...');
@@ -165,9 +178,16 @@ class SecureFirebaseClient {
             if (isMobile) {
                 console.log('📱 Mobile detected, using redirect...');
                 console.log('🔄 Starting signInWithRedirect...');
-                await auth.signInWithRedirect(provider);
-                console.log('✅ Redirect initiated, page will reload...');
-                return { success: true, pending: true }; // Will complete on redirect
+                try {
+                    await auth.signInWithRedirect(provider);
+                    console.log('✅ Redirect initiated, page will reload...');
+                    return { success: true, pending: true }; // Will complete on redirect
+                } catch (redirectError) {
+                    console.error('❌ Apple signInWithRedirect failed:', redirectError);
+                    console.log('🔄 Falling back to popup method...');
+                    // Fallback to popup on mobile if redirect fails
+                    result = await auth.signInWithPopup(provider);
+                }
             } else {
                 console.log('💻 Desktop detected, using popup...');
                 result = await auth.signInWithPopup(provider);
