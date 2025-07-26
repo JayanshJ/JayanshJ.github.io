@@ -82,6 +82,9 @@ let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 
+// Track active requests per chat to prevent race conditions
+let activeRequestTokens = new Map(); // chatId -> requestToken
+
 
 
 // Load chat history from Firebase only
@@ -1953,6 +1956,9 @@ function loadChat(chatId) {
     const chat = chatHistory.find(c => c.id === chatId);
     if (!chat) return;
     
+    // Note: We don't cancel pending requests when switching chats anymore
+    // Each chat maintains its own request token, so responses will appear in the correct chat
+    
     currentChatId = chatId;
     conversationHistory = [...chat.messages];
     
@@ -2171,6 +2177,10 @@ async function clearAllHistory() {
 
 // Start a new chat
 function startNewChat(preserveFolder = false) {
+    // Clear any pending requests when starting a new chat (since currentChatId will be null)
+    // But preserve tokens for other existing chats
+    console.log('🗑️ Starting new chat, existing requests for other chats will be preserved');
+    
     currentChatId = null;
     if (!preserveFolder) {
         currentFolderId = null; // Reset folder when starting new chat normally
@@ -3086,6 +3096,14 @@ function closeTokenUsageModal() {
 
 async function sendMessageAsync() {
     console.log('📤 sendMessageAsync() called');
+    
+    // Generate a unique token for this request to prevent race conditions
+    const requestToken = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    const requestChatId = currentChatId;
+    activeRequestTokens.set(requestChatId, requestToken);
+    
+    console.log('🔒 Request started for chat:', requestChatId, 'with token:', requestToken);
+    
     const input = document.getElementById('messageInput');
     const sendButton = document.getElementById('sendButton');
     
@@ -3440,6 +3458,19 @@ async function sendMessageAsync() {
             updateGlobalTokenDisplay();
         }
 
+        // Check if we're still in the same chat and this is the active request for that chat
+        const currentActiveToken = activeRequestTokens.get(requestChatId);
+        if (currentChatId !== requestChatId || currentActiveToken !== requestToken) {
+            console.warn('🚨 Race condition detected! Response received for chat:', requestChatId, 'token:', requestToken);
+            console.warn('🔄 Current chat:', currentChatId, 'expected token for', requestChatId, ':', currentActiveToken);
+            console.log('❌ Discarding response to prevent it appearing in wrong chat');
+            removeMessage(typingId); // Remove the typing indicator
+            return; // Don't add the response to the wrong chat
+        }
+        
+        // Clear the request token since we're processing the response
+        activeRequestTokens.delete(requestChatId);
+
         // Add AI response to conversation history
         conversationHistory.push({
             role: 'assistant',
@@ -3461,7 +3492,15 @@ async function sendMessageAsync() {
     } catch (error) {
         console.error('Error:', error);
         removeMessage(typingId);
-        addMessage(`❌ Error: ${error.message}`, 'ai', 'error');
+        
+        // Only show error in the same chat where the request was made
+        const currentActiveToken = activeRequestTokens.get(requestChatId);
+        if (currentChatId === requestChatId && currentActiveToken === requestToken) {
+            addMessage(`❌ Error: ${error.message}`, 'ai', 'error');
+            activeRequestTokens.delete(requestChatId); // Clear the token
+        } else {
+            console.log('❌ Error occurred but user switched chats or request cancelled, not showing error message');
+        }
     } finally {
         // Re-enable input and button
         input.disabled = false;
