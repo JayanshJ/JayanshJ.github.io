@@ -1892,13 +1892,15 @@ async function saveCurrentChat() {
     
     console.log('Saving current chat with', conversationHistory.length, 'messages');
     
+    const currentTime = Date.now();
     const chatData = {
         id: currentChatId || generateChatId(),
         title: getChatTitle(conversationHistory),
         messages: [...conversationHistory],
         model: currentModel,
         tokens: { ...currentChatTokens },
-        timestamp: Date.now(),
+        timestamp: currentTime,
+        lastUpdated: currentTime,
         date: new Date().toLocaleDateString()
     };
     
@@ -2364,7 +2366,12 @@ function updateChatHistory() {
     const chatHistoryContainer = document.querySelector('.chat-history-container');
     if (!chatHistoryContainer) return;
 
-    const chats = Object.values(chatHistory).sort((a, b) => b.timestamp - a.timestamp);
+    const chats = Object.values(chatHistory).sort((a, b) => {
+        // Use lastUpdated if available, otherwise fall back to timestamp
+        const aTime = a.lastUpdated || a.timestamp || 0;
+        const bTime = b.lastUpdated || b.timestamp || 0;
+        return bTime - aTime; // Newest first (descending order)
+    });
     
     // Always show the add folder button, regardless of chat count
     const addFolderButton = document.querySelector('.add-folder-btn');
@@ -5392,13 +5399,15 @@ async function initializeApp() {
         if (isRecording) stopRecording();
         if (conversationHistory.length > 0 && typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
             // Save current chat to Firebase only if authenticated
+            const currentTime = Date.now();
             const chatData = {
                 id: currentChatId || generateChatId(),
                 title: getChatTitle(conversationHistory),
                 messages: [...conversationHistory],
                 model: currentModel,
                 tokens: { ...currentChatTokens },
-                timestamp: Date.now(),
+                timestamp: currentTime,
+                lastUpdated: currentTime,
                 date: new Date().toLocaleDateString()
             };
             
