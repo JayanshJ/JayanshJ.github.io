@@ -2040,19 +2040,26 @@ async function deleteChatAsync(chatId) {
     
     // First, delete from Firebase if user is authenticated
     if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
-        console.log('🗑️ Deleting chat from Firebase:', chatId);
+        const currentUser = window.chatStorage.getCurrentUser();
+        console.log('🗑️ Deleting chat from Firebase:', chatId, 'User:', currentUser.email);
+        
         try {
             const result = await window.chatStorage.deleteChat(chatId);
+            console.log('🔍 Firebase delete result:', result);
+            
             if (result.success) {
                 console.log('✅ Chat deleted from Firebase successfully');
             } else {
-                console.warn('⚠️ Failed to delete chat from Firebase:', result.error);
+                console.error('❌ Failed to delete chat from Firebase:', result.error);
+                console.log('🔧 Will still delete locally but chat may remain on other devices');
             }
         } catch (error) {
             console.error('❌ Error deleting chat from Firebase:', error);
+            console.log('🔧 Will still delete locally but chat may remain on other devices');
         }
     } else {
-        console.log('User not authenticated, only deleting locally');
+        console.log('❌ User not authenticated, only deleting locally');
+        console.log('🔧 Chat will remain on other devices and in cloud storage');
     }
     
     // Then delete from local storage

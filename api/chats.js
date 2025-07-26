@@ -230,16 +230,38 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'DELETE') {
       const { chatId, folderId, type } = req.query;
+      console.log('🗑️ DELETE request received:', { chatId, folderId, type, userId });
       
       if (type === 'folder' && folderId) {
         // Delete a folder
+        console.log('🗂️ Deleting folder:', folderId);
         await db.collection('folders').doc(folderId).delete();
+        console.log('✅ Folder deleted successfully');
         return res.json({ success: true });
       } else if (chatId) {
         // Delete a chat
-        await db.collection('chats').doc(chatId).delete();
+        console.log('💬 Deleting chat:', chatId, 'for user:', userId);
+        
+        // Verify the chat belongs to this user before deleting
+        const chatRef = db.collection('chats').doc(chatId);
+        const chatDoc = await chatRef.get();
+        
+        if (!chatDoc.exists) {
+          console.log('❌ Chat not found:', chatId);
+          return res.status(404).json({ success: false, error: 'Chat not found' });
+        }
+        
+        const chatData = chatDoc.data();
+        if (chatData.userId !== userId) {
+          console.log('❌ User', userId, 'not authorized to delete chat', chatId, 'owned by', chatData.userId);
+          return res.status(403).json({ success: false, error: 'Not authorized to delete this chat' });
+        }
+        
+        await chatRef.delete();
+        console.log('✅ Chat deleted successfully:', chatId);
         return res.json({ success: true });
       } else {
+        console.log('❌ Missing required parameters for DELETE');
         return res.status(400).json({ success: false, error: 'Missing required parameters' });
       }
     }

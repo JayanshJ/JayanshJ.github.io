@@ -488,19 +488,58 @@ class SecureFirebaseClient {
     }
 
     async deleteChat(chatId) {
+        console.log('🗑️ deleteChat called for:', chatId);
+        console.log('👤 Current user:', this.currentUser);
+        
         const token = localStorage.getItem('firebase_token');
-        if (!token) return { success: false, error: 'Not authenticated' };
+        console.log('🔑 Firebase token exists:', !!token);
+        
+        if (!token) {
+            console.warn('❌ No authentication token for deleteChat');
+            return { success: false, error: 'Not authenticated' };
+        }
+        
+        if (!this.currentUser) {
+            console.warn('❌ No current user for deleteChat');
+            return { success: false, error: 'User not authenticated' };
+        }
 
         try {
-            const response = await fetch(`${this.apiBase}/chats?chatId=${chatId}`, {
+            const deleteUrl = `${this.apiBase}/chats?chatId=${chatId}`;
+            console.log('📤 Sending DELETE request to:', deleteUrl);
+            console.log('🔑 Using token (first 10 chars):', token.substring(0, 10) + '...');
+            
+            const response = await fetch(deleteUrl, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
             
-            return await response.json();
+            console.log('📡 Delete API response status:', response.status);
+            console.log('📡 Delete API response ok:', response.ok);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Delete API returned error:', response.status, errorText);
+                return { 
+                    success: false, 
+                    error: `API error: ${response.status} - ${errorText}` 
+                };
+            }
+            
+            const result = await response.json();
+            console.log('📥 Delete API response:', result);
+            
+            if (result.success) {
+                console.log('✅ Chat successfully deleted from Firebase');
+            } else {
+                console.error('❌ Firebase delete failed:', result.error);
+            }
+            
+            return result;
         } catch (error) {
+            console.error('💥 deleteChat error:', error);
             return { success: false, error: error.message };
         }
     }
