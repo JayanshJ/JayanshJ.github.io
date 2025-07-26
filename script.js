@@ -3458,35 +3458,60 @@ async function sendMessageAsync() {
             updateGlobalTokenDisplay();
         }
 
-        // Check if we're still in the same chat and this is the active request for that chat
+        // Check if this is a valid request for the original chat
         const currentActiveToken = activeRequestTokens.get(requestChatId);
-        if (currentChatId !== requestChatId || currentActiveToken !== requestToken) {
-            console.warn('🚨 Race condition detected! Response received for chat:', requestChatId, 'token:', requestToken);
-            console.warn('🔄 Current chat:', currentChatId, 'expected token for', requestChatId, ':', currentActiveToken);
-            console.log('❌ Discarding response to prevent it appearing in wrong chat');
-            removeMessage(typingId); // Remove the typing indicator
-            return; // Don't add the response to the wrong chat
+        if (currentActiveToken !== requestToken) {
+            console.warn('🚨 Invalid token! Expected:', currentActiveToken, 'got:', requestToken);
+            console.log('❌ Discarding response - token mismatch');
+            removeMessage(typingId);
+            return;
         }
         
         // Clear the request token since we're processing the response
         activeRequestTokens.delete(requestChatId);
 
-        // Add AI response to conversation history
-        conversationHistory.push({
-            role: 'assistant',
-            content: aiMessage
-        });
+        // Find the chat where this response belongs
+        const targetChat = chatHistory.find(chat => chat.id === requestChatId);
+        if (targetChat) {
+            // Add response to the correct chat's messages
+            targetChat.messages.push({
+                role: 'assistant',
+                content: aiMessage
+            });
+            console.log('✅ Response added to chat:', requestChatId);
+        }
 
-        // Display AI response
-        addMessage(aiMessage, 'ai');
+        // Only update UI if user is currently viewing this chat
+        if (currentChatId === requestChatId) {
+            // Add to current conversation and display
+            conversationHistory.push({
+                role: 'assistant',
+                content: aiMessage
+            });
+            addMessage(aiMessage, 'ai');
+            console.log('✅ Response displayed in current chat');
+        } else {
+            // Just remove typing indicator, don't display response
+            removeMessage(typingId);
+            console.log('✅ Response saved to chat', requestChatId, 'but not displayed (user in different chat)');
+        }
 
-        // Auto-save chat after successful response
-        try {
-            await saveCurrentChat();
-            console.log('✅ Chat saved successfully');
-        } catch (saveError) {
-            console.warn('⚠️ Failed to save chat:', saveError);
-            // Continue anyway - the chat is still visible in the UI
+        // Auto-save the target chat after successful response
+        if (targetChat) {
+            try {
+                // Update the chat in chatHistory and trigger save
+                const chatIndex = chatHistory.findIndex(chat => chat.id === requestChatId);
+                if (chatIndex !== -1) {
+                    chatHistory[chatIndex] = {
+                        ...targetChat,
+                        lastUpdated: Date.now()
+                    };
+                    debouncedSave(); // Save to Firebase
+                    console.log('✅ Target chat saved successfully');
+                }
+            } catch (saveError) {
+                console.warn('⚠️ Failed to save target chat:', saveError);
+            }
         }
 
     } catch (error) {
