@@ -12,11 +12,45 @@ if (!admin.apps.length) {
       throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
     }
     
+    // Parse private key more robustly
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    
+    // Check if the key is Base64 encoded (alternative storage method)
+    if (process.env.FIREBASE_PRIVATE_KEY_BASE64) {
+      console.log('🔑 Using Base64 encoded private key');
+      try {
+        privateKey = Buffer.from(process.env.FIREBASE_PRIVATE_KEY_BASE64, 'base64').toString('utf8');
+      } catch (base64Error) {
+        console.error('❌ Failed to decode Base64 private key:', base64Error.message);
+        throw new Error('Invalid Base64 private key');
+      }
+    }
+    
+    if (privateKey) {
+      // Handle different formats of newlines in environment variables
+      privateKey = privateKey.replace(/\\n/g, '\n');
+      
+      // Ensure the key has proper BEGIN/END markers
+      if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+        console.error('❌ Private key missing BEGIN marker');
+        console.log('Private key preview:', privateKey.substring(0, 100) + '...');
+        throw new Error('Invalid private key format: missing BEGIN marker');
+      }
+      if (!privateKey.includes('-----END PRIVATE KEY-----')) {
+        console.error('❌ Private key missing END marker');
+        throw new Error('Invalid private key format: missing END marker');
+      }
+      
+      console.log('✅ Private key format validated');
+    } else {
+      throw new Error('No private key found in environment variables');
+    }
+
     admin.initializeApp({
       credential: admin.credential.cert({
         projectId: process.env.FIREBASE_PROJECT_ID,
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        privateKey: privateKey,
       }),
     });
     console.log('Firebase Admin initialized successfully');
