@@ -71,6 +71,16 @@ class SecureFirebaseClient {
             console.log('🔗 Current origin:', window.location.origin);
             console.log('📱 User agent:', navigator.userAgent);
             
+            // Mobile troubleshooting info
+            const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            console.log('📱 Mobile User Agent detected:', isMobileUA);
+            console.log('📱 Touch events supported:', 'ontouchstart' in window);
+            console.log('📱 Window innerWidth:', window.innerWidth);
+            console.log('📱 Screen width:', screen.width);
+            console.log('📱 Max touch points:', navigator.maxTouchPoints);
+            console.log('🌐 Online status:', navigator.onLine);
+            console.log('🍪 Cookies enabled:', navigator.cookieEnabled);
+            
             // Check if domain is authorized
             const authorizedDomains = ['github.io', 'vercel.app', 'localhost', '127.0.0.1'];
             const isAuthorizedDomain = authorizedDomains.some(domain => 
@@ -81,52 +91,60 @@ class SecureFirebaseClient {
                 console.warn('⚠️ Domain mismatch! Current domain may not be authorized in Firebase Console');
                 console.warn('💡 Add this domain to Firebase Console → Authentication → Settings → Authorized domains:');
                 console.warn('📝 Domain to add:', window.location.hostname);
-                return { success: false, error: `Domain ${window.location.hostname} not authorized. Please add it to Firebase Console.` };
+                
+                // For mobile, provide specific instructions
+                if (isMobileUA) {
+                    console.warn('📱 MOBILE USERS: This domain authorization issue is common on mobile');
+                    console.warn('📱 Try accessing from: https://jayanshj.github.io instead');
+                }
+                
+                return { 
+                    success: false, 
+                    error: `Domain ${window.location.hostname} not authorized in Firebase Console. Please contact admin to add this domain.` 
+                };
             }
             
             const auth = firebase.auth();
+            
+            // Set persistence for mobile compatibility
+            console.log('🔧 Setting auth persistence for mobile compatibility...');
+            await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+            console.log('✅ Auth persistence set to LOCAL');
+            
             const provider = new firebase.auth.GoogleAuthProvider();
             
             // Add scopes for better user info
             provider.addScope('profile');
             provider.addScope('email');
             
-            // Use redirect for mobile devices, popup for desktop
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-                             window.innerWidth <= 768 || 
-                             ('ontouchstart' in window) || 
-                             (navigator.maxTouchPoints > 0);
-            
-            console.log('📱 Is mobile device:', isMobile);
+            // Always use popup for better mobile compatibility
+            console.log('🔧 Using popup method for all devices (better mobile compatibility)');
+            console.log('📱 User agent:', navigator.userAgent);
             console.log('📏 Window width:', window.innerWidth);
             console.log('👆 Touch support:', 'ontouchstart' in window);
-            console.log('🔢 Max touch points:', navigator.maxTouchPoints);
             
             let result;
-            if (isMobile) {
-                console.log('📱 Mobile detected, using redirect...');
-                console.log('🔄 Starting signInWithRedirect...');
+            try {
+                console.log('🚀 Starting Google sign-in with popup...');
+                result = await auth.signInWithPopup(provider);
+                console.log('✅ Popup sign-in successful');
+            } catch (popupError) {
+                console.error('❌ Popup sign-in failed:', popupError);
                 
-                // Check if redirect is supported
-                if (typeof auth.signInWithRedirect === 'function') {
-                    console.log('✅ signInWithRedirect is available');
+                // Check if it's a popup blocked error
+                if (popupError.code === 'auth/popup-blocked') {
+                    console.log('🚫 Popup was blocked, trying redirect as fallback...');
                     try {
                         await auth.signInWithRedirect(provider);
                         console.log('✅ Redirect initiated, page will reload...');
-                        return { success: true, pending: true }; // Will complete on redirect
+                        return { success: true, pending: true };
                     } catch (redirectError) {
-                        console.error('❌ signInWithRedirect failed:', redirectError);
-                        console.log('🔄 Falling back to popup method...');
-                        // Fallback to popup on mobile if redirect fails
-                        result = await auth.signInWithPopup(provider);
+                        console.error('❌ Redirect also failed:', redirectError);
+                        throw redirectError;
                     }
                 } else {
-                    console.error('❌ signInWithRedirect not available, using popup instead');
-                    result = await auth.signInWithPopup(provider);
+                    throw popupError;
                 }
-            } else {
-                console.log('💻 Desktop detected, using popup...');
-                result = await auth.signInWithPopup(provider);
             }
             
             console.log('Google sign in result:', result);
@@ -168,29 +186,31 @@ class SecureFirebaseClient {
             provider.addScope('email');
             provider.addScope('name');
             
-            // Use redirect for mobile devices, popup for desktop
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-                             window.innerWidth <= 768 || 
-                             ('ontouchstart' in window) || 
-                             (navigator.maxTouchPoints > 0);
+            // Always use popup for better mobile compatibility
+            console.log('🔧 Using popup method for Apple sign-in (better mobile compatibility)');
             
             let result;
-            if (isMobile) {
-                console.log('📱 Mobile detected, using redirect...');
-                console.log('🔄 Starting signInWithRedirect...');
-                try {
-                    await auth.signInWithRedirect(provider);
-                    console.log('✅ Redirect initiated, page will reload...');
-                    return { success: true, pending: true }; // Will complete on redirect
-                } catch (redirectError) {
-                    console.error('❌ Apple signInWithRedirect failed:', redirectError);
-                    console.log('🔄 Falling back to popup method...');
-                    // Fallback to popup on mobile if redirect fails
-                    result = await auth.signInWithPopup(provider);
-                }
-            } else {
-                console.log('💻 Desktop detected, using popup...');
+            try {
+                console.log('🍎 Starting Apple sign-in with popup...');
                 result = await auth.signInWithPopup(provider);
+                console.log('✅ Apple popup sign-in successful');
+            } catch (popupError) {
+                console.error('❌ Apple popup sign-in failed:', popupError);
+                
+                // Check if it's a popup blocked error
+                if (popupError.code === 'auth/popup-blocked') {
+                    console.log('🚫 Popup was blocked, trying redirect as fallback...');
+                    try {
+                        await auth.signInWithRedirect(provider);
+                        console.log('✅ Apple redirect initiated, page will reload...');
+                        return { success: true, pending: true };
+                    } catch (redirectError) {
+                        console.error('❌ Apple redirect also failed:', redirectError);
+                        throw redirectError;
+                    }
+                } else {
+                    throw popupError;
+                }
             }
             
             console.log('Apple sign in result:', result);
