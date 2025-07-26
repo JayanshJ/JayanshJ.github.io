@@ -43,15 +43,32 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    console.log('🚀 API Request:', {
+      method: req.method,
+      url: req.url,
+      hasAuth: !!req.headers.authorization,
+      timestamp: new Date().toISOString()
+    });
+
     // Verify the user's ID token
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ No authorization header found');
       return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
 
     const idToken = authHeader.split('Bearer ')[1];
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    const userId = decodedToken.uid;
+    console.log('🔑 Attempting to verify ID token...');
+    
+    let userId;
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      userId = decodedToken.uid;
+      console.log('✅ Token verified for user:', userId);
+    } catch (tokenError) {
+      console.error('❌ Token verification failed:', tokenError.message);
+      return res.status(401).json({ success: false, error: 'Invalid token: ' + tokenError.message });
+    }
 
     if (req.method === 'GET') {
       const { type } = req.query;
@@ -135,25 +152,45 @@ module.exports = async function handler(req, res) {
         }
       } else {
         // Save a chat (default behavior)
+        console.log('💾 Attempting to save chat...');
         const chatData = req.body;
-        const chatRef = db.collection('chats').doc(chatData.id);
         
-        // Check if this is a new chat or an update
-        const existingDoc = await chatRef.get();
-        const updateData = {
-          ...chatData,
-          userId,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        };
-        
-        // Only set createdAt for new chats
-        if (!existingDoc.exists) {
-          updateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+        if (!chatData || !chatData.id) {
+          console.error('❌ Invalid chat data received:', chatData);
+          return res.status(400).json({ success: false, error: 'Invalid chat data: missing id' });
         }
         
-        await chatRef.set(updateData, { merge: true });
+        console.log('📝 Saving chat:', { id: chatData.id, userId, messageCount: chatData.messages?.length || 0 });
+        
+        try {
+          const chatRef = db.collection('chats').doc(chatData.id);
+          
+          // Check if this is a new chat or an update
+          console.log('🔍 Checking if chat exists...');
+          const existingDoc = await chatRef.get();
+          
+          const updateData = {
+            ...chatData,
+            userId,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          };
+          
+          // Only set createdAt for new chats
+          if (!existingDoc.exists) {
+            console.log('✨ Creating new chat');
+            updateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+          } else {
+            console.log('🔄 Updating existing chat');
+          }
+          
+          await chatRef.set(updateData, { merge: true });
+          console.log('✅ Chat saved successfully');
 
-        return res.json({ success: true, id: chatData.id });
+          return res.json({ success: true, id: chatData.id });
+        } catch (saveError) {
+          console.error('❌ Error saving chat to Firestore:', saveError);
+          return res.status(500).json({ success: false, error: 'Failed to save chat: ' + saveError.message });
+        }
       }
     }
 
