@@ -3388,6 +3388,9 @@ async function sendMessageAsync() {
         content: messageContent
     };
     conversationHistory.push(userMessage);
+    
+    // Store the user message for this request token so we can ensure it's saved later
+    const requestUserMessage = { ...userMessage };
 
     // Auto-save after user message is added
     await saveCurrentChat();
@@ -3470,9 +3473,17 @@ async function sendMessageAsync() {
         // Clear the request token since we're processing the response
         activeRequestTokens.delete(requestChatId);
 
-        // Find the chat where this response belongs
+        // Find the chat where this response belongs and ensure it has the complete conversation
         const targetChat = chatHistory.find(chat => chat.id === requestChatId);
         if (targetChat) {
+            // Ensure the user message is in the target chat (in case save didn't complete before chat switch)
+            const lastMessage = targetChat.messages[targetChat.messages.length - 1];
+            
+            if (!lastMessage || lastMessage.role !== 'user' || lastMessage.content !== requestUserMessage.content) {
+                console.log('🔧 Adding missing user message to target chat');
+                targetChat.messages.push(requestUserMessage);
+            }
+            
             // Add response to the correct chat's messages
             targetChat.messages.push({
                 role: 'assistant',
