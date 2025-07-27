@@ -5,7 +5,9 @@
 const firebaseConfig = {
     apiKey: "AIzaSyDhz3dQ_lHVaX0k53XUS3T-4TL0Y9nNaAk",
     authDomain: "ai-app-daeda.firebaseapp.com",
-    projectId: "ai-app-daeda"
+    projectId: "ai-app-daeda",
+    // Add persistence and session management
+    persistenceEnabled: true
 };
 
 // Initialize Firebase with minimal config
@@ -123,10 +125,16 @@ class SecureFirebaseClient {
             
             const auth = firebase.auth();
             
-            // Set persistence for mobile compatibility
+            // Set persistence for mobile compatibility - use SESSION for better mobile support
             console.log('🔧 Setting auth persistence...');
-            await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-            console.log('✅ Auth persistence set to LOCAL');
+            if (isMobile) {
+                // Use SESSION persistence for mobile to ensure state survives redirects
+                await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+                console.log('✅ Auth persistence set to SESSION for mobile');
+            } else {
+                await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+                console.log('✅ Auth persistence set to LOCAL for desktop');
+            }
             
             const provider = new firebase.auth.GoogleAuthProvider();
             
@@ -139,6 +147,9 @@ class SecureFirebaseClient {
             if (isMobile) {
                 console.log('📱 Mobile device detected - using redirect method for better compatibility');
                 try {
+                    // Reset redirect handled flag for new attempt
+                    this.redirectHandled = false;
+                    
                     // Enhanced mobile redirect setup
                     localStorage.setItem('google_auth_initiated', 'true');
                     localStorage.setItem('auth_redirect_timestamp', Date.now().toString());
@@ -148,18 +159,19 @@ class SecureFirebaseClient {
                     
                     // Enhanced mobile-specific provider settings
                     provider.setCustomParameters({
-                        'prompt': 'consent', // Changed from select_account to consent for better mobile compatibility
-                        'access_type': 'online', // Changed to online for better mobile support
+                        'prompt': 'select_account', // Use select_account for better UX
+                        'access_type': 'offline', // Use offline for better token persistence
                         'include_granted_scopes': 'true',
-                        'response_type': 'code'
+                        'response_type': 'code',
+                        'approval_prompt': 'force' // Force approval for better mobile compatibility
                     });
                     
                     console.log('🔄 Initiating mobile redirect with enhanced OAuth settings...');
                     console.log('🔧 Provider configuration:', {
                         scopes: provider.getScopes(),
                         customParameters: {
-                            prompt: 'consent',
-                            access_type: 'online',
+                            prompt: 'select_account',
+                            access_type: 'offline',
                             include_granted_scopes: 'true',
                             response_type: 'code'
                         }
@@ -226,6 +238,7 @@ class SecureFirebaseClient {
         localStorage.removeItem('mobile_auth_attempt');
         localStorage.removeItem('auth_user_agent');
         localStorage.removeItem('auth_current_domain');
+        this.redirectHandled = false;
     }
     
     async processAuthResult(result) {
@@ -365,6 +378,23 @@ class SecureFirebaseClient {
                 hasError: window.location.href.includes('error=')
             });
             
+            // Special handling for mobile redirects
+            if (wasMobileAttempt && wasRedirectInitiated) {
+                console.log('📱 Mobile redirect detected - using enhanced recovery');
+                
+                // Wait a bit longer for mobile browsers to stabilize
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Try to get current user first before checking redirect result
+                const auth = firebase.auth();
+                const currentUser = auth.currentUser;
+                
+                if (currentUser) {
+                    console.log('✅ Found authenticated user immediately:', currentUser.email);
+                    return await this.processAuthResult({ user: currentUser });
+                }
+            }
+            
             if (wasRedirectInitiated) {
                 console.log('📱 Redirect was initiated, checking result...');
                 
@@ -408,13 +438,29 @@ class SecureFirebaseClient {
             const auth = firebase.auth();
             console.log('🔍 Getting redirect result...');
             
-            // Add a timeout to the redirect result check
-            const result = await Promise.race([
-                auth.getRedirectResult(),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Redirect result timeout')), 10000)
-                )
-            ]);
+            // For mobile, use a different approach
+            let result;
+            if (wasMobileAttempt) {
+                // On mobile, wait for auth state to stabilize before getting redirect result
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                try {
+                    // Don't use timeout on mobile - let it complete naturally
+                    result = await auth.getRedirectResult();
+                } catch (redirectError) {
+                    console.log('⚠️ Mobile redirect result error:', redirectError);
+                    // Don't throw - continue to check auth state
+                    result = null;
+                }
+            } else {
+                // Desktop can use timeout
+                result = await Promise.race([
+                    auth.getRedirectResult(),
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Redirect result timeout')), 10000)
+                    )
+                ]);
+            }
             
             console.log('📱 Redirect result received:', {
                 hasResult: !!result,
@@ -535,9 +581,18 @@ class SecureFirebaseClient {
     onAuthStateChanged(callback) {
         this.authListeners.push(callback);
         
-        // Set up Firebase auth state listener - this will automatically handle redirect results
-        firebase.auth().onAuthStateChanged(async (user) => {
+        // Set up Firebase auth state listener with unsubscribe capability
+        const unsubscribe = firebase.auth().onAuthStateChanged(async (user) => {
             console.log('🔄 Firebase auth state changed:', user ? 'User signed in' : 'User signed out');
+            
+            // Special handling for mobile redirect completion
+            const wasMobileAttempt = localStorage.getItem('mobile_auth_attempt');
+            const wasRedirectInitiated = localStorage.getItem('google_auth_initiated');
+            
+            if (user && wasMobileAttempt && wasRedirectInitiated && !this.redirectHandled) {
+                console.log('📱 Mobile redirect completed via auth state change!');
+                this.redirectHandled = true;
+            }
             
             if (user) {
                 console.log('📱 User details:', {
