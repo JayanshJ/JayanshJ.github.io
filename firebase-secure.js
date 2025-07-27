@@ -526,11 +526,32 @@ class SecureFirebaseClient {
                     for (let i = 0; i < 10; i++) {
                         await new Promise(resolve => setTimeout(resolve, 500));
                         const finalUser = auth.currentUser;
+                        
+                        // Enhanced debugging
+                        console.log(`🔍 Auth state check ${i + 1}/10:`, {
+                            currentUser: !!finalUser,
+                            userEmail: finalUser ? finalUser.email : null,
+                            isSignedIn: !!finalUser,
+                            authReady: !!auth,
+                            persistence: 'SESSION'
+                        });
+                        
                         if (finalUser) {
                             console.log('✅ Found user in final auth state check:', finalUser.email);
                             return await this.processAuthResult({ user: finalUser });
                         }
                         console.log(`⏳ Auth state check attempt ${i + 1}/10`);
+                    }
+                    
+                    // Ultimate fallback: Try to manually trigger auth state
+                    console.log('🚨 All attempts failed - triggering manual popup as last resort');
+                    try {
+                        // Show immediate popup fallback without waiting
+                        if (typeof window.showMobilePopupFallback === 'function') {
+                            window.showMobilePopupFallback();
+                        }
+                    } catch (fallbackError) {
+                        console.error('Failed to show popup fallback:', fallbackError);
                     }
                 }
                 

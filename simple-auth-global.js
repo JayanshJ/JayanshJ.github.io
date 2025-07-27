@@ -452,7 +452,7 @@ function showRedirectError(errorMessage) {
     }
 }
 
-function showMobilePopupFallback() {
+window.showMobilePopupFallback = function showMobilePopupFallback() {
     // Show a notification offering popup fallback for mobile users
     try {
         const fallbackDiv = document.createElement('div');
