@@ -22,6 +22,45 @@ class SecureFirebaseClient {
         this.redirectHandled = false;
     }
 
+    // API Key management functions
+    async saveApiKey(apiKey) {
+        try {
+            const idToken = localStorage.getItem('firebase_token');
+            if (!idToken) {
+                return { success: false, error: 'User not authenticated' };
+            }
+
+            const response = await fetch(`${this.apiBase}/auth`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'saveApiKey', idToken, apiKey })
+            });
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getApiKey() {
+        try {
+            const idToken = localStorage.getItem('firebase_token');
+            if (!idToken) {
+                return { success: false, error: 'User not authenticated' };
+            }
+
+            const response = await fetch(`${this.apiBase}/auth`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'getApiKey', idToken })
+            });
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
     // Authentication functions
     async signUpWithEmail(email, password) {
         try {

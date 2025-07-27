@@ -2046,7 +2046,7 @@ function closeApiKeyModal() {
     }
 }
 
-function saveApiKey() {
+async function saveApiKey() {
     const input = document.getElementById('apiKeyInput');
     const newKey = input.value.trim();
     
@@ -2063,6 +2063,21 @@ function saveApiKey() {
     
     sessionApiKey = newKey;
     localStorage.setItem('chatgpt_api_key', sessionApiKey);
+    
+    // If user is signed in, save to their account
+    if (window.firebaseClient && window.firebaseClient.getCurrentUser()) {
+        try {
+            const result = await window.firebaseClient.saveApiKey(newKey);
+            if (result.success) {
+                console.log('✅ API key saved to user account');
+            } else {
+                console.warn('⚠️ Failed to save API key to account:', result.error);
+            }
+        } catch (error) {
+            console.warn('⚠️ Error saving API key to account:', error);
+        }
+    }
+    
     updateApiKeyStatus();
     
     // Refresh the welcome screen if it's showing the no-API-key message
@@ -2081,6 +2096,13 @@ function getApiKey() {
         return sessionApiKey;
     }
     
+    // Check localStorage
+    const localKey = localStorage.getItem('chatgpt_api_key');
+    if (localKey && localKey !== 'prompt-for-key') {
+        sessionApiKey = localKey;
+        return localKey;
+    }
+    
     // Fallback to config (though it should be 'prompt-for-key')
     const configKey = window.CONFIG?.apiKey;
     if (configKey && configKey !== 'prompt-for-key' && configKey !== 'YOUR_API_KEY') {
@@ -2088,6 +2110,25 @@ function getApiKey() {
     }
     
     return 'YOUR_API_KEY';
+}
+
+// Load API key from user account
+async function loadSavedApiKey() {
+    if (window.firebaseClient && window.firebaseClient.getCurrentUser()) {
+        try {
+            const result = await window.firebaseClient.getApiKey();
+            if (result.success && result.apiKey) {
+                sessionApiKey = result.apiKey;
+                localStorage.setItem('chatgpt_api_key', result.apiKey);
+                console.log('✅ API key loaded from user account');
+                updateApiKeyStatus();
+                return true;
+            }
+        } catch (error) {
+            console.warn('⚠️ Error loading API key from account:', error);
+        }
+    }
+    return false;
 }
 
 // Update API key status indicator
@@ -4663,6 +4704,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                     console.log('Reloading chats from Firebase...');
                     await loadChatHistory();
                     updateHistoryDisplay();
+                    // Load saved API key from user account
+                    await loadSavedApiKey();
                 } else {
                     console.log('User signed out, clearing chat data');
                     chatHistory = [];
@@ -4678,6 +4721,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                 console.log('User already authenticated on page load:', currentUser.email);
                 await loadChatHistory();
                 updateHistoryDisplay();
+                // Load saved API key from user account
+                await loadSavedApiKey();
             }
         } else {
             firebaseRetryCount++;

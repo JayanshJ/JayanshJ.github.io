@@ -197,6 +197,8 @@ window.handleEmailAuth = async function() {
             if (result.success) {
                 closeAuthModal();
                 console.log('User authenticated successfully');
+                // Load saved API key from user account
+                await loadSavedApiKey();
             } else {
                 showAuthError(result.error);
             }
@@ -253,6 +255,9 @@ window.handleGoogleAuth = async function() {
                 if (googleBtn) {
                     googleBtn.innerHTML = 'Success! ✅';
                 }
+                
+                // Load saved API key from user account
+                await loadSavedApiKey();
             } else if (result.pending) {
                 console.log('⏳ Authentication pending (redirect in progress)');
                 

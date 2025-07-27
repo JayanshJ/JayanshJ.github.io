@@ -112,43 +112,32 @@ body {
 /* Sidebar Styles */
 .sidebar {
     width: 260px;
-    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    background: var(--bg-secondary);
     backdrop-filter: blur(24px) saturate(180%);
-    border-right: none;
+    border: 1px solid #4a4a4a;
+    border-left: none;
     display: flex;
     flex-direction: column;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     left: 0;
     transform: none;
-    box-shadow: 
-        var(--shadow-lg),
-        inset 1px 0 0 var(--border-secondary);
-    border-top-right-radius: var(--radius-2xl);
-    border-bottom-right-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-lg);
+    border-radius: 0 12px 12px 0 !important;
     margin: var(--space-3);
-    margin-left: 0;
+    margin-left: var(--space-3);
     height: calc(100vh - var(--space-6));
+    overflow: hidden;
 }
 
 .sidebar-header {
     padding: var(--space-6) var(--space-5) var(--space-5);
-    border-bottom: 1px solid var(--border-primary);
-    background: linear-gradient(180deg, var(--bg-elevated) 0%, transparent 100%);
-    margin-bottom: var(--space-3);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    background: var(--bg-elevated);
     position: relative;
+    border-radius: 12px 12px 12px 12px !important;
 }
 
-.sidebar-header::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: var(--space-4);
-    right: var(--space-4);
-    height: 1px;
-    background: linear-gradient(90deg, transparent 0%, var(--border-primary) 20%, var(--border-primary) 80%, transparent 100%);
-}
+
 
 .logo {
     display: flex;
@@ -276,15 +265,7 @@ body {
     position: relative;
 }
 
-.chat-history::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: var(--space-4);
-    right: var(--space-4);
-    height: 1px;
-    background: linear-gradient(90deg, transparent 0%, rgba(var(--accent-primary-rgb), 0.1) 50%, transparent 100%);
-}
+
 
 .history-header {
     display: none;
@@ -332,10 +313,8 @@ body {
     min-height: 44px;
     max-height: 44px;
     background: rgba(var(--accent-primary-rgb), 0.02);
-    border: 1px solid transparent;
     transform: none;
     margin-bottom: var(--space-2);
-    box-shadow: var(--shadow-xs);
 }
 
 .history-item::before {
@@ -362,15 +341,12 @@ body {
 
 .history-item:hover {
     background-color: var(--interactive-hover);
-    border-color: var(--border-primary);
     transform: translateX(2px);
-    box-shadow: var(--shadow-sm);
 }
 
 .history-item.active {
     background-color: rgba(var(--accent-primary-rgb), 0.15);
-    border-color: var(--accent-primary);
-    box-shadow: var(--shadow-sm), 0 0 0 1px rgba(var(--accent-primary-rgb), 0.2);
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-primary-rgb), 0.3);
 }
 
 .history-content {
@@ -477,13 +453,12 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: var(--space-2);
-    border-bottom: 1px solid var(--border-secondary);
     padding-bottom: var(--space-2);
 }
 
 .create-folder-btn, .folder-action-btn {
     background: transparent;
-    border: 1px solid var(--border-secondary);
+    border: none;
     color: var(--text-muted);
     cursor: pointer;
     padding: var(--space-1);
@@ -499,14 +474,12 @@ body {
 .create-folder-btn:hover, .folder-action-btn:hover {
     background-color: var(--bg-elevated);
     color: var(--text-primary);
-    border-color: var(--border-primary);
     transform: scale(1.1);
 }
 
 .folder-action-btn.delete:hover {
     background-color: var(--accent-error);
     color: var(--text-primary);
-    border-color: var(--accent-error);
 }
 
 .folder-item {
@@ -514,13 +487,11 @@ body {
     border-radius: var(--radius-md);
     overflow: hidden;
     background: var(--bg-surface);
-    border: 1px solid var(--border-secondary);
     transition: all 0.2s ease;
     position: relative;
 }
 
 .folder-item:hover {
-    border-color: var(--border-primary);
     box-shadow: var(--shadow-sm);
 }
 
@@ -638,7 +609,6 @@ body {
     border-radius: 10px;
     min-width: 16px;
     height: 16px;
-    border: 1px solid var(--border-secondary);
     margin-left: var(--space-1);
     opacity: 1;
     z-index: 10;
@@ -660,7 +630,6 @@ body {
     background: var(--bg-surface);
     padding: var(--space-1);
     border-radius: var(--radius-sm);
-    border: 1px solid var(--border-primary);
     box-shadow: var(--shadow-sm);
     z-index: 20;
 }
@@ -674,7 +643,6 @@ body {
     margin: 0;
     padding: var(--space-2) var(--space-3);
     background: var(--bg-primary);
-    border-top: 1px solid var(--border-secondary);
     animation: slideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     transform-origin: top;
     border-radius: 0 0 var(--radius-md) var(--radius-md);
@@ -701,7 +669,6 @@ body {
     transition: all 0.2s ease;
     transform: none !important;
     background: var(--bg-elevated);
-    border: 1px solid transparent;
     position: relative;
     display: flex;
     align-items: center;
@@ -731,7 +698,6 @@ body {
 .folder-chat:hover {
     transform: none !important;
     background: var(--bg-surface);
-    border-color: var(--border-primary);
 }
 
 .folder-chat .history-title {
@@ -784,7 +750,9 @@ body {
     background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
     position: relative;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: var(--radius-xl);
+    border: 1px solid #4a4a4a;
+    border-right: none;
+    border-radius: 12px 0 0 12px !important;
     margin: var(--space-3);
     margin-left: 0;
     box-shadow: var(--shadow-md);
@@ -882,7 +850,7 @@ body {
     padding: var(--space-4);
     scroll-behavior: smooth;
     background: linear-gradient(180deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-radius: 12px 0 0 12px !important;
 }
 
 /* Welcome Screen */
@@ -2634,6 +2602,7 @@ body {
         height: 100%;
         width: 260px;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 12px 12px 12px 12px !important;
     }
     
     .sidebar.open {
@@ -4690,6 +4659,7 @@ body {
     /* Slightly reduce sidebar on very wide screens */
     .sidebar {
         width: 240px;
+        border-radius: 0 12px 12px 0 !important;
     }
 }
 

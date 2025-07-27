@@ -32,6 +32,8 @@ The Firebase configuration is already included for public use. If you want to fo
 2. Enable Authentication (Google & Email/Password providers)  
 3. Create a Firestore database
 4. Replace the config in `firebase-config.js` with your project's config
+5. Set environment variables for Vercel deployment:
+   - `API_KEY_ENCRYPTION_SECRET`: 32+ character secret for encrypting stored API keys
 
 ### ⚠️ **IMPORTANT: Update Your Firebase Security Rules**
 
@@ -47,6 +49,12 @@ service cloud.firestore {
                          request.auth.uid == resource.data.userId;
       allow create: if request.auth != null && 
                     request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Users can only access their own settings (including API keys)
+    match /userSettings/{userId} {
+      allow read, write: if request.auth != null && 
+                         request.auth.uid == userId;
     }
     
     // Deny all other access
@@ -66,7 +74,8 @@ service cloud.firestore {
 ### 3. OpenAI API Key
 
 - The app will prompt for your OpenAI API key on first use
-- Your API key is stored locally and never shared
+- **NEW**: When signed in, API keys are encrypted and stored in your account for cross-device access
+- API keys are encrypted using AES-256-CBC before storage
 - Get your API key from [OpenAI Platform](https://platform.openai.com/api-keys)
 
 ### 4. Local Development
