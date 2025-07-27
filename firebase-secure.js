@@ -159,11 +159,11 @@ class SecureFirebaseClient {
                     
                     // Enhanced mobile-specific provider settings
                     provider.setCustomParameters({
-                        'prompt': 'select_account', // Use select_account for better UX
+                        'prompt': 'select_account', // Use select_account for better UX (replaces approval_prompt)
                         'access_type': 'offline', // Use offline for better token persistence
                         'include_granted_scopes': 'true',
-                        'response_type': 'code',
-                        'approval_prompt': 'force' // Force approval for better mobile compatibility
+                        'response_type': 'code'
+                        // Note: removed approval_prompt as it conflicts with prompt parameter
                     });
                     
                     console.log('🔄 Initiating mobile redirect with enhanced OAuth settings...');
