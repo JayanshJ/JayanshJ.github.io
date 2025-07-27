@@ -27,17 +27,31 @@ document.addEventListener('DOMContentLoaded', function() {
                                 console.log('⏳ Waiting for auth state listener to handle redirect...');
                             } else {
                                 console.warn('❌ Redirect authentication failed:', result.error);
-                                // Show error after a delay to let auth state listener try first
-                                setTimeout(() => {
-                                    const stillHasFlags = localStorage.getItem('google_auth_initiated');
-                                    if (stillHasFlags) {
-                                        console.log('🚨 Auth state listener didn\'t handle redirect, showing error');
-                                        showRedirectError(result.error);
-                                        // Clean up failed redirect flags
-                                        localStorage.removeItem('google_auth_initiated');
-                                        localStorage.removeItem('auth_redirect_timestamp');
-                                    }
-                                }, 3000); // Wait 3 seconds for auth state
+                                
+                                // For mobile users with failed redirects, offer popup fallback
+                                const wasMobileAttempt = localStorage.getItem('mobile_auth_attempt');
+                                if (wasMobileAttempt && result.error.includes('No redirect result')) {
+                                    console.log('📱 Mobile redirect failed, will offer popup fallback');
+                                    setTimeout(() => {
+                                        const stillHasFlags = localStorage.getItem('google_auth_initiated');
+                                        if (stillHasFlags) {
+                                            console.log('🔄 Attempting popup fallback for mobile...');
+                                            showMobilePopupFallback();
+                                        }
+                                    }, 5000); // Wait 5 seconds for auth state first
+                                } else {
+                                    // Show error after a delay to let auth state listener try first
+                                    setTimeout(() => {
+                                        const stillHasFlags = localStorage.getItem('google_auth_initiated');
+                                        if (stillHasFlags) {
+                                            console.log('🚨 Auth state listener didn\'t handle redirect, showing error');
+                                            showRedirectError(result.error);
+                                            // Clean up failed redirect flags
+                                            localStorage.removeItem('google_auth_initiated');
+                                            localStorage.removeItem('auth_redirect_timestamp');
+                                        }
+                                    }, 3000); // Wait 3 seconds for auth state
+                                }
                             }
                         }
                     })
@@ -435,5 +449,76 @@ function showRedirectError(errorMessage) {
         }, 5000);
     } catch (error) {
         console.log('Could not show redirect error:', error);
+    }
+}
+
+function showMobilePopupFallback() {
+    // Show a notification offering popup fallback for mobile users
+    try {
+        const fallbackDiv = document.createElement('div');
+        fallbackDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 14px;
+            max-width: 350px;
+            animation: slideInRight 0.3s ease-out;
+            cursor: pointer;
+        `;
+        fallbackDiv.innerHTML = `
+            📱 Mobile login redirect failed<br>
+            <small style="opacity: 0.9;">Tap here to try popup method instead</small>
+        `;
+        
+        fallbackDiv.onclick = async () => {
+            console.log('📱 User clicked mobile popup fallback');
+            fallbackDiv.innerHTML = '⏳ Trying popup method...';
+            
+            try {
+                // Clean up redirect flags first
+                localStorage.removeItem('google_auth_initiated');
+                localStorage.removeItem('auth_redirect_timestamp');
+                localStorage.removeItem('mobile_auth_attempt');
+                localStorage.removeItem('auth_user_agent');
+                localStorage.removeItem('auth_current_domain');
+                
+                // Try popup method directly
+                if (typeof window.authFunctions !== 'undefined' && window.authFunctions) {
+                    const auth = firebase.auth();
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    provider.addScope('profile');
+                    provider.addScope('email');
+                    
+                    const result = await auth.signInWithPopup(provider);
+                    if (result && result.user) {
+                        fallbackDiv.innerHTML = '✅ Success!';
+                        setTimeout(() => fallbackDiv.remove(), 2000);
+                        console.log('✅ Mobile popup fallback successful');
+                    }
+                }
+            } catch (popupError) {
+                console.error('❌ Mobile popup fallback failed:', popupError);
+                fallbackDiv.innerHTML = '❌ Popup also failed. Please try again.';
+                setTimeout(() => fallbackDiv.remove(), 3000);
+            }
+        };
+        
+        document.body.appendChild(fallbackDiv);
+        
+        // Remove after 15 seconds if not clicked
+        setTimeout(() => {
+            if (fallbackDiv.parentNode) {
+                fallbackDiv.remove();
+            }
+        }, 15000);
+    } catch (error) {
+        console.log('Could not show mobile popup fallback:', error);
     }
 }

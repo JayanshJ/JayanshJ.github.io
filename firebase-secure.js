@@ -129,8 +129,11 @@ class SecureFirebaseClient {
             console.log('✅ Auth persistence set to LOCAL');
             
             const provider = new firebase.auth.GoogleAuthProvider();
+            
+            // Enhanced OAuth configuration for mobile compatibility
             provider.addScope('profile');
             provider.addScope('email');
+            provider.addScope('openid'); // Explicitly request OpenID
             
             // Force redirect on mobile devices for better compatibility
             if (isMobile) {
@@ -141,14 +144,27 @@ class SecureFirebaseClient {
                     localStorage.setItem('auth_redirect_timestamp', Date.now().toString());
                     localStorage.setItem('mobile_auth_attempt', 'true');
                     localStorage.setItem('auth_user_agent', navigator.userAgent);
+                    localStorage.setItem('auth_current_domain', window.location.hostname);
                     
-                    // Add mobile-specific provider settings
+                    // Enhanced mobile-specific provider settings
                     provider.setCustomParameters({
-                        'prompt': 'select_account',
-                        'access_type': 'offline'
+                        'prompt': 'consent', // Changed from select_account to consent for better mobile compatibility
+                        'access_type': 'online', // Changed to online for better mobile support
+                        'include_granted_scopes': 'true',
+                        'response_type': 'code'
                     });
                     
-                    console.log('🔄 Initiating mobile redirect with enhanced settings...');
+                    console.log('🔄 Initiating mobile redirect with enhanced OAuth settings...');
+                    console.log('🔧 Provider configuration:', {
+                        scopes: provider.getScopes(),
+                        customParameters: {
+                            prompt: 'consent',
+                            access_type: 'online',
+                            include_granted_scopes: 'true',
+                            response_type: 'code'
+                        }
+                    });
+                    
                     await auth.signInWithRedirect(provider);
                     console.log('✅ Redirect initiated successfully, page will reload...');
                     return { success: true, pending: true };
@@ -209,6 +225,7 @@ class SecureFirebaseClient {
         localStorage.removeItem('auth_redirect_timestamp');
         localStorage.removeItem('mobile_auth_attempt');
         localStorage.removeItem('auth_user_agent');
+        localStorage.removeItem('auth_current_domain');
     }
     
     async processAuthResult(result) {
@@ -417,7 +434,47 @@ class SecureFirebaseClient {
             } else if (wasRedirectInitiated) {
                 console.log('⚠️ Expected redirect result but got none');
                 console.log('🔍 URL contains auth params:', window.location.href.includes('code='));
+                console.log('🔍 URL contains error params:', window.location.href.includes('error='));
                 console.log('🔍 Current URL:', window.location.href);
+                console.log('🔍 Result object details:', {
+                    hasResult: !!result,
+                    resultKeys: result ? Object.keys(result) : null,
+                    credential: result && result.credential ? 'present' : 'none',
+                    operationType: result && result.operationType ? result.operationType : 'none'
+                });
+                
+                // Check if this is a mobile attempt and try alternative approach
+                if (wasMobileAttempt) {
+                    console.log('📱 Mobile redirect result empty - checking current auth state...');
+                    
+                    // Give Firebase more time to process the redirect on mobile
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    // Check if user is already authenticated
+                    const currentUser = auth.currentUser;
+                    if (currentUser) {
+                        console.log('✅ Found authenticated user in current state:', currentUser.email);
+                        return await this.processAuthResult({ user: currentUser });
+                    }
+                    
+                    // Try getting redirect result again with longer timeout
+                    console.log('🔄 Retry getting redirect result for mobile...');
+                    try {
+                        const retryResult = await Promise.race([
+                            auth.getRedirectResult(),
+                            new Promise((_, reject) => 
+                                setTimeout(() => reject(new Error('Second redirect result timeout')), 5000)
+                            )
+                        ]);
+                        
+                        if (retryResult && retryResult.user) {
+                            console.log('✅ Mobile redirect retry successful!');
+                            return await this.processAuthResult(retryResult);
+                        }
+                    } catch (retryError) {
+                        console.log('⚠️ Mobile redirect retry failed:', retryError.message);
+                    }
+                }
                 
                 // Don't immediately fail - let auth state listener handle it
                 console.log('⏳ Waiting for auth state change instead...');
