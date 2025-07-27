@@ -86,18 +86,39 @@ class SecureFirebaseClient {
                 maxTouchPoints: navigator.maxTouchPoints
             });
             
-            // Check if domain is authorized
-            const authorizedDomains = ['github.io', 'vercel.app', 'localhost', '127.0.0.1'];
+            // Check if domain is authorized - Enhanced for mobile and all deployment targets
+            const authorizedDomains = [
+                'github.io', 
+                'vercel.app', 
+                'localhost', 
+                '127.0.0.1',
+                'jayanshj.github.io',
+                'jgpteasy.vercel.app',
+                'jayansh-j-github-io.vercel.app',
+                'jayansh-j-github-io-2.vercel.app',
+                'new-gpt-taupe.vercel.app'
+            ];
             const isAuthorizedDomain = authorizedDomains.some(domain => 
                 window.location.hostname.includes(domain) || window.location.hostname === domain
             );
             
+            console.log('🔍 Domain authorization check:', {
+                currentDomain: window.location.hostname,
+                authorizedDomains: authorizedDomains,
+                isAuthorized: isAuthorizedDomain
+            });
+            
             if (!isAuthorizedDomain) {
                 console.warn('⚠️ Domain mismatch! Current domain may not be authorized in Firebase Console');
-                return { 
-                    success: false, 
-                    error: `Domain ${window.location.hostname} not authorized in Firebase Console.` 
-                };
+                // Don't immediately fail on mobile - Firebase Console might have different domain settings
+                if (isMobile) {
+                    console.log('📱 Mobile detected - attempting authentication despite domain warning');
+                } else {
+                    return { 
+                        success: false, 
+                        error: `Domain ${window.location.hostname} not authorized in Firebase Console.` 
+                    };
+                }
             }
             
             const auth = firebase.auth();
@@ -115,18 +136,46 @@ class SecureFirebaseClient {
             if (isMobile) {
                 console.log('📱 Mobile device detected - using redirect method for better compatibility');
                 try {
-                    // Store a flag to know we initiated the redirect
+                    // Enhanced mobile redirect setup
                     localStorage.setItem('google_auth_initiated', 'true');
                     localStorage.setItem('auth_redirect_timestamp', Date.now().toString());
+                    localStorage.setItem('mobile_auth_attempt', 'true');
+                    localStorage.setItem('auth_user_agent', navigator.userAgent);
                     
+                    // Add mobile-specific provider settings
+                    provider.setCustomParameters({
+                        'prompt': 'select_account',
+                        'access_type': 'offline'
+                    });
+                    
+                    console.log('🔄 Initiating mobile redirect with enhanced settings...');
                     await auth.signInWithRedirect(provider);
-                    console.log('🔄 Redirect initiated, page will reload...');
+                    console.log('✅ Redirect initiated successfully, page will reload...');
                     return { success: true, pending: true };
                 } catch (redirectError) {
-                    console.error('❌ Redirect failed:', redirectError);
+                    console.error('❌ Mobile redirect failed:', redirectError);
+                    console.error('❌ Redirect error details:', {
+                        code: redirectError.code,
+                        message: redirectError.message,
+                        details: redirectError.details
+                    });
+                    
+                    // Clean up on error
                     localStorage.removeItem('google_auth_initiated');
                     localStorage.removeItem('auth_redirect_timestamp');
-                    throw redirectError;
+                    localStorage.removeItem('mobile_auth_attempt');
+                    localStorage.removeItem('auth_user_agent');
+                    
+                    // Try popup as fallback on mobile if redirect fails
+                    console.log('🔄 Redirect failed, trying popup as fallback...');
+                    try {
+                        const fallbackResult = await auth.signInWithPopup(provider);
+                        console.log('✅ Mobile popup fallback successful');
+                        return await this.processAuthResult(fallbackResult);
+                    } catch (popupError) {
+                        console.error('❌ Mobile popup fallback also failed:', popupError);
+                        throw new Error(`Mobile authentication failed: ${redirectError.message}. Popup fallback: ${popupError.message}`);
+                    }
                 }
             } else {
                 // Desktop: try popup first, fallback to redirect
@@ -155,6 +204,13 @@ class SecureFirebaseClient {
         }
     }
     
+    cleanupRedirectFlags() {
+        localStorage.removeItem('google_auth_initiated');
+        localStorage.removeItem('auth_redirect_timestamp');
+        localStorage.removeItem('mobile_auth_attempt');
+        localStorage.removeItem('auth_user_agent');
+    }
+    
     async processAuthResult(result) {
         try {
             console.log('📋 Processing auth result:', result);
@@ -167,8 +223,7 @@ class SecureFirebaseClient {
             localStorage.setItem('firebase_token', idToken);
             
             // Clean up redirect flags
-            localStorage.removeItem('google_auth_initiated');
-            localStorage.removeItem('auth_redirect_timestamp');
+            this.cleanupRedirectFlags();
             
             const email = result.user.email || '';
             const displayName = result.user.displayName || (email ? email.split('@')[0] : 'User');
@@ -278,13 +333,19 @@ class SecureFirebaseClient {
             // Check if we were expecting a redirect result
             const wasRedirectInitiated = localStorage.getItem('google_auth_initiated');
             const redirectTimestamp = localStorage.getItem('auth_redirect_timestamp');
+            const wasMobileAttempt = localStorage.getItem('mobile_auth_attempt');
+            const authUserAgent = localStorage.getItem('auth_user_agent');
             
             console.log('🔍 Redirect state check:', {
                 wasInitiated: !!wasRedirectInitiated,
                 timestamp: redirectTimestamp,
+                wasMobileAttempt: !!wasMobileAttempt,
+                authUserAgent: authUserAgent,
+                currentUserAgent: navigator.userAgent,
                 url: window.location.href,
                 hasAuthCode: window.location.href.includes('code='),
-                hasAuthState: window.location.href.includes('state=')
+                hasAuthState: window.location.href.includes('state='),
+                hasError: window.location.href.includes('error=')
             });
             
             if (wasRedirectInitiated) {
@@ -295,8 +356,7 @@ class SecureFirebaseClient {
                     const timeDiff = Date.now() - parseInt(redirectTimestamp);
                     if (timeDiff > 10 * 60 * 1000) {
                         console.log('⏰ Redirect timestamp too old, cleaning up');
-                        localStorage.removeItem('google_auth_initiated');
-                        localStorage.removeItem('auth_redirect_timestamp');
+                        this.cleanupRedirectFlags();
                         return { success: false, error: 'Redirect timeout' };
                     }
                 }
@@ -381,8 +441,7 @@ class SecureFirebaseClient {
             }
             
             // Clean up flags on other errors
-            localStorage.removeItem('google_auth_initiated');
-            localStorage.removeItem('auth_redirect_timestamp');
+            this.cleanupRedirectFlags();
             return { success: false, error: error.message };
         }
     }
@@ -442,8 +501,7 @@ class SecureFirebaseClient {
                     console.log('⏱️ Time since redirect:', redirectTimestamp ? Date.now() - parseInt(redirectTimestamp) : 'unknown');
                     
                     // Clean up flags
-                    localStorage.removeItem('google_auth_initiated');
-                    localStorage.removeItem('auth_redirect_timestamp');
+                    this.cleanupRedirectFlags();
                     
                     // Show success notification
                     this.showAuthSuccessMessage();
@@ -480,8 +538,7 @@ class SecureFirebaseClient {
                     // Only clean up if redirect is older than 30 seconds (to avoid cleaning during redirect)
                     if (timeDiff > 30000) {
                         console.log('🧹 Cleaning up old redirect flags');
-                        localStorage.removeItem('google_auth_initiated');
-                        localStorage.removeItem('auth_redirect_timestamp');
+                        this.cleanupRedirectFlags();
                     }
                 }
             }

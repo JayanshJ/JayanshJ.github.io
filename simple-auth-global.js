@@ -202,17 +202,27 @@ window.handleGoogleAuth = async function() {
         if (typeof window.authFunctions !== 'undefined' && window.authFunctions) {
             console.log('✅ Auth functions available, calling signInWithGoogle...');
             
-            // Detect mobile device
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-                           window.innerWidth <= 768 || 
-                           'ontouchstart' in window;
+            // Enhanced mobile detection
+            const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            const isSmallScreen = window.innerWidth <= 768;
+            const isMobile = isMobileUA || isTouchDevice || isSmallScreen;
             
-            // Show loading state
+            console.log('🔐 Mobile detection in UI:', {
+                userAgent: isMobileUA,
+                touchDevice: isTouchDevice, 
+                smallScreen: isSmallScreen,
+                isMobile: isMobile,
+                width: window.innerWidth
+            });
+            
+            // Show enhanced loading state
             const googleBtn = document.querySelector('.social-btn.google');
             if (googleBtn) {
                 googleBtn.disabled = true;
                 if (isMobile) {
-                    googleBtn.innerHTML = 'Redirecting... 🔄';
+                    googleBtn.innerHTML = 'Redirecting to Google... 🔄';
+                    console.log('📱 Mobile login initiated - showing redirect message');
                 } else {
                     googleBtn.innerHTML = 'Signing in... ⏳';
                 }
@@ -233,16 +243,26 @@ window.handleGoogleAuth = async function() {
                 console.log('⏳ Authentication pending (redirect in progress)');
                 
                 if (isMobile) {
-                    // Show mobile-specific message
-                    showAuthError('Redirecting to Google... Please complete sign-in and return to this page.');
-                    if (googleBtn) {
-                        googleBtn.innerHTML = 'Redirecting... Please wait';
+                    // Show mobile-specific guidance
+                    const authError = document.getElementById('authError');
+                    if (authError) {
+                        authError.innerHTML = '🔄 Redirecting to Google... Complete sign-in and return to this page. If you\'re not redirected, try refreshing the page.';
+                        authError.style.display = 'block';
+                        authError.style.backgroundColor = '#1f2937';
+                        authError.style.color = '#60a5fa';
+                        authError.style.border = '1px solid #3b82f6';
                     }
                     
-                    // Don't close modal immediately on mobile - let user see the message
+                    if (googleBtn) {
+                        googleBtn.innerHTML = 'Redirecting... Please wait ⏳';
+                    }
+                    
+                    console.log('📱 Mobile redirect pending - showing user guidance');
+                    
+                    // Keep modal open longer on mobile to show instructions
                     setTimeout(() => {
                         closeAuthModal();
-                    }, 2000);
+                    }, 3000);
                 } else {
                     closeAuthModal();
                 }
