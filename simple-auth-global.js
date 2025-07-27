@@ -22,17 +22,36 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (result && result.success) {
                             console.log('✅ Redirect authentication successful');
                         } else if (result && result.error) {
-                            console.warn('❌ Redirect authentication failed:', result.error);
-                            // Clean up failed redirect flags
-                            localStorage.removeItem('google_auth_initiated');
-                            localStorage.removeItem('auth_redirect_timestamp');
+                            // Don't show error immediately - auth state listener might handle it
+                            if (result.error.includes('waiting for auth state')) {
+                                console.log('⏳ Waiting for auth state listener to handle redirect...');
+                            } else {
+                                console.warn('❌ Redirect authentication failed:', result.error);
+                                // Show error after a delay to let auth state listener try first
+                                setTimeout(() => {
+                                    const stillHasFlags = localStorage.getItem('google_auth_initiated');
+                                    if (stillHasFlags) {
+                                        console.log('🚨 Auth state listener didn\\'t handle redirect, showing error');
+                                        showRedirectError(result.error);
+                                        // Clean up failed redirect flags
+                                        localStorage.removeItem('google_auth_initiated');
+                                        localStorage.removeItem('auth_redirect_timestamp');
+                                    }
+                                }, 3000); // Wait 3 seconds for auth state
+                            }
                         }
                     })
                     .catch(error => {
                         console.warn('❌ Redirect check failed:', error);
-                        // Clean up on error
-                        localStorage.removeItem('google_auth_initiated');
-                        localStorage.removeItem('auth_redirect_timestamp');
+                        // Don't immediately show error - give auth state listener a chance
+                        setTimeout(() => {
+                            const stillHasFlags = localStorage.getItem('google_auth_initiated');
+                            if (stillHasFlags) {
+                                console.log('🚨 Auth state listener didn\\'t handle redirect error, cleaning up');
+                                localStorage.removeItem('google_auth_initiated');
+                                localStorage.removeItem('auth_redirect_timestamp');
+                            }
+                        }, 5000);
                     });
             } else {
                 // Always check for redirect results just in case
@@ -363,4 +382,38 @@ function clearAuthForm() {
     
     if (emailInput) emailInput.value = '';
     if (passwordInput) passwordInput.value = '';
+}
+
+function showRedirectError(errorMessage) {
+    // Show a non-intrusive notification for redirect errors
+    try {
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 14px;
+            max-width: 300px;
+            animation: slideInRight 0.3s ease-out;
+        `;
+        errorDiv.innerHTML = `❌ Login failed: ${errorMessage}`;
+        
+        document.body.appendChild(errorDiv);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            if (errorDiv.parentNode) {
+                errorDiv.remove();
+            }
+        }, 5000);
+    } catch (error) {
+        console.log('Could not show redirect error:', error);
+    }
 }

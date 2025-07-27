@@ -279,13 +279,21 @@ class SecureFirebaseClient {
             const wasRedirectInitiated = localStorage.getItem('google_auth_initiated');
             const redirectTimestamp = localStorage.getItem('auth_redirect_timestamp');
             
+            console.log('🔍 Redirect state check:', {
+                wasInitiated: !!wasRedirectInitiated,
+                timestamp: redirectTimestamp,
+                url: window.location.href,
+                hasAuthCode: window.location.href.includes('code='),
+                hasAuthState: window.location.href.includes('state=')
+            });
+            
             if (wasRedirectInitiated) {
                 console.log('📱 Redirect was initiated, checking result...');
                 
-                // Check if redirect is too old (more than 5 minutes)
+                // Check if redirect is too old (more than 10 minutes - increased timeout)
                 if (redirectTimestamp) {
                     const timeDiff = Date.now() - parseInt(redirectTimestamp);
-                    if (timeDiff > 5 * 60 * 1000) {
+                    if (timeDiff > 10 * 60 * 1000) {
                         console.log('⏰ Redirect timestamp too old, cleaning up');
                         localStorage.removeItem('google_auth_initiated');
                         localStorage.removeItem('auth_redirect_timestamp');
@@ -294,47 +302,85 @@ class SecureFirebaseClient {
                 }
             }
             
-            // Wait for Firebase to initialize
-            await new Promise(resolve => {
+            // Wait for Firebase to initialize with longer timeout
+            await new Promise((resolve, reject) => {
+                let attempts = 0;
+                const maxAttempts = 50; // 5 seconds
+                
+                const checkFirebase = () => {
+                    attempts++;
+                    if (firebase.auth) {
+                        console.log('✅ Firebase auth loaded after', attempts * 100, 'ms');
+                        resolve();
+                    } else if (attempts >= maxAttempts) {
+                        reject(new Error('Firebase auth failed to load'));
+                    } else {
+                        setTimeout(checkFirebase, 100);
+                    }
+                };
+                
                 if (firebase.auth) {
-                    console.log('✅ Firebase auth is ready');
+                    console.log('✅ Firebase auth already ready');
                     resolve();
                 } else {
                     console.log('⏳ Waiting for Firebase auth to load...');
-                    const checkFirebase = () => {
-                        if (firebase.auth) {
-                            console.log('✅ Firebase auth loaded');
-                            resolve();
-                        } else {
-                            setTimeout(checkFirebase, 100);
-                        }
-                    };
                     checkFirebase();
                 }
             });
 
             const auth = firebase.auth();
             console.log('🔍 Getting redirect result...');
-            const result = await auth.getRedirectResult();
             
-            console.log('📱 Redirect result:', result);
+            // Add a timeout to the redirect result check
+            const result = await Promise.race([
+                auth.getRedirectResult(),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Redirect result timeout')), 10000)
+                )
+            ]);
+            
+            console.log('📱 Redirect result received:', {
+                hasResult: !!result,
+                hasUser: !!(result && result.user),
+                userEmail: result && result.user ? result.user.email : null,
+                credential: result && result.credential ? 'present' : 'none'
+            });
             
             if (result && result.user) {
-                console.log('🎉 Redirect authentication successful!', result);
+                console.log('🎉 Redirect authentication successful!');
+                console.log('👤 User details:', {
+                    uid: result.user.uid,
+                    email: result.user.email,
+                    displayName: result.user.displayName
+                });
                 return await this.processAuthResult(result);
             } else if (wasRedirectInitiated) {
                 console.log('⚠️ Expected redirect result but got none');
-                // Clean up the flags since redirect didn't work
-                localStorage.removeItem('google_auth_initiated');
-                localStorage.removeItem('auth_redirect_timestamp');
-                return { success: false, error: 'Redirect authentication failed' };
+                console.log('🔍 URL contains auth params:', window.location.href.includes('code='));
+                console.log('🔍 Current URL:', window.location.href);
+                
+                // Don't immediately fail - let auth state listener handle it
+                console.log('⏳ Waiting for auth state change instead...');
+                return { success: false, error: 'No redirect result, waiting for auth state' };
             } else {
                 console.log('ℹ️ No redirect result (not expected)');
+                return { success: false, error: 'No redirect result' };
             }
-            return { success: false, error: 'No redirect result' };
         } catch (error) {
             console.error('❌ Initial redirect result error:', error);
-            // Clean up flags on error
+            console.error('❌ Error details:', {
+                message: error.message,
+                code: error.code,
+                stack: error.stack
+            });
+            
+            // Don't clean up flags immediately on error - give auth state listener a chance
+            if (error.message.includes('timeout')) {
+                console.log('⏳ Timeout error - waiting for auth state listener');
+                return { success: false, error: 'Waiting for auth state change' };
+            }
+            
+            // Clean up flags on other errors
             localStorage.removeItem('google_auth_initiated');
             localStorage.removeItem('auth_redirect_timestamp');
             return { success: false, error: error.message };
@@ -382,19 +428,36 @@ class SecureFirebaseClient {
                     uid: user.uid,
                     email: user.email,
                     displayName: user.displayName,
-                    providerData: user.providerData
+                    providerData: user.providerData,
+                    isAnonymous: user.isAnonymous,
+                    emailVerified: user.emailVerified
                 });
                 
                 // Check if this is from a redirect we initiated
                 const wasRedirectInitiated = localStorage.getItem('google_auth_initiated');
+                const redirectTimestamp = localStorage.getItem('auth_redirect_timestamp');
+                
                 if (wasRedirectInitiated) {
-                    console.log('✅ Auth state change from redirect - cleaning up flags');
+                    console.log('✅ Auth state change from redirect - SUCCESS!');
+                    console.log('⏱️ Time since redirect:', redirectTimestamp ? Date.now() - parseInt(redirectTimestamp) : 'unknown');
+                    
+                    // Clean up flags
                     localStorage.removeItem('google_auth_initiated');
                     localStorage.removeItem('auth_redirect_timestamp');
+                    
+                    // Show success notification
+                    this.showAuthSuccessMessage();
+                } else {
+                    console.log('✅ Auth state change (not from redirect)');
                 }
                 
-                const idToken = await user.getIdToken();
-                localStorage.setItem('firebase_token', idToken);
+                try {
+                    const idToken = await user.getIdToken();
+                    localStorage.setItem('firebase_token', idToken);
+                    console.log('🔑 ID token saved successfully');
+                } catch (tokenError) {
+                    console.error('❌ Failed to get ID token:', tokenError);
+                }
                 
                 this.currentUser = {
                     uid: user.uid,
@@ -405,17 +468,22 @@ class SecureFirebaseClient {
                 console.log('👤 Current user updated from auth state:', this.currentUser);
                 console.log('✅ Authentication successful!');
                 
-                // Show success notification for redirects
-                if (wasRedirectInitiated) {
-                    this.showAuthSuccessMessage();
-                }
             } else {
+                console.log('👤 User signed out');
                 this.currentUser = null;
                 localStorage.removeItem('firebase_token');
-                // Clean up any pending redirect flags
-                localStorage.removeItem('google_auth_initiated');
-                localStorage.removeItem('auth_redirect_timestamp');
-                console.log('👤 User signed out');
+                
+                // Clean up any pending redirect flags only if they're old
+                const redirectTimestamp = localStorage.getItem('auth_redirect_timestamp');
+                if (redirectTimestamp) {
+                    const timeDiff = Date.now() - parseInt(redirectTimestamp);
+                    // Only clean up if redirect is older than 30 seconds (to avoid cleaning during redirect)
+                    if (timeDiff > 30000) {
+                        console.log('🧹 Cleaning up old redirect flags');
+                        localStorage.removeItem('google_auth_initiated');
+                        localStorage.removeItem('auth_redirect_timestamp');
+                    }
+                }
             }
             
             this.notifyAuthListeners(this.currentUser);
