@@ -2096,6 +2096,7 @@ function clearSavedApiKey() {
 
 function updateApiKey() {
     closeSettingsModal(); // Close the settings modal first
+    closeSidebar(); // Close sidebar if open on mobile
     
     // Show the API key modal
     const modal = document.getElementById('apiKeyModal');
@@ -2676,6 +2677,9 @@ function closeSidebar() {
 
 // Settings menu function
 function showSettingsMenu() {
+    // Close sidebar if open on mobile
+    closeSidebar();
+    
     const isApiKeySaved = localStorage.getItem('chatgpt_api_key') !== null;
     
     // Show/hide the clear API key option based on whether a key is saved

@@ -115,6 +115,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Global functions for HTML onclick handlers
 window.showAuthModal = function() {
+    // Close sidebar if open on mobile
+    if (typeof closeSidebar === 'function') {
+        closeSidebar();
+    }
+    
     const modal = document.getElementById('authModal');
     if (modal) {
         // Check if Firebase is available and update modal content accordingly
@@ -330,6 +335,11 @@ window.handleAppleAuth = async function() {
 };
 
 window.showUserProfileModal = function() {
+    // Close sidebar if open on mobile
+    if (typeof closeSidebar === 'function') {
+        closeSidebar();
+    }
+    
     const modal = document.getElementById('userProfileModal');
     if (modal && currentUser) {
         // Update user info in modal
