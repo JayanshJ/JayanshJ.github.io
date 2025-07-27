@@ -5432,3 +5432,100 @@ async function copyToClipboard(button) {
     }
 }
 
+// Accent Color Management
+const accentColors = {
+    '#4f46e5': { 
+        primary: '#4f46e5', secondary: '#7c3aed', tertiary: '#06b6d4', 
+        rgb: '79, 70, 229', secondaryRgb: '124, 58, 237', tertiaryRgb: '6, 182, 212' 
+    },
+    '#06b6d4': { 
+        primary: '#06b6d4', secondary: '#0891b2', tertiary: '#22d3ee', 
+        rgb: '6, 182, 212', secondaryRgb: '8, 145, 178', tertiaryRgb: '34, 211, 238' 
+    },
+    '#10b981': { 
+        primary: '#10b981', secondary: '#059669', tertiary: '#34d399', 
+        rgb: '16, 185, 129', secondaryRgb: '5, 150, 105', tertiaryRgb: '52, 211, 153' 
+    },
+    '#f59e0b': { 
+        primary: '#f59e0b', secondary: '#d97706', tertiary: '#fbbf24', 
+        rgb: '245, 158, 11', secondaryRgb: '217, 119, 6', tertiaryRgb: '251, 191, 36' 
+    },
+    '#ef4444': { 
+        primary: '#ef4444', secondary: '#dc2626', tertiary: '#f87171', 
+        rgb: '239, 68, 68', secondaryRgb: '220, 38, 38', tertiaryRgb: '248, 113, 113' 
+    },
+    '#8b5cf6': { 
+        primary: '#8b5cf6', secondary: '#7c3aed', tertiary: '#a78bfa', 
+        rgb: '139, 92, 246', secondaryRgb: '124, 58, 237', tertiaryRgb: '167, 139, 250' 
+    },
+    '#ec4899': { 
+        primary: '#ec4899', secondary: '#db2777', tertiary: '#f472b6', 
+        rgb: '236, 72, 153', secondaryRgb: '219, 39, 119', tertiaryRgb: '244, 114, 182' 
+    },
+    '#6366f1': { 
+        primary: '#6366f1', secondary: '#4f46e5', tertiary: '#818cf8', 
+        rgb: '99, 102, 241', secondaryRgb: '79, 70, 229', tertiaryRgb: '129, 140, 248' 
+    },
+    '#6b7280': { 
+        primary: '#6b7280', secondary: '#4b5563', tertiary: '#9ca3af', 
+        rgb: '107, 114, 128', secondaryRgb: '75, 85, 99', tertiaryRgb: '156, 163, 175' 
+    },
+    '#374151': { 
+        primary: '#374151', secondary: '#1f2937', tertiary: '#6b7280', 
+        rgb: '55, 65, 81', secondaryRgb: '31, 41, 55', tertiaryRgb: '107, 114, 128' 
+    }
+};
+
+function initializeAccentColorPicker() {
+    const colorOptions = document.querySelectorAll('.color-option');
+    const savedColor = localStorage.getItem('accentColor') || '#6b7280';
+    
+    // Set active color on load
+    setActiveColor(savedColor);
+    applyAccentColor(savedColor);
+    
+    // Add click handlers
+    colorOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            const color = option.dataset.color;
+            setActiveColor(color);
+            applyAccentColor(color);
+            localStorage.setItem('accentColor', color);
+        });
+    });
+}
+
+function setActiveColor(color) {
+    const colorOptions = document.querySelectorAll('.color-option');
+    colorOptions.forEach(option => {
+        option.classList.remove('active');
+        if (option.dataset.color === color) {
+            option.classList.add('active');
+        }
+    });
+}
+
+function applyAccentColor(color) {
+    const colorScheme = accentColors[color];
+    if (!colorScheme) return;
+    
+    const root = document.documentElement;
+    root.style.setProperty('--accent-primary', colorScheme.primary);
+    root.style.setProperty('--accent-secondary', colorScheme.secondary);
+    root.style.setProperty('--accent-tertiary', colorScheme.tertiary);
+    root.style.setProperty('--accent-primary-rgb', colorScheme.rgb);
+    root.style.setProperty('--accent-secondary-rgb', colorScheme.secondaryRgb);
+    root.style.setProperty('--accent-tertiary-rgb', colorScheme.tertiaryRgb);
+    
+    // Update derived colors
+    root.style.setProperty('--interactive-focus', `rgba(${colorScheme.rgb}, 0.2)`);
+    root.style.setProperty('--border-accent', `rgba(${colorScheme.rgb}, 0.3)`);
+}
+
+// Initialize accent color picker when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        initializeAccentColorPicker();
+    }, 100);
+});
+
