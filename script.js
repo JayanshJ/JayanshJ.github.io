@@ -3204,85 +3204,12 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
         }
     }
     
-    messagesContainer.appendChild(messageDiv);
-    
-    // Add buttons as separate element for AI messages
+    // Add action buttons directly inside the message content for AI messages
     if (sender === 'ai' && type === 'normal' && text) {
-        const buttonsDiv = document.createElement('div');
-        buttonsDiv.className = 'ai-message-buttons';
-        buttonsDiv.style.cssText = `
-            display: flex !important;
-            gap: 8px !important;
-            margin: 8px auto 16px auto !important;
-            padding: 0 24px !important;
-            max-width: 48rem !important;
-            background: transparent !important;
-            border: none !important;
-            justify-content: flex-start !important;
-            align-items: center !important;
-        `;
-        
-        const copyBtn = document.createElement('button');
-        copyBtn.style.cssText = `
-            display: flex !important;
-            align-items: center !important;
-            gap: 4px !important;
-            padding: 6px 12px !important;
-            background-color: rgba(34, 197, 94, 0.15) !important;
-            border: 1px solid rgba(34, 197, 94, 0.5) !important;
-            border-radius: 8px !important;
-            color: #22c55e !important;
-            font-size: 12px !important;
-            cursor: pointer !important;
-            transition: all 0.2s ease !important;
-        `;
-        copyBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2;">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="m5 15-2-2v-6a2 2 0 0 1 2-2h6l2 2"></path>
-            </svg>
-            Copy
-        `;
-        copyBtn.setAttribute('aria-label', 'Copy message');
-        copyBtn.onclick = () => copyMessageToClipboard(copyBtn, messageDiv);
-        
-        const rewriteBtn = document.createElement('button');
-        rewriteBtn.style.cssText = `
-            display: flex !important;
-            align-items: center !important;
-            gap: 4px !important;
-            padding: 6px 12px !important;
-            background-color: rgba(59, 130, 246, 0.15) !important;
-            border: 1px solid rgba(59, 130, 246, 0.5) !important;
-            border-radius: 8px !important;
-            color: #3b82f6 !important;
-            font-size: 12px !important;
-            cursor: pointer !important;
-            transition: all 0.2s ease !important;
-        `;
-        rewriteBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2;">
-                <path d="m3 16 4 4 4-4"></path>
-                <path d="M7 20V4"></path>
-                <path d="M20 8l-4-4-4 4"></path>
-                <path d="M17 4v16"></path>
-            </svg>
-            Rewrite
-        `;
-        rewriteBtn.setAttribute('aria-label', 'Regenerate response');
-        rewriteBtn.onclick = () => rewriteMessage(messageDiv);
-        
-        // Add responsive behavior for mobile
-        const isMobile = window.innerWidth <= 768;
-        if (isMobile) {
-            buttonsDiv.style.justifyContent = 'flex-start';
-            buttonsDiv.style.padding = '0 16px';
-        }
-        
-        buttonsDiv.appendChild(copyBtn);
-        buttonsDiv.appendChild(rewriteBtn);
-        messagesContainer.appendChild(buttonsDiv);
+        addMessageActions(messageDiv, text);
     }
+    
+    messagesContainer.appendChild(messageDiv);
     
     // Render LaTeX if this is an AI message with text
     if (sender === 'ai' && text && type === 'normal') {
@@ -4013,24 +3940,13 @@ function hideSelectionPreview() {
 
 // Add Copy and Rewrite buttons to AI messages
 function addMessageActions(messageDiv, messageText) {
-    console.log('addMessageActions called with:', messageDiv, messageText);
     const messageContent = messageDiv.querySelector('.message-content');
-    console.log('messageContent found:', messageContent);
     if (!messageContent) {
-        console.log('No message-content found, returning');
         return;
     }
     
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'message-actions';
-    // Force visibility for debugging
-    actionsDiv.style.setProperty('display', 'flex', 'important');
-    actionsDiv.style.setProperty('opacity', '1', 'important');
-    actionsDiv.style.setProperty('visibility', 'visible', 'important');
-    actionsDiv.style.setProperty('transform', 'translateY(0)', 'important');
-    actionsDiv.style.setProperty('margin-top', '12px', 'important');
-    actionsDiv.style.setProperty('gap', '8px', 'important');
-    actionsDiv.style.setProperty('background-color', 'red', 'important'); // Debug background
     
     // Store the message text on the message div for safe access
     messageDiv.dataset.messageText = messageText;
@@ -4038,42 +3954,17 @@ function addMessageActions(messageDiv, messageText) {
     const copyButton = document.createElement('button');
     copyButton.className = 'message-action-btn copy-btn';
     copyButton.setAttribute('aria-label', 'Copy message to clipboard');
-    // Force button styling for debugging
-    copyButton.style.setProperty('display', 'flex', 'important');
-    copyButton.style.setProperty('align-items', 'center', 'important');
-    copyButton.style.setProperty('gap', '4px', 'important');
-    copyButton.style.setProperty('padding', '6px 12px', 'important');
-    copyButton.style.setProperty('background-color', '#22c55e', 'important');
-    copyButton.style.setProperty('border', '1px solid #22c55e', 'important');
-    copyButton.style.setProperty('border-radius', '8px', 'important');
-    copyButton.style.setProperty('color', 'white', 'important');
-    copyButton.style.setProperty('font-size', '12px', 'important');
-    copyButton.style.setProperty('cursor', 'pointer', 'important');
-    copyButton.style.setProperty('visibility', 'visible', 'important');
     copyButton.innerHTML = `
         <svg viewBox="0 0 24 24">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
             <path d="m5 15-2-2v-6a2 2 0 0 1 2-2h6l2 2"></path>
         </svg>
-        Copy
     `;
     copyButton.addEventListener('click', () => copyMessageToClipboard(copyButton, messageDiv));
     
     const rewriteButton = document.createElement('button');
     rewriteButton.className = 'message-action-btn rewrite-btn';
     rewriteButton.setAttribute('aria-label', 'Ask AI to rewrite this message');
-    // Force button styling for debugging
-    rewriteButton.style.setProperty('display', 'flex', 'important');
-    rewriteButton.style.setProperty('align-items', 'center', 'important');
-    rewriteButton.style.setProperty('gap', '4px', 'important');
-    rewriteButton.style.setProperty('padding', '6px 12px', 'important');
-    rewriteButton.style.setProperty('background-color', '#3b82f6', 'important');
-    rewriteButton.style.setProperty('border', '1px solid #3b82f6', 'important');
-    rewriteButton.style.setProperty('border-radius', '8px', 'important');
-    rewriteButton.style.setProperty('color', 'white', 'important');
-    rewriteButton.style.setProperty('font-size', '12px', 'important');
-    rewriteButton.style.setProperty('cursor', 'pointer', 'important');
-    rewriteButton.style.setProperty('visibility', 'visible', 'important');
     rewriteButton.innerHTML = `
         <svg viewBox="0 0 24 24">
             <path d="m3 16 4 4 4-4"></path>
@@ -4088,18 +3979,6 @@ function addMessageActions(messageDiv, messageText) {
     actionsDiv.appendChild(copyButton);
     actionsDiv.appendChild(rewriteButton);
     messageContent.appendChild(actionsDiv);
-    console.log('Message actions added to DOM:', actionsDiv);
-    
-    // Check if buttons are still there after 1 second
-    setTimeout(() => {
-        const stillThere = document.contains(actionsDiv);
-        const parentStillThere = actionsDiv.parentElement;
-        console.log('Buttons still in DOM after 1 second:', stillThere, 'Parent:', parentStillThere);
-        if (stillThere) {
-            console.log('Computed styles for actionsDiv:', window.getComputedStyle(actionsDiv));
-            console.log('Computed styles for copyButton:', window.getComputedStyle(copyButton));
-        }
-    }, 1000);
 }
 
 // Copy message content to clipboard
