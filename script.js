@@ -68,6 +68,10 @@ let activeRequestTokens = new Map(); // chatId -> requestToken
 
 // Load chat history from Firebase only
 async function loadChatHistory() {
+    // Store current chat ID to preserve it if possible
+    const previousChatId = currentChatId;
+    console.log('Loading chat history, preserving current chat ID:', previousChatId);
+    
     try {
         // Wait for Firebase and authentication to complete
         let authRetries = 0;
@@ -136,7 +140,60 @@ async function loadChatHistory() {
         }
     }
     await loadChatFolders();
+    
+    // Try to restore the previous current chat ID if it still exists
+    if (previousChatId) {
+        const previousChatExists = chatHistory.find(chat => chat.id === previousChatId);
+        if (previousChatExists) {
+            console.log('Restoring previous current chat ID:', previousChatId);
+            currentChatId = previousChatId;
+            // Load the conversation history for the current chat
+            conversationHistory = [...previousChatExists.messages];
+            // Update the UI to show the current chat messages
+            redisplayConversation();
+        } else {
+            console.log('Previous chat ID no longer exists, clearing current chat');
+            currentChatId = null;
+            conversationHistory = [];
+        }
+    }
+    
     updateHistoryDisplay();
+}
+
+// Function to redisplay conversation messages without changing chat state
+function redisplayConversation() {
+    console.log('Redisplaying conversation with', conversationHistory.length, 'messages');
+    
+    // Clear current messages
+    const messagesContainer = document.getElementById('messages');
+    messagesContainer.innerHTML = '';
+    
+    // Display all messages from the conversation history
+    conversationHistory.forEach(message => {
+        if (message.role === 'user') {
+            let text = '';
+            let image = null;
+            
+            if (typeof message.content === 'string') {
+                text = message.content;
+            } else if (Array.isArray(message.content)) {
+                const textContent = message.content.find(c => c.type === 'text');
+                const imageContent = message.content.find(c => c.type === 'image_url');
+                
+                if (textContent) {
+                    text = textContent.text;
+                }
+                if (imageContent) {
+                    image = imageContent.image_url.url;
+                }
+            }
+            
+            addMessage(text, 'user', 'normal', image);
+        } else if (message.role === 'assistant') {
+            addMessage(message.content, 'ai');
+        }
+    });
 }
 
 
@@ -4779,11 +4836,17 @@ document.addEventListener('DOMContentLoaded', async function() {
                     updateHistoryDisplay();
                     // Load saved API key from user account
                     await loadSavedApiKey();
+                    
+                    // Initialize URL routing after chat history is loaded
+                    initializeUrlRoutingAfterLoad();
                 } else {
                     console.log('User signed out, clearing chat data');
                     chatHistory = [];
                     chatFolders = [];
                     updateHistoryDisplay();
+                    
+                    // Still initialize URL routing for new chats
+                    initializeUrlRoutingAfterLoad();
                 }
             });
             console.log('Firebase auth listener established');
@@ -4796,6 +4859,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 updateHistoryDisplay();
                 // Load saved API key from user account
                 await loadSavedApiKey();
+                
+                // Initialize URL routing after chat history is loaded
+                initializeUrlRoutingAfterLoad();
             }
         } else {
             firebaseRetryCount++;
@@ -4808,34 +4874,15 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // Load empty state to show login requirement
                 await loadChatHistory();
                 updateHistoryDisplay();
+                
+                // Initialize URL routing even without Firebase
+                initializeUrlRoutingAfterLoad();
             }
         }
     }
     
     // Start trying to set up Firebase
     setTimeout(setupFirebaseAuthListener, 500);
-    
-    // Initialize URL routing after app is loaded
-    setTimeout(() => {
-        initializeUrlRouting();
-    }, 50);
-    
-    // Multiple fallback attempts for GitHub Pages
-    setTimeout(() => {
-        const urlChatId = getChatIdFromUrl();
-        if (urlChatId && !currentChatId) {
-            console.log('Fallback 1: attempting to load chat from URL');
-            handleUrlChange();
-        }
-    }, 500);
-    
-    setTimeout(() => {
-        const urlChatId = getChatIdFromUrl();
-        if (urlChatId && !currentChatId) {
-            console.log('Fallback 2: attempting to load chat from URL');
-            handleUrlChange();
-        }
-    }, 1000);
     
     if (!hasApiKey) {
         // Show a helpful message in the welcome screen
@@ -4868,6 +4915,43 @@ function initializeUrlRouting() {
             console.log('Attempting to load chat from URL after delay');
             handleUrlChange();
         }, 200);
+    }
+}
+
+// Initialize URL routing after chat history is loaded
+function initializeUrlRoutingAfterLoad() {
+    console.log('Initializing URL routing after chat history loaded');
+    
+    // Only set up event listeners once
+    if (!window.urlRoutingInitialized) {
+        // Handle hash changes (back/forward navigation and direct URL access)
+        window.addEventListener('hashchange', function(event) {
+            console.log('Hash changed:', window.location.hash);
+            handleUrlChange();
+        });
+        
+        // Also handle popstate for broader compatibility
+        window.addEventListener('popstate', function(event) {
+            handleUrlChange();
+        });
+        
+        window.urlRoutingInitialized = true;
+        console.log('URL routing event listeners set up');
+    }
+    
+    // Check URL immediately since chat history is now available
+    const urlChatId = getChatIdFromUrl();
+    console.log('Checking URL after load:', window.location.href, 'Chat ID:', urlChatId);
+    console.log('Available chats:', chatHistory.length);
+    
+    if (urlChatId) {
+        console.log('Loading chat from URL immediately:', urlChatId);
+        handleUrlChange();
+    } else if (currentChatId) {
+        console.log('No chat ID in URL, but current chat exists. Updating URL to match:', currentChatId);
+        updateChatUrl(currentChatId);
+    } else {
+        console.log('No chat ID in URL and no current chat, staying on welcome screen');
     }
 }
 
