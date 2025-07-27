@@ -1546,6 +1546,9 @@ async function saveCurrentChat() {
     console.log('Saving current chat with', conversationHistory.length, 'messages');
     
     const currentTime = Date.now();
+    // Collect current overlay data
+    const currentOverlays = collectCurrentOverlays();
+    
     const chatData = {
         id: currentChatId || generateChatId(),
         title: getChatTitle(conversationHistory),
@@ -1553,7 +1556,8 @@ async function saveCurrentChat() {
         model: currentModel,
         timestamp: currentTime,
         lastUpdated: currentTime,
-        date: new Date().toLocaleDateString()
+        date: new Date().toLocaleDateString(),
+        overlays: currentOverlays
     };
     
     // Add userId if user is authenticated
@@ -1602,9 +1606,18 @@ async function saveCurrentChat() {
 }
 
 // Load a chat from history
-function loadChat(chatId) {
+async function loadChat(chatId) {
     const chat = chatHistory.find(c => c.id === chatId);
     if (!chat) return;
+    
+    // Save current chat with its overlays before switching
+    if (currentChatId && currentChatId !== chatId) {
+        console.log('Saving current chat before switching to new chat');
+        await saveCurrentChat();
+    }
+    
+    // Clear overlays from previous chat FIRST
+    clearAllOverlays();
     
     // Note: We don't cancel pending requests when switching chats anymore
     // Each chat maintains its own request token, so responses will appear in the correct chat
@@ -1667,6 +1680,13 @@ function loadChat(chatId) {
             renderMathInElement(messageElement);
         });
     }, 100);
+    
+    // Restore overlays if they exist in the chat data
+    if (chat.overlays && chat.overlays.length > 0) {
+        setTimeout(() => {
+            restoreChatOverlays(chat.overlays);
+        }, 200); // Delay to ensure DOM is ready
+    }
     
     // Update active state in history
     updateHistoryDisplay();
@@ -1823,6 +1843,7 @@ function startNewChat(preserveFolder = false) {
         currentFolderId = null; // Reset folder when starting new chat normally
     }
     clearChat();
+    clearAllOverlays(); // Clear overlays when starting new chat
     updateHistoryDisplay();
     
     // Update URL to reflect new chat
@@ -3330,6 +3351,18 @@ function initializeSelectionTooltip() {
             hideSelectionTooltip();
         }
     });
+    
+    // Add window resize listener to reposition overlay
+    window.addEventListener('resize', repositionOverlayOnResize);
+    
+    // Restore saved overlay on page load
+    restoreSavedOverlay();
+}
+
+function restoreSavedOverlay() {
+    // Multiple overlays mode - don't auto-restore old single overlay
+    // Users can create new overlays as needed
+    console.log('Multiple overlay mode active - auto-restore disabled');
 }
 
 
@@ -3413,6 +3446,7 @@ function showSelectionTooltip(selection) {
     
     // Add click handler
     selectionTooltip.addEventListener('click', () => {
+        console.log('Ask ChatGPT tooltip clicked with selectedText:', selectedText);
         askAboutSelection(selectedText);
         hideSelectionTooltip();
     });
@@ -3474,12 +3508,12 @@ function askAboutSelection(selectedText) {
         rect: selectionRect
     };
     
-    // Show overlay with input form
-    showSelectionResponseOverlay(selectedText, prefix, selectionRect);
+    // Show overlay with input form and get the overlay ID
+    const overlayId = showSelectionResponseOverlay(selectedText, prefix, selectionRect);
     
     // Focus on the textarea after a brief delay and add keyboard support
     setTimeout(() => {
-        const textarea = document.getElementById('additionalContext');
+        const textarea = document.getElementById('additionalContext_' + overlayCounter);
         if (textarea) {
             textarea.focus();
             
@@ -3496,7 +3530,7 @@ function askAboutSelection(selectedText) {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     // Enter to send (unless Shift is held)
                     e.preventDefault();
-                    sendSelectionQuery();
+                    sendSelectionQuery(overlayId);
                 } else if (e.key === 'Enter' && e.shiftKey) {
                     // Shift+Enter for new line - let default behavior happen
                     setTimeout(autoResize, 0); // Resize after new line is added
@@ -3510,10 +3544,14 @@ function askAboutSelection(selectedText) {
     }, 300);
 }
 
-async function sendSelectionQueryAsync() {
+async function sendSelectionQueryAsync(overlayId) {
     if (!currentSelectionData) return;
     
-    const additionalContext = document.getElementById('additionalContext').value.trim();
+    const overlay = document.getElementById(overlayId);
+    if (!overlay) return;
+    
+    const textareaId = overlay.querySelector('textarea').id;
+    const additionalContext = document.getElementById(textareaId).value.trim();
     
     // Build the query with better context
     let query = `I selected this text from our conversation: "${currentSelectionData.text}"`;
@@ -3534,27 +3572,30 @@ async function sendSelectionQueryAsync() {
     }
     
     // Hide the input form and show loading
-    showSelectionLoading();
+    showSelectionLoading(overlayId);
     
     // Make API call
     try {
         const response = await getSelectionResponse(query);
-        updateSelectionOverlayResponse(response);
+        updateSelectionOverlayResponse(overlayId, response);
     } catch (error) {
-        updateSelectionOverlayResponse(`Error: ${error.message}`, true);
+        updateSelectionOverlayResponse(overlayId, `Error: ${error.message}`, true);
     }
 }
 
 // Wrapper for HTML onclick handlers
-function sendSelectionQuery() {
-    sendSelectionQueryAsync().catch(error => {
+function sendSelectionQuery(overlayId) {
+    sendSelectionQueryAsync(overlayId).catch(error => {
         console.error('Error sending selection query:', error);
     });
 }
 
-function showSelectionLoading() {
-    const querySection = document.querySelector('.selection-query-section');
-    const responseArea = document.querySelector('.selection-response-area');
+function showSelectionLoading(overlayId) {
+    const overlay = document.getElementById(overlayId);
+    if (!overlay) return;
+    
+    const querySection = overlay.querySelector('.selection-query-section');
+    const responseArea = overlay.querySelector('.selection-response-area');
     
     if (querySection) querySection.style.display = 'none';
     if (responseArea) {
@@ -3570,27 +3611,53 @@ function showSelectionLoading() {
     }
 }
 
+// Counter for unique overlay IDs
+let overlayCounter = 0;
+
 function showSelectionResponseOverlay(selectedText, prefix, selectionRect) {
-    // Remove any existing overlay
-    hideSelectionResponseOverlay();
+    console.log('showSelectionResponseOverlay called with:', { selectedText, prefix, selectionRect });
     
-    // Create overlay
+    // Create a new overlay with unique ID
+    overlayCounter++;
+    const overlayId = 'selectionResponseOverlay_' + overlayCounter;
+    
+    // Create new overlay
     const overlay = document.createElement('div');
-    overlay.id = 'selectionResponseOverlay';
-    overlay.className = 'selection-response-overlay';
+    overlay.id = overlayId;
+    overlay.className = 'selection-response-overlay persistent-overlay';
     
     overlay.innerHTML = `
-        <div class="selection-response-content">
+        <div class="selection-response-content" data-selected-text="${selectedText.replace(/"/g, '&quot;')}">
+            <div class="overlay-header">
+                <div class="overlay-drag-handle" title="Drag to move">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18M3 6h18M3 18h18"/>
+                    </svg>
+                    <span>ChatGPT Assistant #${overlayCounter}</span>
+                </div>
+                <div class="overlay-controls">
+                    <button class="overlay-minimize" onclick="minimizeSelectionOverlay('${overlayId}')" title="Minimize">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                    <button class="overlay-close" onclick="closeSelectionOverlay('${overlayId}')" title="Close">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
             <div class="bubble-content">
                 <div class="selection-query-section">
                     <div class="selected-text-display">${selectedText}</div>
                     <div class="quick-input">
                         <textarea 
-                            id="additionalContext" 
+                            id="additionalContext_${overlayCounter}" 
                             placeholder="Ask about this..."
                             rows="1"
                         ></textarea>
-                        <button class="quick-send" onclick="sendSelectionQuery()">
+                        <button class="quick-send" onclick="sendSelectionQuery('${overlayId}')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
                             </svg>
@@ -3605,17 +3672,30 @@ function showSelectionResponseOverlay(selectedText, prefix, selectionRect) {
         </div>
     `;
     
-    document.body.appendChild(overlay);
-    
-    // Position the overlay relative to the selection
-    if (selectionRect) {
-        console.log('Selection rect:', selectionRect);
-        const content = overlay.querySelector('.selection-response-content');
-        if (content) {
-            positionBubbleRelativeToSelection(content, selectionRect);
-        }
+    // Append to messages container instead of body for better positioning
+    const messagesContainer = document.getElementById('messages');
+    if (messagesContainer) {
+        messagesContainer.appendChild(overlay);
     } else {
-        console.log('No selection rect available');
+        document.body.appendChild(overlay);
+    }
+    
+    // Set z-index to ensure newer overlays appear on top
+    overlay.style.zIndex = 1005 + overlayCounter;
+    
+    // Initialize overlay position and functionality
+    initializeOverlayDrag(overlay);
+    setupOverlayResize(overlay);
+    
+    // Load saved position and state
+    loadOverlayPosition(overlay);
+    restoreOverlayState(overlay);
+    
+    // Position the overlay relative to the selection only if not restoring saved position
+    if (selectionRect && !localStorage.getItem('selectionOverlayPosition_' + overlayId)) {
+        positionBubbleRelativeToSelection(content, selectionRect);
+    } else {
+        console.log('Using saved/default position for overlay:', overlayId);
     }
     
     // Animate in
@@ -3629,6 +3709,14 @@ function showSelectionResponseOverlay(selectedText, prefix, selectionRect) {
     
     // Add resize functionality for desktop
     setupOverlayResize(overlay);
+    
+    // Auto-save chat when new overlay is created
+    if (currentChatId) {
+        setTimeout(() => saveCurrentChat(), 500); // Delay to ensure overlay is fully initialized
+    }
+    
+    // Return the overlay ID for further operations
+    return overlayId;
 }
 
 function positionBubbleRelativeToSelection(content, selectionRect) {
@@ -3637,9 +3725,10 @@ function positionBubbleRelativeToSelection(content, selectionRect) {
     const bubbleWidth = 320;
     const margin = 20;
     
-    // Calculate initial position - try right side first
-    let bubbleLeft = selectionRect.right + margin;
-    let bubbleTop = selectionRect.top;
+    // Calculate initial position - try right side first, with staggered offset for multiple overlays
+    const staggerOffset = (overlayCounter - 1) * 40; // 40px offset per overlay
+    let bubbleLeft = selectionRect.right + margin + staggerOffset;
+    let bubbleTop = selectionRect.top + staggerOffset;
     
     // Check if it fits in viewport horizontally
     if (bubbleLeft + bubbleWidth > window.innerWidth - margin) {
@@ -3664,8 +3753,12 @@ function positionBubbleRelativeToSelection(content, selectionRect) {
     
     // Apply initial positioning to measure actual size
     content.style.position = 'fixed';
-    content.style.left = bubbleLeft + 'px';
-    content.style.top = bubbleTop + 'px';
+    
+    // Ensure the initial position is constrained to viewport
+    const constrainedPosition = constrainToViewport(bubbleLeft, bubbleTop, bubbleWidth, 200);
+    
+    content.style.left = constrainedPosition.left + 'px';
+    content.style.top = constrainedPosition.top + 'px';
     content.style.margin = '0';
     content.style.transform = 'scale(1) translateY(0) !important';
     
@@ -3701,8 +3794,8 @@ function repositionBubbleAfterContentChange() {
     positionBubbleRelativeToSelection(content, currentSelectionData.rect);
 }
 
-function updateSelectionOverlayResponse(response, isError = false) {
-    const overlay = document.getElementById('selectionResponseOverlay');
+function updateSelectionOverlayResponse(overlayId, response, isError = false) {
+    const overlay = document.getElementById(overlayId);
     if (!overlay) return;
     
     const responseArea = overlay.querySelector('.selection-response-area');
@@ -3712,7 +3805,8 @@ function updateSelectionOverlayResponse(response, isError = false) {
     const queryDiv = document.createElement('div');
     queryDiv.className = 'selection-final-query';
     
-    const additionalContext = document.getElementById('additionalContext')?.value.trim();
+    const textareaId = overlay.querySelector('textarea').id;
+    const additionalContext = document.getElementById(textareaId)?.value.trim();
     
     // Frontend display: Quoted text at top, then user's question below
     let displayHTML = `<div class="selected-text-quote">${currentSelectionData.text}</div>`;
@@ -3758,6 +3852,17 @@ function updateSelectionOverlayResponse(response, isError = false) {
     
     // Reposition after content changes to ensure it stays on screen
     setTimeout(() => repositionBubbleAfterContentChange(), 100);
+    
+    // Save the overlay state including the new response
+    const overlayElement = document.getElementById(overlayId);
+    if (overlayElement) {
+        saveOverlayState(overlayElement);
+        
+        // Auto-save chat when overlay response is added
+        if (currentChatId) {
+            setTimeout(() => saveCurrentChat(), 200);
+        }
+    }
     
     // No footer needed - close button is in top-right corner
 }
@@ -5734,4 +5839,394 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeAccentColorPicker();
     }, 100);
 });
+
+// New functions for persistent overlay functionality
+function minimizeSelectionOverlay(overlayId) {
+    const overlay = document.getElementById(overlayId);
+    if (overlay) {
+        const content = overlay.querySelector('.selection-response-content');
+        const minimizeBtn = overlay.querySelector('.overlay-minimize svg path');
+        
+        if (content.classList.contains('minimized')) {
+            // Expand
+            content.classList.remove('minimized');
+            if (minimizeBtn) {
+                minimizeBtn.setAttribute('d', 'M6 9l6 6 6-6'); // Down arrow
+            }
+        } else {
+            // Minimize
+            content.classList.add('minimized');
+            if (minimizeBtn) {
+                minimizeBtn.setAttribute('d', 'M18 15l-6-6-6 6'); // Up arrow
+            }
+        }
+        saveOverlayState(overlay);
+        
+        // Auto-save chat when overlay state changes
+        if (currentChatId) {
+            saveCurrentChat();
+        }
+    }
+}
+
+function closeSelectionOverlay(overlayId) {
+    const overlay = document.getElementById(overlayId);
+    if (overlay) {
+        // Remove overlay-specific saved data
+        localStorage.removeItem('selectionOverlayPosition_' + overlayId);
+        localStorage.removeItem('selectionOverlayState_' + overlayId);
+        overlay.remove();
+        
+        // Auto-save chat when overlay is closed
+        if (currentChatId) {
+            saveCurrentChat();
+        }
+    }
+}
+
+function initializeOverlayDrag(overlay) {
+    const dragHandle = overlay.querySelector('.overlay-drag-handle');
+    const content = overlay.querySelector('.selection-response-content');
+    
+    if (!dragHandle || !content) return;
+    
+    let isDragging = false;
+    let startX, startY, startLeft, startTop;
+    
+    dragHandle.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        dragHandle.style.cursor = 'grabbing';
+        
+        const rect = content.getBoundingClientRect();
+        startX = e.clientX;
+        startY = e.clientY;
+        startLeft = rect.left;
+        startTop = rect.top;
+        
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        
+        let newLeft = startLeft + deltaX;
+        let newTop = startTop + deltaY;
+        
+        // Keep within viewport bounds
+        const maxLeft = window.innerWidth - content.offsetWidth;
+        const maxTop = window.innerHeight - content.offsetHeight;
+        
+        newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+        newTop = Math.max(0, Math.min(newTop, maxTop));
+        
+        content.style.left = newLeft + 'px';
+        content.style.top = newTop + 'px';
+        content.style.position = 'fixed';
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            dragHandle.style.cursor = 'grab';
+            saveOverlayPosition(overlay);
+        }
+    });
+}
+
+function saveOverlayPosition(overlay) {
+    const content = overlay.querySelector('.selection-response-content');
+    if (content) {
+        const rect = content.getBoundingClientRect();
+        const position = {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height
+        };
+        localStorage.setItem('selectionOverlayPosition_' + overlay.id, JSON.stringify(position));
+        
+        // Auto-save chat when overlay position changes
+        if (currentChatId) {
+            setTimeout(() => saveCurrentChat(), 100); // Small delay to avoid excessive saves during drag
+        }
+    }
+}
+
+function loadOverlayPosition(overlay) {
+    const savedPosition = localStorage.getItem('selectionOverlayPosition_' + overlay.id);
+    if (savedPosition) {
+        try {
+            const position = JSON.parse(savedPosition);
+            const content = overlay.querySelector('.selection-response-content');
+            if (content) {
+                content.style.position = 'fixed';
+                
+                // Ensure position is within viewport bounds
+                const constrainedPosition = constrainToViewport(position.left, position.top, position.width || 320, position.height || 200);
+                
+                content.style.left = constrainedPosition.left + 'px';
+                content.style.top = constrainedPosition.top + 'px';
+                if (position.width) content.style.width = position.width + 'px';
+                if (position.height) content.style.height = position.height + 'px';
+            }
+        } catch (e) {
+            console.warn('Failed to load overlay position:', e);
+        }
+    }
+}
+
+function constrainToViewport(left, top, width, height) {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Ensure overlay doesn't go off the right edge
+    if (left + width > viewportWidth) {
+        left = viewportWidth - width - 20; // 20px margin
+    }
+    
+    // Ensure overlay doesn't go off the left edge
+    if (left < 20) {
+        left = 20;
+    }
+    
+    // Ensure overlay doesn't go off the bottom edge
+    if (top + height > viewportHeight) {
+        top = viewportHeight - height - 20;
+    }
+    
+    // Ensure overlay doesn't go off the top edge
+    if (top < 20) {
+        top = 20;
+    }
+    
+    return { left, top };
+}
+
+function repositionOverlayOnResize() {
+    // Find all selection overlays and reposition them
+    const overlays = document.querySelectorAll('[id^="selectionResponseOverlay_"]');
+    overlays.forEach(overlay => {
+        const content = overlay.querySelector('.selection-response-content');
+        if (content) {
+            const currentLeft = parseInt(content.style.left) || 0;
+            const currentTop = parseInt(content.style.top) || 0;
+            const currentWidth = parseInt(content.style.width) || content.offsetWidth;
+            const currentHeight = parseInt(content.style.height) || content.offsetHeight;
+            
+            const constrainedPosition = constrainToViewport(currentLeft, currentTop, currentWidth, currentHeight);
+            
+            content.style.left = constrainedPosition.left + 'px';
+            content.style.top = constrainedPosition.top + 'px';
+            
+            // Save the new position
+            saveOverlayPosition(overlay);
+        }
+    });
+}
+
+function collectCurrentOverlays() {
+    const overlays = document.querySelectorAll('[id^="selectionResponseOverlay_"]');
+    console.log(`Collecting ${overlays.length} current overlays`);
+    const overlayData = [];
+    
+    overlays.forEach(overlay => {
+        const content = overlay.querySelector('.selection-response-content');
+        const selectedTextDisplay = overlay.querySelector('.selected-text-display');
+        const responseArea = overlay.querySelector('.selection-response-area');
+        const textarea = overlay.querySelector('textarea');
+        
+        if (content && selectedTextDisplay) {
+            const overlayInfo = {
+                id: overlay.id,
+                selectedText: selectedTextDisplay.textContent,
+                position: {
+                    left: parseInt(content.style.left) || 0,
+                    top: parseInt(content.style.top) || 0,
+                    width: parseInt(content.style.width) || content.offsetWidth,
+                    height: parseInt(content.style.height) || content.offsetHeight
+                },
+                minimized: content.classList.contains('minimized'),
+                zIndex: overlay.style.zIndex || '',
+                hasResponse: responseArea && responseArea.style.display !== 'none' && responseArea.innerHTML.trim() !== '',
+                responseContent: responseArea ? responseArea.innerHTML : '',
+                textareaValue: textarea ? textarea.value : ''
+            };
+            
+            console.log(`Collected overlay ${overlayInfo.id} with text: "${overlayInfo.selectedText}"`);
+            overlayData.push(overlayInfo);
+        }
+    });
+    
+    console.log(`Total collected overlay data:`, overlayData);
+    return overlayData;
+}
+
+function restoreChatOverlays(overlayData) {
+    console.log(`Restoring ${overlayData.length} overlays for this chat:`, overlayData);
+    
+    // Restore each overlay (overlays should already be cleared by loadChat)
+    overlayData.forEach(overlayInfo => {
+        console.log(`Restoring overlay: ${overlayInfo.id} with text: "${overlayInfo.selectedText}"`);
+        restoreSingleOverlay(overlayInfo);
+    });
+    
+    console.log(`Finished restoring ${overlayData.length} overlays for this chat`);
+}
+
+function clearAllOverlays() {
+    const existingOverlays = document.querySelectorAll('[id^="selectionResponseOverlay_"]');
+    console.log(`Clearing ${existingOverlays.length} overlays`);
+    existingOverlays.forEach(overlay => {
+        console.log(`Removing overlay: ${overlay.id}`);
+        overlay.remove();
+    });
+    
+    // Reset overlay counter when clearing all overlays
+    overlayCounter = 0;
+    console.log('Reset overlay counter to 0');
+}
+
+function restoreSingleOverlay(overlayInfo) {
+    // Extract the counter from the ID (e.g., "selectionResponseOverlay_3" -> 3)
+    const idParts = overlayInfo.id.split('_');
+    const originalCounter = parseInt(idParts[1]) || 1;
+    
+    // Update the global counter to avoid conflicts
+    overlayCounter = Math.max(overlayCounter, originalCounter);
+    
+    // Create overlay with the original ID
+    const overlay = document.createElement('div');
+    overlay.id = overlayInfo.id;
+    overlay.className = 'selection-response-overlay persistent-overlay';
+    overlay.style.zIndex = overlayInfo.zIndex || (1005 + originalCounter);
+    
+    const textareaId = 'additionalContext_' + originalCounter;
+    
+    overlay.innerHTML = `
+        <div class="selection-response-content" data-selected-text="${overlayInfo.selectedText.replace(/"/g, '&quot;')}">
+            <div class="overlay-header">
+                <div class="overlay-drag-handle" title="Drag to move">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18M3 6h18M3 18h18"/>
+                    </svg>
+                    <span>ChatGPT Assistant #${originalCounter}</span>
+                </div>
+                <div class="overlay-controls">
+                    <button class="overlay-minimize" onclick="minimizeSelectionOverlay('${overlayInfo.id}')" title="Minimize">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                    <button class="overlay-close" onclick="closeSelectionOverlay('${overlayInfo.id}')" title="Close">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="bubble-content">
+                <div class="selection-query-section" style="${overlayInfo.hasResponse ? 'display: none;' : ''}">
+                    <div class="selected-text-display">${overlayInfo.selectedText}</div>
+                    <div class="quick-input">
+                        <textarea 
+                            id="${textareaId}" 
+                            placeholder="Ask about this..."
+                            rows="1"
+                        >${overlayInfo.textareaValue || ''}</textarea>
+                        <button class="quick-send" onclick="sendSelectionQuery('${overlayInfo.id}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="selection-response-area" style="${overlayInfo.hasResponse ? 'display: block;' : 'display: none;'}">
+                    ${overlayInfo.responseContent || ''}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add to DOM
+    document.body.appendChild(overlay);
+    
+    // Apply saved position and state
+    const content = overlay.querySelector('.selection-response-content');
+    if (content && overlayInfo.position) {
+        content.style.position = 'fixed';
+        content.style.left = overlayInfo.position.left + 'px';
+        content.style.top = overlayInfo.position.top + 'px';
+        if (overlayInfo.position.width) content.style.width = overlayInfo.position.width + 'px';
+        if (overlayInfo.position.height) content.style.height = overlayInfo.position.height + 'px';
+        
+        // Apply minimized state
+        if (overlayInfo.minimized) {
+            content.classList.add('minimized');
+            const minimizeBtn = overlay.querySelector('.overlay-minimize svg path');
+            if (minimizeBtn) {
+                minimizeBtn.setAttribute('d', 'M18 15l-6-6-6 6'); // Up arrow
+            }
+        }
+    }
+    
+    // Initialize drag and resize functionality
+    initializeOverlayDrag(overlay);
+    setupOverlayResize(overlay);
+    
+    // Show overlay with animation
+    setTimeout(() => {
+        overlay.classList.add('show');
+    }, 10);
+}
+
+function saveOverlayState(overlay) {
+    const content = overlay.querySelector('.selection-response-content');
+    if (content) {
+        const selectedTextDisplay = overlay.querySelector('.selected-text-display');
+        const responseContent = overlay.querySelector('.response-content');
+        
+        const state = {
+            minimized: content.classList.contains('minimized'),
+            selectedText: selectedTextDisplay ? selectedTextDisplay.textContent : '',
+            responseText: responseContent ? responseContent.innerHTML : '',
+            hasResponse: responseContent ? responseContent.innerHTML.trim() !== '' : false
+        };
+        localStorage.setItem('selectionOverlayState_' + overlay.id, JSON.stringify(state));
+    }
+}
+
+function restoreOverlayState(overlay) {
+    const savedState = localStorage.getItem('selectionOverlayState_' + overlay.id);
+    if (savedState) {
+        try {
+            const state = JSON.parse(savedState);
+            const content = overlay.querySelector('.selection-response-content');
+            
+            // Restore minimized state
+            if (content && state.minimized) {
+                content.classList.add('minimized');
+                const minimizeBtn = overlay.querySelector('.overlay-minimize svg path');
+                if (minimizeBtn) {
+                    minimizeBtn.setAttribute('d', 'M18 15l-6-6-6 6'); // Up arrow
+                }
+            }
+            
+            // Restore response content if it exists
+            if (state.hasResponse && state.responseText) {
+                const responseArea = overlay.querySelector('.selection-response-area');
+                const responseContent = overlay.querySelector('.response-content');
+                if (responseArea && responseContent) {
+                    responseContent.innerHTML = state.responseText;
+                    responseArea.style.display = 'block';
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to restore overlay state:', e);
+        }
+    }
+}
+
 

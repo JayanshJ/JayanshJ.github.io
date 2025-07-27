@@ -4119,16 +4119,26 @@ body {
     left: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    background: rgba(0, 0, 0, 0.1) !important;
-    backdrop-filter: blur(0.5px);
+    background: transparent !important;
+    backdrop-filter: none;
     display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
     z-index: 1005 !important;
-    opacity: 0;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    pointer-events: auto !important;
+    opacity: 1;
+    transition: none;
+    pointer-events: none !important;
     padding: 0;
+}
+
+.selection-response-overlay.persistent-overlay {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    pointer-events: none !important;
+}
+
+.selection-response-overlay.persistent-overlay .selection-response-content {
+    pointer-events: auto !important;
 }
 
 .selection-response-overlay.show {
@@ -4136,25 +4146,106 @@ body {
 }
 
 .selection-response-content {
-    background: #1f1f1f;
+    background: var(--bg-elevated);
     border-radius: 12px;
     width: 320px;
     max-width: 90vw;
     max-height: 400px;
     min-width: 280px;
     min-height: 200px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    transform: scale(0.9) translateY(-5px);
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border-primary);
+    transform: scale(1) translateY(0);
     transition: all 0.2s ease-out;
-    position: relative;
+    position: fixed;
+    top: 100px;
+    right: 20px;
     display: flex;
     flex-direction: column;
-    resize: none; /* We'll handle resize manually */
+    resize: none;
+    z-index: 1006;
+}
+
+.selection-response-content.minimized {
+    height: 50px !important;
+    min-height: 50px !important;
+    overflow: hidden;
+}
+
+.selection-response-content.minimized .bubble-content {
+    display: none;
+}
+
+.selection-response-content.minimized .overlay-resize-handle {
+    display: none;
 }
 
 .selection-response-overlay.show .selection-response-content {
     transform: scale(1) translateY(0);
+}
+
+/* Overlay Header and Controls */
+.overlay-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-primary);
+    border-radius: 12px 12px 0 0;
+    cursor: default;
+}
+
+.overlay-drag-handle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: grab;
+    user-select: none;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+.overlay-drag-handle:active {
+    cursor: grabbing;
+}
+
+.overlay-drag-handle svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0.7;
+}
+
+.overlay-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.overlay-minimize,
+.overlay-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.overlay-minimize:hover,
+.overlay-close:hover {
+    background: var(--interactive-hover);
+    color: var(--text-primary);
+}
+
+.overlay-close:hover {
+    color: var(--accent-error);
 }
 
 /* Clean bubble without tail */
@@ -4573,8 +4664,8 @@ body {
 /* Mobile adjustments for positioned bubble overlay */
 @media (max-width: 768px) {
     .selection-response-overlay {
-        background: rgba(0, 0, 0, 0.6) !important;
-        backdrop-filter: blur(4px);
+        background: transparent !important;
+        backdrop-filter: none !important;
     }
     
     .selection-response-content {
@@ -4583,25 +4674,26 @@ body {
         max-height: 85vh;
         position: fixed !important;
         left: 2.5vw !important;
-        top: 50% !important;
-        transform: translateY(-50%) scale(0.9) !important;
-        --tail-position: 50% !important;
+        top: 80px !important;
+        right: auto !important;
+        transform: none !important;
+        border-radius: 0 !important;
     }
     
     .selection-response-overlay.show .selection-response-content {
-        transform: translateY(-50%) scale(1) !important;
+        transform: none !important;
+    }
+    
+    .overlay-header {
+        border-radius: 0 !important;
     }
     
     .bubble-content {
-        padding: 20px;
-        padding-top: 16px;
+        padding: 16px;
     }
     
-    .bubble-close-btn {
-        top: 8px;
-        right: 8px;
-        width: 32px;
-        height: 32px;
+    .overlay-resize-handle {
+        display: none !important;
     }
     
     .additional-context-section textarea {
