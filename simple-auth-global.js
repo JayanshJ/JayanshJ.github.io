@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                             console.log('🔄 Attempting popup fallback for mobile...');
                                             showMobilePopupFallback();
                                         }
-                                    }, 5000); // Wait 5 seconds for auth state first
+                                    }, 3000); // Reduced to 3 seconds for faster fallback
                                 } else {
                                     // Show error after a delay to let auth state listener try first
                                     setTimeout(() => {
@@ -505,8 +505,11 @@ function showMobilePopupFallback() {
                 }
             } catch (popupError) {
                 console.error('❌ Mobile popup fallback failed:', popupError);
-                fallbackDiv.innerHTML = '❌ Popup also failed. Please try again.';
-                setTimeout(() => fallbackDiv.remove(), 3000);
+                fallbackDiv.innerHTML = '❌ Popup also failed.<br><small>Try opening the login page again</small>';
+                setTimeout(() => fallbackDiv.remove(), 5000);
+                
+                // Show manual refresh option
+                showManualRefreshOption();
             }
         };
         
@@ -520,5 +523,50 @@ function showMobilePopupFallback() {
         }, 15000);
     } catch (error) {
         console.log('Could not show mobile popup fallback:', error);
+    }
+}
+
+function showManualRefreshOption() {
+    try {
+        const refreshDiv = document.createElement('div');
+        refreshDiv.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 14px;
+            max-width: 350px;
+            animation: slideInRight 0.3s ease-out;
+            cursor: pointer;
+        `;
+        refreshDiv.innerHTML = `
+            🔄 Try Manual Login<br>
+            <small style="opacity: 0.9;">Tap to clear state and try again</small>
+        `;
+        
+        refreshDiv.onclick = () => {
+            // Clear all auth states
+            localStorage.clear();
+            
+            // Reload the page to start fresh
+            window.location.reload();
+        };
+        
+        document.body.appendChild(refreshDiv);
+        
+        // Remove after 20 seconds
+        setTimeout(() => {
+            if (refreshDiv.parentNode) {
+                refreshDiv.remove();
+            }
+        }, 20000);
+    } catch (error) {
+        console.log('Could not show manual refresh option:', error);
     }
 }

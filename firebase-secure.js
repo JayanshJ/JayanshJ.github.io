@@ -520,6 +520,18 @@ class SecureFirebaseClient {
                     } catch (retryError) {
                         console.log('⚠️ Mobile redirect retry failed:', retryError.message);
                     }
+                    
+                    // Last resort: Force check auth state with extended waiting
+                    console.log('🔄 Final attempt: Force auth state check...');
+                    for (let i = 0; i < 10; i++) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        const finalUser = auth.currentUser;
+                        if (finalUser) {
+                            console.log('✅ Found user in final auth state check:', finalUser.email);
+                            return await this.processAuthResult({ user: finalUser });
+                        }
+                        console.log(`⏳ Auth state check attempt ${i + 1}/10`);
+                    }
                 }
                 
                 // Don't immediately fail - let auth state listener handle it
