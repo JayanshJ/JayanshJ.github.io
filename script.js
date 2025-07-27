@@ -2126,13 +2126,11 @@ function getApiKey() {
 async function loadSavedApiKey() {
     console.log('🔑 Attempting to load API key from user account...');
     
-    // Wait for Firebase client to be available
-    let retries = 0;
-    const maxRetries = 20;
-    while ((!window.firebaseClient || !window.firebaseClient.getCurrentUser()) && retries < maxRetries) {
-        console.log(`Waiting for Firebase client... (${retries + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        retries++;
+    // Wait for Firebase authentication to complete
+    const authenticatedUser = await waitForFirebaseAuth();
+    if (!authenticatedUser) {
+        console.log('❌ No authenticated user found, cannot load API key');
+        return false;
     }
     
     if (window.firebaseClient && window.firebaseClient.getCurrentUser()) {
@@ -2171,7 +2169,9 @@ async function loadSavedApiKey() {
 async function refreshApiKeyFromAccount() {
     console.log('🔄 Force refreshing API key from user account...');
     
-    if (!window.firebaseClient || !window.firebaseClient.getCurrentUser()) {
+    // Wait for Firebase authentication to complete
+    const authenticatedUser = await waitForFirebaseAuth();
+    if (!authenticatedUser) {
         console.log('❌ User not authenticated, cannot refresh API key');
         return false;
     }
@@ -2200,9 +2200,44 @@ async function refreshApiKeyFromAccount() {
     return false;
 }
 
+// Wait for Firebase authentication to complete
+async function waitForFirebaseAuth() {
+    console.log('⏳ Waiting for Firebase authentication to complete...');
+    
+    let retries = 0;
+    const maxRetries = 30; // 15 seconds
+    
+    while (retries < maxRetries) {
+        // Check if Firebase is loaded
+        if (window.firebaseClient && typeof window.firebaseClient.getCurrentUser === 'function') {
+            const currentUser = window.firebaseClient.getCurrentUser();
+            if (currentUser) {
+                console.log(`✅ Firebase authentication complete: ${currentUser.email}`);
+                return currentUser;
+            }
+        }
+        
+        // Also check Firebase auth directly
+        if (typeof firebase !== 'undefined' && firebase.auth) {
+            const user = firebase.auth().currentUser;
+            if (user) {
+                console.log(`✅ Firebase auth direct check found user: ${user.email}`);
+                return user;
+            }
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
+        retries++;
+    }
+    
+    console.log('❌ Firebase authentication timeout - no user found');
+    return null;
+}
+
 // Make functions globally available
 window.loadSavedApiKey = loadSavedApiKey;
 window.refreshApiKeyFromAccount = refreshApiKeyFromAccount;
+window.waitForFirebaseAuth = waitForFirebaseAuth;
 
 // Update API key status indicator
 function updateApiKeyStatus() {

@@ -1122,3 +1122,4 @@ const secureFirebase = new SecureFirebaseClient();
 // Make available globally
 window.authFunctions = secureFirebase;
 window.chatStorage = secureFirebase;
+window.firebaseClient = secureFirebase;
