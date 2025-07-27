@@ -71,15 +71,20 @@ class SecureFirebaseClient {
             console.log('🔗 Current origin:', window.location.origin);
             console.log('📱 User agent:', navigator.userAgent);
             
-            // Mobile troubleshooting info
+            // Enhanced mobile detection
             const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            console.log('📱 Mobile User Agent detected:', isMobileUA);
-            console.log('📱 Touch events supported:', 'ontouchstart' in window);
-            console.log('📱 Window innerWidth:', window.innerWidth);
-            console.log('📱 Screen width:', screen.width);
-            console.log('📱 Max touch points:', navigator.maxTouchPoints);
-            console.log('🌐 Online status:', navigator.onLine);
-            console.log('🍪 Cookies enabled:', navigator.cookieEnabled);
+            const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            const isSmallScreen = window.innerWidth <= 768;
+            const isMobile = isMobileUA || isTouchDevice || isSmallScreen;
+            
+            console.log('📱 Mobile detection:', {
+                userAgent: isMobileUA,
+                touchDevice: isTouchDevice,
+                smallScreen: isSmallScreen,
+                isMobile: isMobile,
+                width: window.innerWidth,
+                maxTouchPoints: navigator.maxTouchPoints
+            });
             
             // Check if domain is authorized
             const authorizedDomains = ['github.io', 'vercel.app', 'localhost', '127.0.0.1'];
@@ -89,75 +94,82 @@ class SecureFirebaseClient {
             
             if (!isAuthorizedDomain) {
                 console.warn('⚠️ Domain mismatch! Current domain may not be authorized in Firebase Console');
-                console.warn('💡 Add this domain to Firebase Console → Authentication → Settings → Authorized domains:');
-                console.warn('📝 Domain to add:', window.location.hostname);
-                
-                // For mobile, provide specific instructions
-                if (isMobileUA) {
-                    console.warn('📱 MOBILE USERS: This domain authorization issue is common on mobile');
-                    console.warn('📱 Try accessing from: https://jayanshj.github.io instead');
-                }
-                
                 return { 
                     success: false, 
-                    error: `Domain ${window.location.hostname} not authorized in Firebase Console. Please contact admin to add this domain.` 
+                    error: `Domain ${window.location.hostname} not authorized in Firebase Console.` 
                 };
             }
             
             const auth = firebase.auth();
             
             // Set persistence for mobile compatibility
-            console.log('🔧 Setting auth persistence for mobile compatibility...');
+            console.log('🔧 Setting auth persistence...');
             await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
             console.log('✅ Auth persistence set to LOCAL');
             
             const provider = new firebase.auth.GoogleAuthProvider();
-            
-            // Add scopes for better user info
             provider.addScope('profile');
             provider.addScope('email');
             
-            // Always use popup for better mobile compatibility
-            console.log('🔧 Using popup method for all devices (better mobile compatibility)');
-            console.log('📱 User agent:', navigator.userAgent);
-            console.log('📏 Window width:', window.innerWidth);
-            console.log('👆 Touch support:', 'ontouchstart' in window);
-            
-            let result;
-            try {
-                console.log('🚀 Starting Google sign-in with popup...');
-                result = await auth.signInWithPopup(provider);
-                console.log('✅ Popup sign-in successful');
-            } catch (popupError) {
-                console.error('❌ Popup sign-in failed:', popupError);
-                
-                // Check if it's a popup blocked error
-                if (popupError.code === 'auth/popup-blocked') {
-                    console.log('🚫 Popup was blocked, trying redirect as fallback...');
-                    try {
+            // Force redirect on mobile devices for better compatibility
+            if (isMobile) {
+                console.log('📱 Mobile device detected - using redirect method for better compatibility');
+                try {
+                    // Store a flag to know we initiated the redirect
+                    localStorage.setItem('google_auth_initiated', 'true');
+                    localStorage.setItem('auth_redirect_timestamp', Date.now().toString());
+                    
+                    await auth.signInWithRedirect(provider);
+                    console.log('🔄 Redirect initiated, page will reload...');
+                    return { success: true, pending: true };
+                } catch (redirectError) {
+                    console.error('❌ Redirect failed:', redirectError);
+                    localStorage.removeItem('google_auth_initiated');
+                    localStorage.removeItem('auth_redirect_timestamp');
+                    throw redirectError;
+                }
+            } else {
+                // Desktop: try popup first, fallback to redirect
+                console.log('🖥️ Desktop device - trying popup method');
+                try {
+                    const result = await auth.signInWithPopup(provider);
+                    console.log('✅ Popup sign-in successful');
+                    return await this.processAuthResult(result);
+                } catch (popupError) {
+                    console.error('❌ Popup sign-in failed:', popupError);
+                    
+                    if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
+                        console.log('🔄 Popup blocked/closed, trying redirect as fallback...');
+                        localStorage.setItem('google_auth_initiated', 'true');
+                        localStorage.setItem('auth_redirect_timestamp', Date.now().toString());
                         await auth.signInWithRedirect(provider);
-                        console.log('✅ Redirect initiated, page will reload...');
                         return { success: true, pending: true };
-                    } catch (redirectError) {
-                        console.error('❌ Redirect also failed:', redirectError);
-                        throw redirectError;
+                    } else {
+                        throw popupError;
                     }
-                } else {
-                    throw popupError;
                 }
             }
-            
-            console.log('Google sign in result:', result);
-            console.log('User object:', result.user);
+        } catch (error) {
+            console.error('🚨 Google sign in error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    
+    async processAuthResult(result) {
+        try {
+            console.log('📋 Processing auth result:', result);
             
             if (!result || !result.user) {
-                throw new Error('No user returned from Google sign in');
+                throw new Error('No user returned from authentication');
             }
             
             const idToken = await result.user.getIdToken();
             localStorage.setItem('firebase_token', idToken);
             
-            // Safely extract email and displayName
+            // Clean up redirect flags
+            localStorage.removeItem('google_auth_initiated');
+            localStorage.removeItem('auth_redirect_timestamp');
+            
             const email = result.user.email || '';
             const displayName = result.user.displayName || (email ? email.split('@')[0] : 'User');
             
@@ -167,12 +179,12 @@ class SecureFirebaseClient {
                 displayName: displayName
             };
             
-            console.log('Created user object:', this.currentUser);
+            console.log('✅ User authenticated successfully:', this.currentUser);
             this.notifyAuthListeners(this.currentUser);
             return { success: true, user: this.currentUser };
         } catch (error) {
-            console.error('Google sign in error:', error);
-            return { success: false, error: error.message };
+            console.error('❌ Error processing auth result:', error);
+            throw error;
         }
     }
 
@@ -261,7 +273,26 @@ class SecureFirebaseClient {
 
     async handleInitialRedirectResult() {
         try {
-            console.log('🔄 Checking for mobile redirect result on page load...');
+            console.log('🔄 Checking for redirect result on page load...');
+            
+            // Check if we were expecting a redirect result
+            const wasRedirectInitiated = localStorage.getItem('google_auth_initiated');
+            const redirectTimestamp = localStorage.getItem('auth_redirect_timestamp');
+            
+            if (wasRedirectInitiated) {
+                console.log('📱 Redirect was initiated, checking result...');
+                
+                // Check if redirect is too old (more than 5 minutes)
+                if (redirectTimestamp) {
+                    const timeDiff = Date.now() - parseInt(redirectTimestamp);
+                    if (timeDiff > 5 * 60 * 1000) {
+                        console.log('⏰ Redirect timestamp too old, cleaning up');
+                        localStorage.removeItem('google_auth_initiated');
+                        localStorage.removeItem('auth_redirect_timestamp');
+                        return { success: false, error: 'Redirect timeout' };
+                    }
+                }
+            }
             
             // Wait for Firebase to initialize
             await new Promise(resolve => {
@@ -289,28 +320,23 @@ class SecureFirebaseClient {
             console.log('📱 Redirect result:', result);
             
             if (result && result.user) {
-                console.log('🎉 Mobile redirect authentication successful!', result);
-                const idToken = await result.user.getIdToken();
-                localStorage.setItem('firebase_token', idToken);
-                
-                const email = result.user.email || '';
-                const displayName = result.user.displayName || (email ? email.split('@')[0] : 'User');
-                
-                this.currentUser = {
-                    uid: result.user.uid,
-                    email: email,
-                    displayName: displayName
-                };
-                
-                console.log('👤 Current user set:', this.currentUser);
-                this.notifyAuthListeners(this.currentUser);
-                return { success: true, user: this.currentUser };
+                console.log('🎉 Redirect authentication successful!', result);
+                return await this.processAuthResult(result);
+            } else if (wasRedirectInitiated) {
+                console.log('⚠️ Expected redirect result but got none');
+                // Clean up the flags since redirect didn't work
+                localStorage.removeItem('google_auth_initiated');
+                localStorage.removeItem('auth_redirect_timestamp');
+                return { success: false, error: 'Redirect authentication failed' };
             } else {
-                console.log('❌ No redirect result found');
+                console.log('ℹ️ No redirect result (not expected)');
             }
             return { success: false, error: 'No redirect result' };
         } catch (error) {
             console.error('❌ Initial redirect result error:', error);
+            // Clean up flags on error
+            localStorage.removeItem('google_auth_initiated');
+            localStorage.removeItem('auth_redirect_timestamp');
             return { success: false, error: error.message };
         }
     }
@@ -359,6 +385,14 @@ class SecureFirebaseClient {
                     providerData: user.providerData
                 });
                 
+                // Check if this is from a redirect we initiated
+                const wasRedirectInitiated = localStorage.getItem('google_auth_initiated');
+                if (wasRedirectInitiated) {
+                    console.log('✅ Auth state change from redirect - cleaning up flags');
+                    localStorage.removeItem('google_auth_initiated');
+                    localStorage.removeItem('auth_redirect_timestamp');
+                }
+                
                 const idToken = await user.getIdToken();
                 localStorage.setItem('firebase_token', idToken);
                 
@@ -369,15 +403,69 @@ class SecureFirebaseClient {
                 };
                 
                 console.log('👤 Current user updated from auth state:', this.currentUser);
-                console.log('✅ Mobile sign-in successful!');
+                console.log('✅ Authentication successful!');
+                
+                // Show success notification for redirects
+                if (wasRedirectInitiated) {
+                    this.showAuthSuccessMessage();
+                }
             } else {
                 this.currentUser = null;
                 localStorage.removeItem('firebase_token');
+                // Clean up any pending redirect flags
+                localStorage.removeItem('google_auth_initiated');
+                localStorage.removeItem('auth_redirect_timestamp');
                 console.log('👤 User signed out');
             }
             
             this.notifyAuthListeners(this.currentUser);
         });
+    }
+    
+    showAuthSuccessMessage() {
+        try {
+            // Show a brief success message
+            const successDiv = document.createElement('div');
+            successDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #22c55e, #16a34a);
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 10000;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                font-size: 14px;
+                animation: slideInRight 0.3s ease-out;
+            `;
+            successDiv.innerHTML = '✅ Successfully signed in!';
+            
+            // Add animation styles
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideInRight {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            document.body.appendChild(successDiv);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                if (successDiv.parentNode) {
+                    successDiv.remove();
+                }
+                if (style.parentNode) {
+                    style.remove();
+                }
+            }, 3000);
+        } catch (error) {
+            console.log('Could not show success message:', error);
+        }
     }
 
     notifyAuthListeners(user) {
