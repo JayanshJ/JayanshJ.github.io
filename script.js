@@ -1992,16 +1992,26 @@ function updateChatHistory() {
 let sessionApiKey = null;
 
 // API Key Management Functions
-function promptForApiKey() {
+async function promptForApiKey() {
+    // First check localStorage
     const savedKey = localStorage.getItem('chatgpt_api_key');
     
     if (savedKey && savedKey !== 'prompt-for-key') {
         sessionApiKey = savedKey;
-        console.log('✅ Using saved API key from previous session');
+        console.log('✅ Using saved API key from localStorage');
         return true;
     }
     
-    // No API key found - user can set it in settings
+    // If no local key, try to load from user account
+    console.log('🔄 No local API key found, attempting to load from user account...');
+    const loadedFromAccount = await loadSavedApiKey();
+    
+    if (loadedFromAccount) {
+        console.log('✅ API key loaded from user account');
+        return true;
+    }
+    
+    // No API key found anywhere - user can set it in settings
     console.log('ℹ️ No API key found. User can set it in Settings.');
     return false;
 }
@@ -2114,22 +2124,85 @@ function getApiKey() {
 
 // Load API key from user account
 async function loadSavedApiKey() {
+    console.log('🔑 Attempting to load API key from user account...');
+    
+    // Wait for Firebase client to be available
+    let retries = 0;
+    const maxRetries = 20;
+    while ((!window.firebaseClient || !window.firebaseClient.getCurrentUser()) && retries < maxRetries) {
+        console.log(`Waiting for Firebase client... (${retries + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        retries++;
+    }
+    
     if (window.firebaseClient && window.firebaseClient.getCurrentUser()) {
         try {
+            console.log('🔐 User authenticated, fetching API key...');
             const result = await window.firebaseClient.getApiKey();
+            console.log('📥 API key fetch result:', result.success ? 'Success' : 'Failed', result.error || '');
+            
             if (result.success && result.apiKey) {
                 sessionApiKey = result.apiKey;
                 localStorage.setItem('chatgpt_api_key', result.apiKey);
-                console.log('✅ API key loaded from user account');
+                console.log('✅ API key loaded from user account and stored locally');
                 updateApiKeyStatus();
+                
+                // Force update the welcome screen if it's showing API key prompt
+                const welcomeScreen = document.querySelector('.welcome-screen');
+                if (welcomeScreen && welcomeScreen.innerHTML.includes('add your OpenAI API key')) {
+                    console.log('🔄 Refreshing welcome screen with loaded API key');
+                    location.reload();
+                }
+                
                 return true;
+            } else {
+                console.log('📝 No API key found in user account');
             }
         } catch (error) {
             console.warn('⚠️ Error loading API key from account:', error);
         }
+    } else {
+        console.log('❌ Firebase client not available or user not authenticated');
     }
     return false;
 }
+
+// Force refresh API key from account (useful when localStorage is out of sync)
+async function refreshApiKeyFromAccount() {
+    console.log('🔄 Force refreshing API key from user account...');
+    
+    if (!window.firebaseClient || !window.firebaseClient.getCurrentUser()) {
+        console.log('❌ User not authenticated, cannot refresh API key');
+        return false;
+    }
+    
+    try {
+        const result = await window.firebaseClient.getApiKey();
+        console.log('📥 API key refresh result:', result.success ? 'Success' : 'Failed', result.error || '');
+        
+        if (result.success && result.apiKey) {
+            // Clear any stale localStorage data first
+            localStorage.removeItem('chatgpt_api_key');
+            
+            // Set fresh data
+            sessionApiKey = result.apiKey;
+            localStorage.setItem('chatgpt_api_key', result.apiKey);
+            console.log('✅ API key refreshed from user account');
+            updateApiKeyStatus();
+            return true;
+        } else {
+            console.log('📝 No API key found in user account during refresh');
+        }
+    } catch (error) {
+        console.warn('⚠️ Error refreshing API key from account:', error);
+    }
+    
+    return false;
+}
+
+// Make functions globally available
+window.loadSavedApiKey = loadSavedApiKey;
+window.refreshApiKeyFromAccount = refreshApiKeyFromAccount;
 
 // Update API key status indicator
 function updateApiKeyStatus() {
@@ -4687,7 +4760,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const mainContent = document.querySelector('.main-content');
 
     // Check for API key
-    const hasApiKey = promptForApiKey();
+    const hasApiKey = await promptForApiKey();
     
     // Always initialize the app, but show a message if no API key
     await initializeApp();

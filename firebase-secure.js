@@ -710,6 +710,19 @@ class SecureFirebaseClient {
                 console.log('👤 Current user updated from auth state:', this.currentUser);
                 console.log('✅ Authentication successful!');
                 
+                // Load API key from user account after successful authentication
+                try {
+                    if (typeof window.refreshApiKeyFromAccount === 'function') {
+                        console.log('🔑 Triggering API key refresh from Firebase auth state change...');
+                        await window.refreshApiKeyFromAccount();
+                    } else if (typeof window.loadSavedApiKey === 'function') {
+                        console.log('🔑 Triggering API key load from Firebase auth state change...');
+                        await window.loadSavedApiKey();
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Error loading API key from auth state change:', error);
+                }
+                
             } else {
                 console.log('👤 User signed out');
                 this.currentUser = null;
