@@ -235,8 +235,8 @@ window.handleGoogleAuth = async function() {
             if (googleBtn) {
                 googleBtn.disabled = true;
                 if (isMobile) {
-                    googleBtn.innerHTML = 'Redirecting to Google... 🔄';
-                    console.log('📱 Mobile login initiated - showing redirect message');
+                    googleBtn.innerHTML = 'Opening popup... 📱';
+                    console.log('📱 Mobile login initiated - showing popup message');
                 } else {
                     googleBtn.innerHTML = 'Signing in... ⏳';
                 }
@@ -257,10 +257,10 @@ window.handleGoogleAuth = async function() {
                 console.log('⏳ Authentication pending (redirect in progress)');
                 
                 if (isMobile) {
-                    // Show mobile-specific guidance
+                    // Mobile popup fallback to redirect - show guidance
                     const authError = document.getElementById('authError');
                     if (authError) {
-                        authError.innerHTML = '🔄 Redirecting to Google... Complete sign-in and return to this page. If you\'re not redirected, try refreshing the page.';
+                        authError.innerHTML = '🔄 Popup blocked - redirecting to Google... Complete sign-in and return to this page.';
                         authError.style.display = 'block';
                         authError.style.backgroundColor = '#1f2937';
                         authError.style.color = '#60a5fa';
@@ -271,7 +271,7 @@ window.handleGoogleAuth = async function() {
                         googleBtn.innerHTML = 'Redirecting... Please wait ⏳';
                     }
                     
-                    console.log('📱 Mobile redirect pending - showing user guidance');
+                    console.log('📱 Mobile fallback redirect pending - showing user guidance');
                     
                     // Keep modal open longer on mobile to show instructions
                     setTimeout(() => {

@@ -143,66 +143,66 @@ class SecureFirebaseClient {
             provider.addScope('email');
             provider.addScope('openid'); // Explicitly request OpenID
             
-            // Force redirect on mobile devices for better compatibility
+            // Use popup-first approach for mobile devices for better reliability
             if (isMobile) {
-                console.log('📱 Mobile device detected - using redirect method for better compatibility');
+                console.log('📱 Mobile device detected - using popup-first method for faster, more reliable authentication');
                 try {
-                    // Reset redirect handled flag for new attempt
-                    this.redirectHandled = false;
-                    
-                    // Enhanced mobile redirect setup
-                    localStorage.setItem('google_auth_initiated', 'true');
-                    localStorage.setItem('auth_redirect_timestamp', Date.now().toString());
-                    localStorage.setItem('mobile_auth_attempt', 'true');
-                    localStorage.setItem('auth_user_agent', navigator.userAgent);
-                    localStorage.setItem('auth_current_domain', window.location.hostname);
-                    
-                    // Enhanced mobile-specific provider settings
+                    // Mobile-optimized provider settings for popup
                     provider.setCustomParameters({
-                        'prompt': 'select_account', // Use select_account for better UX (replaces approval_prompt)
-                        'access_type': 'offline', // Use offline for better token persistence
-                        'include_granted_scopes': 'true',
-                        'response_type': 'code'
-                        // Note: removed approval_prompt as it conflicts with prompt parameter
+                        'prompt': 'select_account', // Better UX for account selection
+                        'access_type': 'offline', // Better token persistence
+                        'include_granted_scopes': 'true'
+                        // Removed response_type for popup method
                     });
                     
-                    console.log('🔄 Initiating mobile redirect with enhanced OAuth settings...');
-                    console.log('🔧 Provider configuration:', {
+                    console.log('🔄 Initiating mobile popup authentication...');
+                    console.log('🔧 Mobile popup configuration:', {
                         scopes: provider.getScopes(),
                         customParameters: {
                             prompt: 'select_account',
                             access_type: 'offline',
-                            include_granted_scopes: 'true',
-                            response_type: 'code'
+                            include_granted_scopes: 'true'
                         }
                     });
                     
-                    await auth.signInWithRedirect(provider);
-                    console.log('✅ Redirect initiated successfully, page will reload...');
-                    return { success: true, pending: true };
-                } catch (redirectError) {
-                    console.error('❌ Mobile redirect failed:', redirectError);
-                    console.error('❌ Redirect error details:', {
-                        code: redirectError.code,
-                        message: redirectError.message,
-                        details: redirectError.details
+                    const result = await auth.signInWithPopup(provider);
+                    console.log('✅ Mobile popup authentication successful');
+                    return await this.processAuthResult(result);
+                } catch (popupError) {
+                    console.error('❌ Mobile popup failed:', popupError);
+                    console.error('❌ Popup error details:', {
+                        code: popupError.code,
+                        message: popupError.message,
+                        details: popupError.details
                     });
                     
-                    // Clean up on error
-                    localStorage.removeItem('google_auth_initiated');
-                    localStorage.removeItem('auth_redirect_timestamp');
-                    localStorage.removeItem('mobile_auth_attempt');
-                    localStorage.removeItem('auth_user_agent');
-                    
-                    // Try popup as fallback on mobile if redirect fails
-                    console.log('🔄 Redirect failed, trying popup as fallback...');
-                    try {
-                        const fallbackResult = await auth.signInWithPopup(provider);
-                        console.log('✅ Mobile popup fallback successful');
-                        return await this.processAuthResult(fallbackResult);
-                    } catch (popupError) {
-                        console.error('❌ Mobile popup fallback also failed:', popupError);
-                        throw new Error(`Mobile authentication failed: ${redirectError.message}. Popup fallback: ${popupError.message}`);
+                    // If popup fails, try redirect as fallback
+                    if (popupError.code === 'auth/popup-blocked' || popupError.code === 'auth/popup-closed-by-user') {
+                        console.log('🔄 Popup blocked/closed, trying redirect as fallback...');
+                        try {
+                            // Set redirect tracking for fallback
+                            localStorage.setItem('google_auth_initiated', 'true');
+                            localStorage.setItem('auth_redirect_timestamp', Date.now().toString());
+                            localStorage.setItem('mobile_auth_attempt', 'true');
+                            localStorage.setItem('auth_user_agent', navigator.userAgent);
+                            
+                            // Enhanced settings for redirect fallback
+                            provider.setCustomParameters({
+                                'prompt': 'select_account',
+                                'access_type': 'offline',
+                                'include_granted_scopes': 'true',
+                                'response_type': 'code'
+                            });
+                            
+                            await auth.signInWithRedirect(provider);
+                            console.log('✅ Redirect fallback initiated, page will reload...');
+                            return { success: true, pending: true };
+                        } catch (redirectError) {
+                            console.error('❌ Redirect fallback also failed:', redirectError);
+                            throw new Error(`Mobile authentication failed: Popup: ${popupError.message}. Redirect: ${redirectError.message}`);
+                        }
+                    } else {
+                        throw popupError;
                     }
                 }
             } else {
