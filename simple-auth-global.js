@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 setTimeout(() => {
                                     const stillHasFlags = localStorage.getItem('google_auth_initiated');
                                     if (stillHasFlags) {
-                                        console.log('🚨 Auth state listener didn\\'t handle redirect, showing error');
+                                        console.log('🚨 Auth state listener didn\'t handle redirect, showing error');
                                         showRedirectError(result.error);
                                         // Clean up failed redirect flags
                                         localStorage.removeItem('google_auth_initiated');
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         setTimeout(() => {
                             const stillHasFlags = localStorage.getItem('google_auth_initiated');
                             if (stillHasFlags) {
-                                console.log('🚨 Auth state listener didn\\'t handle redirect error, cleaning up');
+                                console.log('🚨 Auth state listener didn\'t handle redirect error, cleaning up');
                                 localStorage.removeItem('google_auth_initiated');
                                 localStorage.removeItem('auth_redirect_timestamp');
                             }
