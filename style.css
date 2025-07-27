@@ -3478,78 +3478,36 @@ body {
 
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
+    /* Hide the action buttons on mobile */
     .message-actions {
-        display: flex !important;
-        flex-direction: row !important;
-        justify-content: flex-start !important;
-        align-items: center !important;
-        gap: 8px !important;
-        margin-top: 12px !important;
-        margin-left: 0 !important;
-        margin-right: auto !important;
-        padding: 0 !important;
-        width: auto !important;
-        opacity: 1 !important;
-        transform: translateY(0) !important;
-        min-height: 36px !important;
+        display: none !important;
     }
     
-    .message-action-btn:not(.copy-btn) {
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        padding: 8px 12px !important;
-        font-size: 12px !important;
-        height: 36px !important;
-        border-radius: 8px !important;
-        box-sizing: border-box !important;
-        flex-shrink: 0 !important;
-        width: auto !important;
-        min-width: auto !important;
-        vertical-align: middle !important;
-        line-height: 1 !important;
-        margin: 0 !important;
+    /* Add mobile-friendly message interaction */
+    .ai-message .message-content {
         position: relative !important;
-        top: 0 !important;
     }
     
-    .message-action-btn.copy-btn {
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        padding: 10px !important;
-        font-size: 12px !important;
-        height: 36px !important;
-        border-radius: 8px !important;
-        box-sizing: border-box !important;
-        flex-shrink: 0 !important;
-        width: 36px !important;
-        min-width: 36px !important;
-        max-width: 36px !important;
-        vertical-align: middle !important;
-        line-height: 1 !important;
-        margin: 0 !important;
-        position: relative !important;
-        top: 0 !important;
-        cursor: pointer !important;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        backdrop-filter: blur(4px) !important;
-        text-decoration: none !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-        user-select: none !important;
-        visibility: visible !important;
-        opacity: 1 !important;
+    /* Add subtle copy hint for mobile */
+    .ai-message .message-content::before {
+        content: "📋";
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        font-size: 12px;
+        opacity: 0.3;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
     }
     
-    .message-action-btn svg {
-        width: 14px !important;
-        height: 14px !important;
-        flex-shrink: 0;
+    .ai-message .message-content:active::before {
+        opacity: 0.8;
     }
     
-    .message-action-btn.copy-btn svg {
-        width: 14px !important;
-        height: 14px !important;
+    .ai-message .message-content:active {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        transform: scale(0.98);
+        transition: all 0.1s ease;
     }
 }
 

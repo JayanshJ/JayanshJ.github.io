@@ -3204,9 +3204,15 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
         }
     }
     
-    // Add action buttons directly inside the message content for AI messages
+    // Add action buttons directly inside the message content for AI messages (desktop only)
     if (sender === 'ai' && type === 'normal' && text) {
-        addMessageActions(messageDiv, text);
+        // Only add buttons on desktop
+        if (window.innerWidth > 768) {
+            addMessageActions(messageDiv, text);
+        } else {
+            // Add mobile long-press functionality
+            addMobileCopyFunctionality(messageDiv, text);
+        }
     }
     
     messagesContainer.appendChild(messageDiv);
@@ -3979,6 +3985,80 @@ function addMessageActions(messageDiv, messageText) {
     actionsDiv.appendChild(copyButton);
     actionsDiv.appendChild(rewriteButton);
     messageContent.appendChild(actionsDiv);
+}
+
+// Mobile-friendly copy functionality
+function addMobileCopyFunctionality(messageDiv, messageText) {
+    const messageContent = messageDiv.querySelector('.message-content');
+    if (!messageContent) return;
+    
+    let longPressTimer;
+    let longPressTriggered = false;
+    
+    // Store the message text
+    messageDiv.dataset.messageText = messageText;
+    
+    // Long press to copy
+    messageContent.addEventListener('touchstart', (e) => {
+        longPressTriggered = false;
+        longPressTimer = setTimeout(() => {
+            longPressTriggered = true;
+            // Haptic feedback if available
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+            
+            // Copy to clipboard
+            copyToClipboardMobile(messageText, messageContent);
+        }, 800); // 800ms long press
+    });
+    
+    messageContent.addEventListener('touchend', () => {
+        clearTimeout(longPressTimer);
+    });
+    
+    messageContent.addEventListener('touchmove', () => {
+        clearTimeout(longPressTimer);
+    });
+}
+
+// Mobile clipboard copy with feedback
+async function copyToClipboardMobile(text, element) {
+    try {
+        await navigator.clipboard.writeText(text);
+        showMobileCopyFeedback(element, 'Copied!');
+    } catch (err) {
+        console.error('Failed to copy: ', err);
+        showMobileCopyFeedback(element, 'Copy failed');
+    }
+}
+
+// Show mobile copy feedback
+function showMobileCopyFeedback(element, message) {
+    const feedback = document.createElement('div');
+    feedback.textContent = message;
+    feedback.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 10000;
+        pointer-events: none;
+    `;
+    
+    document.body.appendChild(feedback);
+    
+    setTimeout(() => {
+        if (feedback.parentNode) {
+            feedback.parentNode.removeChild(feedback);
+        }
+    }, 2000);
 }
 
 // Copy message content to clipboard
