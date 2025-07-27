@@ -1513,7 +1513,10 @@ async function saveCurrentChat() {
         chatHistory[existingIndex] = chatData;
     } else {
         chatHistory.unshift(chatData); // Add to beginning
-        currentChatId = chatData.id;
+        // currentChatId should already be set, but ensure it matches
+        if (!currentChatId) {
+            currentChatId = chatData.id;
+        }
         
         // Update URL for new chat
         updateChatUrl(currentChatId);
@@ -1526,8 +1529,10 @@ async function saveCurrentChat() {
                 await saveChatFolders();
             }
         }
-        
-        }
+    }
+    
+    // Update history display to show the new chat
+    updateHistoryDisplay();
     
     // Keep only last 50 chats
     if (chatHistory.length > 50) {
@@ -2694,6 +2699,13 @@ document.addEventListener('keydown', function(event) {
 
 async function sendMessageAsync() {
     console.log('📤 sendMessageAsync() called');
+    
+    // Ensure we have a chat ID before starting the request
+    if (!currentChatId) {
+        currentChatId = generateChatId();
+        console.log('🆕 Generated new chat ID:', currentChatId);
+        updateChatUrl(currentChatId);
+    }
     
     // Generate a unique token for this request to prevent race conditions
     const requestToken = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
