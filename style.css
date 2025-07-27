@@ -3482,33 +3482,6 @@ body {
     .message-actions {
         display: none !important;
     }
-    
-    /* Add mobile-friendly message interaction */
-    .ai-message .message-content {
-        position: relative !important;
-    }
-    
-    /* Add subtle copy hint for mobile */
-    .ai-message .message-content::before {
-        content: "📋";
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        font-size: 12px;
-        opacity: 0.3;
-        pointer-events: none;
-        transition: opacity 0.3s ease;
-    }
-    
-    .ai-message .message-content:active::before {
-        opacity: 0.8;
-    }
-    
-    .ai-message .message-content:active {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        transform: scale(0.98);
-        transition: all 0.1s ease;
-    }
 }
 
 /* Generated Image Styles */

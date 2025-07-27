@@ -3205,14 +3205,8 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
     }
     
     // Add action buttons directly inside the message content for AI messages (desktop only)
-    if (sender === 'ai' && type === 'normal' && text) {
-        // Only add buttons on desktop
-        if (window.innerWidth > 768) {
-            addMessageActions(messageDiv, text);
-        } else {
-            // Add mobile long-press functionality
-            addMobileCopyFunctionality(messageDiv, text);
-        }
+    if (sender === 'ai' && type === 'normal' && text && window.innerWidth > 768) {
+        addMessageActions(messageDiv, text);
     }
     
     messagesContainer.appendChild(messageDiv);
