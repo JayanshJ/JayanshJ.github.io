@@ -3633,7 +3633,7 @@ function showSelectionResponseOverlay(selectedText, prefix, selectionRect) {
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 12h18M3 6h18M3 18h18"/>
                     </svg>
-                    <span>ChatGPT Assistant #${overlayCounter}</span>
+                    <span class="overlay-title">Analyzing selection...</span>
                 </div>
                 <div class="overlay-controls">
                     <button class="overlay-minimize" onclick="minimizeSelectionOverlay('${overlayId}')" title="Minimize">
@@ -3656,6 +3656,7 @@ function showSelectionResponseOverlay(selectedText, prefix, selectionRect) {
                             id="additionalContext_${overlayCounter}" 
                             placeholder="Ask about this..."
                             rows="1"
+                            onkeydown="handleOverlayKeyPress(event, '${overlayId}')"
                         ></textarea>
                         <button class="quick-send" onclick="sendSelectionQuery('${overlayId}')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3794,12 +3795,44 @@ function repositionBubbleAfterContentChange() {
     positionBubbleRelativeToSelection(content, currentSelectionData.rect);
 }
 
-function updateSelectionOverlayResponse(overlayId, response, isError = false) {
+async function updateSelectionOverlayResponse(overlayId, response, isError = false) {
     const overlay = document.getElementById(overlayId);
     if (!overlay) return;
     
     const responseArea = overlay.querySelector('.selection-response-area');
+    const titleElement = overlay.querySelector('.overlay-title');
     const footer = overlay.querySelector('.selection-response-footer');
+    
+    // First update with the response
+    if (responseArea) {
+        responseArea.style.display = 'block';
+        responseArea.innerHTML = `<div class="response-content">${formatAIResponse(response)}</div>`;
+    }
+    
+    // Generate a concise summary using GPT
+    try {
+        const summaryPrompt = `Give a 3-4 word title that captures the main topic: ${response}`;
+        const summaryResponse = await getSelectionResponse(summaryPrompt);
+        
+        // Update the overlay title with the summary
+        if (titleElement) {
+            let summary = summaryResponse.trim();
+            // Remove any markdown or quotes that GPT might add
+            summary = summary.replace(/[*`"']/g, '').trim();
+            // Ensure it's not too long
+            if (summary.length > 50) {
+                summary = summary.substring(0, 47) + '...';
+            }
+            titleElement.textContent = summary;
+        }
+    } catch (error) {
+        console.error('Error generating summary:', error);
+        // Fallback to a simple truncated version if summary generation fails
+        if (titleElement) {
+            const shortTitle = response.split(' ').slice(0, 5).join(' ') + '...';
+            titleElement.textContent = shortTitle;
+        }
+    }
     
     // Show the original query and response
     const queryDiv = document.createElement('div');
@@ -3893,6 +3926,41 @@ function handleOverlayClickOutside(event) {
     }
 }
 
+function handleOverlayKeyPress(event, overlayId) {
+    const textarea = event.target;
+    
+    // Handle Enter key
+    if (event.key === 'Enter') {
+        // If Shift is held, allow new line
+        if (event.shiftKey) {
+            return;
+        }
+        
+        // Prevent default Enter behavior
+        event.preventDefault();
+        
+        // Don't send if the textarea is empty
+        if (textarea.value.trim() === '') {
+            return;
+        }
+        
+        // Send the message
+        sendSelectionQuery(overlayId);
+        
+        // Clear the textarea
+        textarea.value = '';
+        
+        // Reset the height
+        textarea.style.height = 'auto';
+    }
+    
+    // Auto-resize the textarea
+    setTimeout(() => {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    }, 0);
+}
+
 function setupOverlayResize(overlay) {
     const content = overlay.querySelector('.selection-response-content');
     const resizeHandle = overlay.querySelector('.overlay-resize-handle');
@@ -3903,6 +3971,19 @@ function setupOverlayResize(overlay) {
     
     let isResizing = false;
     let startX, startY, startWidth, startHeight;
+    let currentWidth, currentHeight;
+    let resizeTimeout;
+    
+    // Add visual feedback for resize handle
+    resizeHandle.addEventListener('mouseover', () => {
+        resizeHandle.style.opacity = '1';
+    });
+    
+    resizeHandle.addEventListener('mouseout', () => {
+        if (!isResizing) {
+            resizeHandle.style.opacity = '0.6';
+        }
+    });
     
     resizeHandle.addEventListener('mousedown', (e) => {
         isResizing = true;
@@ -3910,34 +3991,85 @@ function setupOverlayResize(overlay) {
         startY = e.clientY;
         startWidth = parseInt(document.defaultView.getComputedStyle(content).width, 10);
         startHeight = parseInt(document.defaultView.getComputedStyle(content).height, 10);
+        currentWidth = startWidth;
+        currentHeight = startHeight;
         
         e.preventDefault();
         e.stopPropagation();
         
-        // Add body class to prevent text selection during resize
+        // Add resize feedback
+        content.style.transition = 'none';
         document.body.style.userSelect = 'none';
         document.body.style.cursor = 'nw-resize';
+        resizeHandle.style.opacity = '1';
+        
+        // Add resize indicator
+        let resizeIndicator = document.createElement('div');
+        resizeIndicator.className = 'resize-indicator';
+        resizeIndicator.style.position = 'fixed';
+        resizeIndicator.style.background = 'rgba(var(--accent-primary-rgb), 0.9)';
+        resizeIndicator.style.color = 'white';
+        resizeIndicator.style.padding = '4px 8px';
+        resizeIndicator.style.borderRadius = '4px';
+        resizeIndicator.style.fontSize = '12px';
+        resizeIndicator.style.zIndex = '10000';
+        resizeIndicator.style.pointerEvents = 'none';
+        document.body.appendChild(resizeIndicator);
+        
+        // Update size indicator
+        function updateSizeIndicator(width, height) {
+            resizeIndicator.textContent = `${width}px × ${height}px`;
+            resizeIndicator.style.left = (e.clientX + 15) + 'px';
+            resizeIndicator.style.top = (e.clientY + 15) + 'px';
+        }
+        updateSizeIndicator(startWidth, startHeight);
     });
     
     document.addEventListener('mousemove', (e) => {
         if (!isResizing) return;
         
+        // Calculate new dimensions
         const width = startWidth + e.clientX - startX;
         const height = startHeight + e.clientY - startY;
         
-        // Apply constraints
+        // Apply constraints with smooth snapping
         const minWidth = 280;
         const maxWidth = Math.min(800, window.innerWidth - 40);
         const minHeight = 200;
         const maxHeight = Math.min(600, window.innerHeight - 40);
         
-        const constrainedWidth = Math.max(minWidth, Math.min(width, maxWidth));
-        const constrainedHeight = Math.max(minHeight, Math.min(height, maxHeight));
+        // Snap to min/max with a 20px threshold
+        const snapThreshold = 20;
+        let constrainedWidth = width;
+        let constrainedHeight = height;
         
-        content.style.width = constrainedWidth + 'px';
-        content.style.height = constrainedHeight + 'px';
-        content.style.maxWidth = 'none';
-        content.style.maxHeight = 'none';
+        if (Math.abs(width - minWidth) < snapThreshold) constrainedWidth = minWidth;
+        if (Math.abs(width - maxWidth) < snapThreshold) constrainedWidth = maxWidth;
+        if (Math.abs(height - minHeight) < snapThreshold) constrainedHeight = minHeight;
+        if (Math.abs(height - maxHeight) < snapThreshold) constrainedHeight = maxHeight;
+        
+        // Ensure within bounds
+        constrainedWidth = Math.max(minWidth, Math.min(constrainedWidth, maxWidth));
+        constrainedHeight = Math.max(minHeight, Math.min(constrainedHeight, maxHeight));
+        
+        // Only update if size changed
+        if (constrainedWidth !== currentWidth || constrainedHeight !== currentHeight) {
+            currentWidth = constrainedWidth;
+            currentHeight = constrainedHeight;
+            
+            content.style.width = constrainedWidth + 'px';
+            content.style.height = constrainedHeight + 'px';
+            content.style.maxWidth = 'none';
+            content.style.maxHeight = 'none';
+            
+            // Update size indicator
+            const indicator = document.querySelector('.resize-indicator');
+            if (indicator) {
+                indicator.textContent = `${constrainedWidth}px × ${constrainedHeight}px`;
+                indicator.style.left = (e.clientX + 15) + 'px';
+                indicator.style.top = (e.clientY + 15) + 'px';
+            }
+        }
     });
     
     document.addEventListener('mouseup', () => {
@@ -3945,6 +4077,21 @@ function setupOverlayResize(overlay) {
             isResizing = false;
             document.body.style.userSelect = '';
             document.body.style.cursor = '';
+            resizeHandle.style.opacity = '0.6';
+            
+            // Remove size indicator
+            const indicator = document.querySelector('.resize-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+            
+            // Save the new size
+            saveOverlayState(overlay);
+            
+            // Restore transition
+            setTimeout(() => {
+                content.style.transition = '';
+            }, 100);
         }
     });
 }
@@ -5885,55 +6032,39 @@ function closeSelectionOverlay(overlayId) {
 }
 
 function initializeOverlayDrag(overlay) {
-    const dragHandle = overlay.querySelector('.overlay-drag-handle');
     const content = overlay.querySelector('.selection-response-content');
+    const dragHandle = overlay.querySelector('.overlay-drag-handle');
+    if (!content || !dragHandle) return;
+
+    let startX = 0, startY = 0;
+    let translateX = 0, translateY = 0;
+
+    // Enable GPU acceleration
+    content.style.transform = 'translate3d(0,0,0)';
+    content.style.willChange = 'transform';
     
-    if (!dragHandle || !content) return;
-    
-    let isDragging = false;
-    let startX, startY, startLeft, startTop;
-    
-    dragHandle.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        dragHandle.style.cursor = 'grabbing';
-        
-        const rect = content.getBoundingClientRect();
-        startX = e.clientX;
-        startY = e.clientY;
-        startLeft = rect.left;
-        startTop = rect.top;
-        
+    function onMouseDown(e) {
+        startX = e.clientX - translateX;
+        startY = e.clientY - translateY;
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp, { once: true });
         e.preventDefault();
-    });
-    
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
-        
-        let newLeft = startLeft + deltaX;
-        let newTop = startTop + deltaY;
-        
-        // Keep within viewport bounds
-        const maxLeft = window.innerWidth - content.offsetWidth;
-        const maxTop = window.innerHeight - content.offsetHeight;
-        
-        newLeft = Math.max(0, Math.min(newLeft, maxLeft));
-        newTop = Math.max(0, Math.min(newTop, maxTop));
-        
-        content.style.left = newLeft + 'px';
-        content.style.top = newTop + 'px';
-        content.style.position = 'fixed';
-    });
-    
-    document.addEventListener('mouseup', () => {
-        if (isDragging) {
-            isDragging = false;
-            dragHandle.style.cursor = 'grab';
-            saveOverlayPosition(overlay);
-        }
-    });
+    }
+
+    function onMouseMove(e) {
+        translateX = e.clientX - startX;
+        translateY = e.clientY - startY;
+        requestAnimationFrame(() => {
+            content.style.transform = `translate3d(${translateX}px,${translateY}px,0)`;
+        });
+    }
+
+    function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        saveOverlayPosition(overlay);
+    }
+
+    dragHandle.addEventListener('mousedown', onMouseDown);
 }
 
 function saveOverlayPosition(overlay) {
