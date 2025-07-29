@@ -1316,24 +1316,24 @@ async function saveChatFolders() {
             }
         });
         
-        // Always save to localStorage first
-        localStorage.setItem('chatgpt_folders_dev', JSON.stringify(chatFolders));
-        console.log(`📁 Saved ${chatFolders.length} folders to localStorage`);
-        
-        // Also save to Firebase if user is authenticated
+        // Save to cloud if signed in, localStorage if not
         if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
-            console.log(`☁️ Syncing ${chatFolders.length} folders to Firebase...`);
+            console.log(`☁️ User signed in - saving ${chatFolders.length} folders to Firebase...`);
             
             try {
                 const result = await window.chatStorage.saveFolders(chatFolders);
                 if (result.success) {
-                    console.log('✅ Folders synced to Firebase');
+                    console.log('✅ Folders saved to Firebase');
                 } else {
-                    console.warn('⚠️ Failed to sync folders to Firebase:', result.error);
+                    console.warn('⚠️ Failed to save folders to Firebase:', result.error);
                 }
             } catch (error) {
-                console.warn('⚠️ Firebase folder sync failed, but localStorage save succeeded:', error);
+                console.warn('⚠️ Firebase folder save failed:', error);
             }
+        } else {
+            // User not signed in - save to localStorage
+            localStorage.setItem('chatgpt_folders_dev', JSON.stringify(chatFolders));
+            console.log(`📁 User not signed in - saved ${chatFolders.length} folders to localStorage`);
         }
     } catch (e) {
         console.error('Error saving chat folders:', e);
@@ -1587,18 +1587,9 @@ async function saveChatHistory() {
                 console.warn(`${failures.length} chats failed to save to Firebase`);
             }
         } else {
-            console.log('User not authenticated, chats not saved');
-            
-            // In development, save to localStorage as fallback
-            if (isLocalDevelopment()) {
-                console.log('💾 Development mode: saving to localStorage as fallback');
-                try {
-                    localStorage.setItem('chatgpt_history_dev', JSON.stringify(chatHistory));
-                    console.log('✅ Saved to localStorage (development fallback)');
-                } catch (devError) {
-                    console.warn('Failed to save to localStorage:', devError);
-                }
-            }
+            // User not signed in - save to localStorage
+            localStorage.setItem('chatgpt_history_dev', JSON.stringify(chatHistory));
+            console.log(`💾 User not signed in - saved ${chatHistory.length} chats to localStorage`);
         }
     } catch (e) {
         console.error('Error saving chat history:', e);
