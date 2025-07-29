@@ -1210,6 +1210,124 @@ class SecureFirebaseClient {
 const secureFirebase = new SecureFirebaseClient();
 
 // Make available globally
-window.authFunctions = secureFirebase;
+// Create comprehensive auth functions for the UI using Firebase compat
+const authFunctions = {
+    async signInWithGoogle() {
+        try {
+            console.log('🔐 Starting Google sign-in...');
+            
+            if (!window.firebaseAuth) {
+                throw new Error('Firebase auth not initialized');
+            }
+            
+            const provider = new firebase.auth.GoogleAuthProvider();
+            provider.addScope('profile');
+            provider.addScope('email');
+            
+            const result = await window.firebaseAuth.signInWithPopup(provider);
+            console.log('✅ Google sign-in successful:', result.user.email);
+            return { success: true, user: result.user };
+        } catch (error) {
+            console.error('❌ Google sign-in failed:', error);
+            return { success: false, error: error.message };
+        }
+    },
+    
+    async signInWithGoogleRedirect() {
+        try {
+            console.log('🔐 Starting Google redirect sign-in...');
+            
+            if (!window.firebaseAuth) {
+                throw new Error('Firebase auth not initialized');
+            }
+            
+            const provider = new firebase.auth.GoogleAuthProvider();
+            provider.addScope('profile');
+            provider.addScope('email');
+            
+            await window.firebaseAuth.signInWithRedirect(provider);
+            return { success: true, pending: true };
+        } catch (error) {
+            console.error('❌ Google redirect sign-in failed:', error);
+            return { success: false, error: error.message };
+        }
+    },
+    
+    async handleInitialRedirectResult() {
+        try {
+            if (!window.firebaseAuth) {
+                throw new Error('Firebase auth not initialized');
+            }
+            
+            const result = await window.firebaseAuth.getRedirectResult();
+            if (result && result.user) {
+                console.log('✅ Redirect sign-in completed:', result.user.email);
+                return { success: true, user: result.user };
+            }
+            return { success: false, error: 'No redirect result' };
+        } catch (error) {
+            console.error('❌ Redirect result handling failed:', error);
+            return { success: false, error: error.message };
+        }
+    },
+    
+    async signInWithEmail(email, password) {
+        try {
+            if (!window.firebaseAuth) {
+                throw new Error('Firebase auth not initialized');
+            }
+            
+            const result = await window.firebaseAuth.signInWithEmailAndPassword(email, password);
+            return { success: true, user: result.user };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+    
+    async signUpWithEmail(email, password) {
+        try {
+            if (!window.firebaseAuth) {
+                throw new Error('Firebase auth not initialized');
+            }
+            
+            const result = await window.firebaseAuth.createUserWithEmailAndPassword(email, password);
+            return { success: true, user: result.user };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+    
+    async signOut() {
+        try {
+            if (!window.firebaseAuth) {
+                throw new Error('Firebase auth not initialized');
+            }
+            
+            await window.firebaseAuth.signOut();
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+    
+    onAuthStateChanged(callback) {
+        if (!window.firebaseAuth) {
+            console.error('Firebase auth not initialized');
+            return;
+        }
+        return window.firebaseAuth.onAuthStateChanged(callback);
+    },
+    
+    getCurrentUser() {
+        if (!window.firebaseAuth) {
+            console.error('Firebase auth not initialized');
+            return null;
+        }
+        return window.firebaseAuth.currentUser;
+    }
+};
+
+window.authFunctions = authFunctions;
+console.log('✅ Auth functions initialized and available globally');
 window.chatStorage = secureFirebase;
 window.firebaseClient = secureFirebase;

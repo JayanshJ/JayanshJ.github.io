@@ -249,50 +249,70 @@ window.handleGoogleAuth = async function() {
                 }
             }
             
-            const result = await window.authFunctions.signInWithGoogle();
-            console.log('📥 Auth result received:', result);
-            
-            if (result.success && !result.pending) {
-                closeAuthModal();
-                console.log('✅ Google authentication successful');
+            try {
+                let result;
                 
-                // Show success message briefly
-                if (googleBtn) {
-                    googleBtn.innerHTML = 'Success! ✅';
-                }
-                
-                // Load saved API key from user account
-                await loadSavedApiKey();
-            } else if (result.pending) {
-                console.log('⏳ Authentication pending (redirect in progress)');
-                
+                // For mobile devices, try redirect method first for better compatibility
                 if (isMobile) {
-                    // Mobile popup fallback to redirect - show guidance
-                    const authError = document.getElementById('authError');
-                    if (authError) {
-                        authError.innerHTML = '🔄 Popup blocked - redirecting to Google... Complete sign-in and return to this page.';
-                        authError.style.display = 'block';
-                        authError.style.backgroundColor = '#1f2937';
-                        authError.style.color = '#60a5fa';
-                        authError.style.border = '1px solid #3b82f6';
-                    }
-                    
-                    if (googleBtn) {
-                        googleBtn.innerHTML = 'Redirecting... Please wait ⏳';
-                    }
-                    
-                    console.log('📱 Mobile fallback redirect pending - showing user guidance');
-                    
-                    // Keep modal open longer on mobile to show instructions
-                    setTimeout(() => {
-                        closeAuthModal();
-                    }, 3000);
+                    console.log('📱 Using redirect method for mobile device');
+                    result = await window.authFunctions.signInWithGoogleRedirect();
                 } else {
-                    closeAuthModal();
+                    console.log('💻 Using popup method for desktop');
+                    result = await window.authFunctions.signInWithGoogle();
                 }
-            } else {
-                console.error('❌ Google auth failed:', result.error);
-                showAuthError(result.error || 'Google sign-in failed');
+                
+                console.log('📥 Auth result received:', result);
+                
+                if (result.success) {
+                    closeAuthModal();
+                    console.log('✅ Google authentication successful');
+                    
+                    // Show success message briefly
+                    if (googleBtn) {
+                        googleBtn.innerHTML = 'Success! ✅';
+                        setTimeout(() => {
+                            resetGoogleButton(googleBtn);
+                        }, 2000);
+                    }
+                    
+                    // Load saved API key from user account
+                    await loadSavedApiKey();
+                    return;
+                }
+                
+                // If redirect method failed on mobile, try popup as fallback
+                if (isMobile && !result.success) {
+                    console.log('📱 Redirect failed, trying popup method...');
+                    if (googleBtn) {
+                        googleBtn.innerHTML = 'Trying popup... 📱';
+                    }
+                    
+                    try {
+                        result = await window.authFunctions.signInWithGoogle();
+                        if (result.success) {
+                            closeAuthModal();
+                            if (googleBtn) {
+                                googleBtn.innerHTML = 'Success! ✅';
+                                setTimeout(() => {
+                                    resetGoogleButton(googleBtn);
+                                }, 2000);
+                            }
+                            await loadSavedApiKey();
+                            return;
+                        }
+                    } catch (popupError) {
+                        console.error('📱 Popup fallback also failed:', popupError);
+                    }
+                }
+                
+                // If we get here, both methods failed
+                console.error('❌ All Google auth methods failed:', result.error);
+                showAuthError(result.error || 'Google sign-in failed. Please try again.');
+                resetGoogleButton(googleBtn);
+                
+            } catch (authError) {
+                console.error('💥 Authentication error:', authError);
+                showAuthError('Google sign-in failed. Please try again.');
                 resetGoogleButton(googleBtn);
             }
         } else {
