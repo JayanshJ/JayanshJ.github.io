@@ -1,17 +1,13 @@
 // Secure Firebase client that uses serverless functions
 // No Firebase credentials exposed to client!
 
-// Initialize minimal Firebase config for auth only
-const firebaseConfig = {
-    apiKey: "AIzaSyDhz3dQ_lHVaX0k53XUS3T-4TL0Y9nNaAk",
-    authDomain: "ai-app-daeda.firebaseapp.com",
-    projectId: "ai-app-daeda",
-    // Add persistence and session management
-    persistenceEnabled: true
-};
-
-// Initialize Firebase with minimal config
-firebase.initializeApp(firebaseConfig);
+// Firebase is now initialized in HTML - no need to initialize again here
+// Just verify it's available
+if (typeof firebase === 'undefined') {
+    console.error('❌ Firebase not loaded - check HTML script tags');
+} else {
+    console.log('✅ Firebase already initialized in HTML');
+}
 
 class SecureFirebaseClient {
     constructor() {
@@ -1245,8 +1241,19 @@ const authFunctions = {
             provider.addScope('profile');
             provider.addScope('email');
             
-            await window.firebaseAuth.signInWithRedirect(provider);
-            return { success: true, pending: true };
+            // For mobile, try popup first, then redirect as fallback
+            try {
+                console.log('📱 Trying popup method first on mobile...');
+                const result = await window.firebaseAuth.signInWithPopup(provider);
+                console.log('✅ Mobile popup sign-in successful:', result.user.email);
+                return { success: true, user: result.user };
+            } catch (popupError) {
+                console.log('📱 Popup failed, falling back to redirect:', popupError.message);
+                
+                // If popup fails, use redirect
+                await window.firebaseAuth.signInWithRedirect(provider);
+                return { success: true, pending: true };
+            }
         } catch (error) {
             console.error('❌ Google redirect sign-in failed:', error);
             return { success: false, error: error.message };
@@ -1327,7 +1334,24 @@ const authFunctions = {
     }
 };
 
-window.authFunctions = authFunctions;
-console.log('✅ Auth functions initialized and available globally');
+// Wait for Firebase to be ready before exposing auth functions
+function initializeAuthFunctions() {
+    if (window.firebaseAuth) {
+        window.authFunctions = authFunctions;
+        console.log('✅ Main auth functions initialized and available globally');
+    } else {
+        console.log('⏳ Waiting for Firebase auth to initialize...');
+        setTimeout(initializeAuthFunctions, 50); // Faster retry
+    }
+}
+
+// Initialize auth functions immediately if Firebase is ready, otherwise wait
+if (window.firebaseAuth) {
+    window.authFunctions = authFunctions;
+    console.log('✅ Main auth functions initialized immediately');
+} else {
+    // Start checking for Firebase readiness
+    initializeAuthFunctions();
+}
 window.chatStorage = secureFirebase;
 window.firebaseClient = secureFirebase;

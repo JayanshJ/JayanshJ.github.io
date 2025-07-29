@@ -99,13 +99,144 @@ document.addEventListener('DOMContentLoaded', function() {
             retryCount++;
             if (retryCount < maxRetries) {
                 console.log(`Firebase not ready yet, retrying... (${retryCount}/${maxRetries})`);
-                setTimeout(initializeFirebaseAuth, 500);
+                // Check if Firebase is at least partially loaded
+                if (typeof firebase !== 'undefined' && window.firebaseAuth) {
+                    console.log('🔥 Firebase detected but authFunctions not ready, waiting longer...');
+                    setTimeout(initializeFirebaseAuth, 200); // Shorter retry for when Firebase is detected
+                } else {
+                    setTimeout(initializeFirebaseAuth, 500);
+                }
             } else {
                 console.warn('Firebase authFunctions not available after maximum retries');
                 console.warn('Authentication features will be disabled');
-                // Update UI to show that auth is not available
-                updateSettingsAuthUI();
+                // Try one more time with direct Firebase access
+                if (typeof firebase !== 'undefined' && window.firebaseAuth) {
+                    console.log('🔄 Last attempt: Firebase detected, creating minimal auth functions...');
+                    createMinimalAuthFunctions();
+                } else {
+                    updateSettingsAuthUI();
+                }
             }
+        }
+    }
+    
+    // Create minimal auth functions as fallback
+    function createMinimalAuthFunctions() {
+        console.log('🔧 Creating minimal auth functions as fallback...');
+        
+        window.authFunctions = {
+            async signInWithGoogle() {
+                try {
+                    if (!window.firebaseAuth) {
+                        throw new Error('Firebase auth not available');
+                    }
+                    
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    provider.addScope('profile');
+                    provider.addScope('email');
+                    
+                    const result = await window.firebaseAuth.signInWithPopup(provider);
+                    console.log('✅ Minimal Google sign-in successful:', result.user.email);
+                    return { success: true, user: result.user };
+                } catch (error) {
+                    console.error('❌ Minimal Google sign-in failed:', error);
+                    return { success: false, error: error.message };
+                }
+            },
+            
+            async signInWithGoogleRedirect() {
+                try {
+                    if (!window.firebaseAuth) {
+                        throw new Error('Firebase auth not available');
+                    }
+                    
+                    const provider = new firebase.auth.GoogleAuthProvider();
+                    provider.addScope('profile');
+                    provider.addScope('email');
+                    
+                    await window.firebaseAuth.signInWithRedirect(provider);
+                    return { success: true, pending: true };
+                } catch (error) {
+                    console.error('❌ Minimal Google redirect failed:', error);
+                    return { success: false, error: error.message };
+                }
+            },
+            
+            async signInWithEmail(email, password) {
+                try {
+                    if (!window.firebaseAuth) {
+                        throw new Error('Firebase auth not available');
+                    }
+                    
+                    const result = await window.firebaseAuth.signInWithEmailAndPassword(email, password);
+                    return { success: true, user: result.user };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            },
+            
+            async signUpWithEmail(email, password) {
+                try {
+                    if (!window.firebaseAuth) {
+                        throw new Error('Firebase auth not available');
+                    }
+                    
+                    const result = await window.firebaseAuth.createUserWithEmailAndPassword(email, password);
+                    return { success: true, user: result.user };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            },
+            
+            async signOut() {
+                try {
+                    if (!window.firebaseAuth) {
+                        throw new Error('Firebase auth not available');
+                    }
+                    
+                    await window.firebaseAuth.signOut();
+                    return { success: true };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            },
+            
+            onAuthStateChanged(callback) {
+                if (!window.firebaseAuth) {
+                    console.error('Firebase auth not available');
+                    return;
+                }
+                return window.firebaseAuth.onAuthStateChanged(callback);
+            },
+            
+            getCurrentUser() {
+                if (!window.firebaseAuth) {
+                    return null;
+                }
+                return window.firebaseAuth.currentUser;
+            }
+        };
+        
+        console.log('✅ Minimal auth functions created successfully');
+        
+        // Initialize auth state monitoring
+        if (window.firebaseAuth) {
+            window.firebaseAuth.onAuthStateChanged((user) => {
+                if (user) {
+                    isAuthenticated = true;
+                    currentUser = {
+                        email: user.email,
+                        provider: user.providerData[0]?.providerId === 'google.com' ? 'Google' : 'Email/Password',
+                        displayName: user.displayName || user.email.split('@')[0],
+                        uid: user.uid
+                    };
+                } else {
+                    isAuthenticated = false;
+                    currentUser = null;
+                }
+                updateSettingsAuthUI();
+            });
+            console.log('✅ Minimal Firebase auth state monitoring initialized');
         }
     }
     
@@ -219,6 +350,10 @@ window.handleEmailAuth = async function() {
 window.handleGoogleAuth = async function() {
     try {
         console.log('🔐 Starting Google authentication from UI...');
+        console.log('🔍 Checking auth functions availability:', typeof window.authFunctions);
+        console.log('🔍 Auth functions object:', window.authFunctions);
+        console.log('🔍 Firebase auth instance:', window.firebaseAuth);
+        console.log('🔍 Firebase global:', typeof firebase);
         
         if (typeof window.authFunctions !== 'undefined' && window.authFunctions) {
             console.log('✅ Auth functions available, calling signInWithGoogle...');
@@ -252,10 +387,19 @@ window.handleGoogleAuth = async function() {
             try {
                 let result;
                 
-                // For mobile devices, try redirect method first for better compatibility
+                // For mobile devices, try popup first (works on modern mobile browsers)
                 if (isMobile) {
-                    console.log('📱 Using redirect method for mobile device');
+                    console.log('📱 Trying mobile authentication...');
+                    
+                    // Update button
+                    if (googleBtn) {
+                        googleBtn.innerHTML = 'Signing in... 📱';
+                        googleBtn.disabled = true;
+                    }
+                    
+                    // Try the mobile-optimized method (popup first, then redirect)
                     result = await window.authFunctions.signInWithGoogleRedirect();
+                    
                 } else {
                     console.log('💻 Using popup method for desktop');
                     result = await window.authFunctions.signInWithGoogle();
@@ -317,6 +461,11 @@ window.handleGoogleAuth = async function() {
             }
         } else {
             console.error('❌ Auth functions not available');
+            console.error('🔍 Debug info:');
+            console.error('  - window.authFunctions:', window.authFunctions);
+            console.error('  - window.firebaseAuth:', window.firebaseAuth);
+            console.error('  - firebase global:', typeof firebase);
+            console.error('  - Available window properties:', Object.keys(window).filter(k => k.includes('auth') || k.includes('firebase')));
             showAuthError('Authentication system not available');
             resetGoogleButton(googleBtn);
         }
