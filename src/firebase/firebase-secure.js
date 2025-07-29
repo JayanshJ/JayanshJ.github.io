@@ -1114,6 +1114,96 @@ class SecureFirebaseClient {
             return { success: false, error: error.message };
         }
     }
+
+    // Get user settings (including inline commands)
+    async getUserSettings() {
+        console.log('🔍 getUserSettings called');
+        
+        let token = localStorage.getItem('firebase_token');
+        if (!token) {
+            console.warn('❌ No authentication token for getUserSettings');
+            return { success: false, error: 'Not authenticated' };
+        }
+        
+        if (!this.currentUser) {
+            console.warn('❌ No current user for getUserSettings');
+            return { success: false, error: 'User not authenticated' };
+        }
+
+        try {
+            const response = await fetch(`${this.apiBase}/user-settings`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('✅ getUserSettings API response:', result);
+            return result;
+        } catch (error) {
+            console.error('❌ getUserSettings error:', error);
+            console.log('📱 Falling back to localStorage only');
+            return { 
+                success: false, 
+                error: error.message,
+                fallback: true
+            };
+        }
+    }
+
+    // Save user settings (including inline commands)
+    async saveUserSettings(settings) {
+        console.log('💾 saveUserSettings called with:', settings);
+        
+        let token = localStorage.getItem('firebase_token');
+        if (!token) {
+            console.warn('❌ No authentication token for saveUserSettings');
+            return { success: false, error: 'Not authenticated' };
+        }
+        
+        if (!this.currentUser) {
+            console.warn('❌ No current user for saveUserSettings');
+            return { success: false, error: 'User not authenticated' };
+        }
+
+        try {
+            // Add user ID and timestamp
+            const settingsToSave = {
+                ...settings,
+                userId: this.currentUser.uid,
+                lastUpdated: Date.now()
+            };
+
+            const response = await fetch(`${this.apiBase}/user-settings`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(settingsToSave)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('✅ saveUserSettings API response:', result);
+            return result;
+        } catch (error) {
+            console.error('❌ saveUserSettings error:', error);
+            return { 
+                success: false, 
+                error: error.message 
+            };
+        }
+    }
 }
 
 // Initialize the secure client

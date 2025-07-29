@@ -401,24 +401,134 @@ let inlineCommands = {
     '/yt': 'https://youtube.com',
     '/google': 'https://google.com',
     '/github': 'https://github.com',
-    '/gmail': 'https://gmail.com'
+    '/gmail': 'https://gmail.com',
+    '/wiki': 'https://wikipedia.org',
+    '/weather': 'https://weather.com',
+    '/maps': 'https://maps.google.com',
+    '/translate': 'https://translate.google.com',
+    '/calculator': 'https://calculator.net',
+    '/timer': 'https://timer.onlineclock.net',
+    '/color': 'https://coolors.co',
+    '/unsplash': 'https://unsplash.com',
+    '/codepen': 'https://codepen.io',
+    '/stackoverflow': 'https://stackoverflow.com',
+    '/mdn': 'https://developer.mozilla.org',
+    '/regex': 'https://regex101.com',
+    '/json': 'https://jsonformatter.org'
 };
 
-// Load commands from localStorage
-function loadInlineCommands() {
+// Load commands from localStorage and Firebase
+async function loadInlineCommands() {
+    console.log('🔄 Loading inline commands...');
+    
+    // First load from localStorage as fallback
     const saved = localStorage.getItem('inlineCommands');
     if (saved) {
         try {
             inlineCommands = JSON.parse(saved);
+            console.log('📱 Loaded commands from localStorage:', Object.keys(inlineCommands).length);
         } catch (e) {
-            console.warn('Failed to load inline commands:', e);
+            console.warn('Failed to load inline commands from localStorage:', e);
         }
+    }
+    
+    // If user is authenticated, try to load from Firebase
+    if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
+        try {
+            console.log('☁️ User authenticated, loading commands from Firebase...');
+            const result = await window.chatStorage.getUserSettings();
+            
+            if (result.success && result.settings && result.settings.inlineCommands) {
+                const cloudCommands = result.settings.inlineCommands;
+                console.log('☁️ Loaded commands from Firebase:', Object.keys(cloudCommands).length);
+                
+                // Merge cloud commands with local ones (cloud takes precedence)
+                inlineCommands = { ...inlineCommands, ...cloudCommands };
+                
+                // Update localStorage with merged commands
+                localStorage.setItem('inlineCommands', JSON.stringify(inlineCommands));
+                console.log('✅ Commands synced from cloud to local storage');
+            } else {
+                console.log('📝 No commands found in Firebase, using local only');
+                // If no cloud commands exist but we have local ones, sync them to cloud
+                if (Object.keys(inlineCommands).length > 0) {
+                    console.log('⬆️ Syncing local commands to Firebase...');
+                    await saveInlineCommandsToCloud();
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Failed to load commands from Firebase:', error);
+            console.log('📱 Falling back to localStorage only');
+        }
+    } else {
+        console.log('🔒 User not authenticated, using localStorage only');
     }
 }
 
-// Save commands to localStorage
-function saveInlineCommands() {
+// Save commands to localStorage and Firebase
+async function saveInlineCommands() {
+    console.log('💾 Saving inline commands...');
+    
+    // Always save to localStorage first
     localStorage.setItem('inlineCommands', JSON.stringify(inlineCommands));
+    console.log('📱 Commands saved to localStorage');
+    
+    // If user is authenticated, also save to Firebase
+    await saveInlineCommandsToCloud();
+}
+
+// Save commands to Firebase cloud storage
+async function saveInlineCommandsToCloud() {
+    if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
+        try {
+            console.log('☁️ Saving commands to Firebase...');
+            const currentUser = window.chatStorage.getCurrentUser();
+            
+            // Get existing user settings first
+            const existingResult = await window.chatStorage.getUserSettings();
+            let userSettings = {};
+            
+            if (existingResult.success && existingResult.settings) {
+                userSettings = existingResult.settings;
+            }
+            
+            // Update the inline commands in user settings
+            userSettings.inlineCommands = inlineCommands;
+            userSettings.lastUpdated = Date.now();
+            
+            // Save updated settings
+            const result = await window.chatStorage.saveUserSettings(userSettings);
+            
+            if (result.success) {
+                console.log('✅ Commands successfully saved to Firebase');
+            } else {
+                console.warn('⚠️ Failed to save commands to Firebase:', result.error);
+            }
+        } catch (error) {
+            console.warn('⚠️ Error saving commands to Firebase:', error);
+        }
+    } else {
+        console.log('🔒 User not authenticated, skipping cloud save');
+    }
+}
+
+// Sync commands when user authentication state changes
+async function syncCommandsOnAuthChange() {
+    console.log('🔄 Syncing commands due to auth state change...');
+    
+    // Wait a moment for authentication to fully initialize
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Reload commands from cloud if user is now authenticated
+    await loadInlineCommands();
+    
+    // Update the commands modal if it's open
+    const modal = document.getElementById('commandsModal');
+    if (modal && modal.style.display === 'flex') {
+        populateCommandsList();
+    }
+    
+    console.log('✅ Commands sync completed');
 }
 
 // Process inline command
@@ -430,6 +540,327 @@ function processInlineCommand(input) {
         return true; // Command was processed
     }
     return false; // Not a command
+}
+
+// Open website in overlay
+function openWebsiteOverlay(url, command) {
+    console.log(`🌐 Opening ${command} (${url}) in overlay`);
+    
+    // Create overlay container
+    const overlayId = 'websiteOverlay_' + Date.now();
+    const overlay = document.createElement('div');
+    overlay.id = overlayId;
+    overlay.className = 'website-overlay';
+    
+    // Ensure URL has protocol
+    const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+    
+    overlay.innerHTML = `
+        <div class="website-overlay-content">
+            <div class="website-overlay-header">
+                <div class="website-overlay-info">
+                    <div class="website-overlay-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                        </svg>
+                        <span>${command}</span>
+                    </div>
+                    <div class="website-overlay-url">${fullUrl}</div>
+                </div>
+                <div class="website-overlay-controls">
+                    <button class="overlay-btn refresh-btn" onclick="refreshWebsiteOverlay('${overlayId}')" title="Refresh">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <polyline points="1 20 1 14 7 14"/>
+                            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                        </svg>
+                    </button>
+                    <button class="overlay-btn external-btn" onclick="openExternalLink('${fullUrl}')" title="Open in new tab">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                            <polyline points="15,3 21,3 21,9"/>
+                            <line x1="10" y1="14" x2="21" y2="3"/>
+                        </svg>
+                    </button>
+                    <button class="overlay-btn minimize-btn" onclick="minimizeWebsiteOverlay('${overlayId}')" title="Minimize">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                    <button class="overlay-btn close-btn" onclick="closeWebsiteOverlay('${overlayId}')" title="Close">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="website-overlay-body">
+                <div class="website-loading">
+                    <div class="loading-spinner"></div>
+                    <span>Loading ${fullUrl}...</span>
+                </div>
+                <iframe 
+                    src="${fullUrl}" 
+                    frameborder="0" 
+                    allowfullscreen
+                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation"
+                    onload="handleIframeLoad('${overlayId}')"
+                    onerror="showWebsiteError('${overlayId}', '${fullUrl}')"
+                ></iframe>
+            </div>
+        </div>
+        <div class="website-overlay-backdrop" onclick="closeWebsiteOverlay('${overlayId}')"></div>
+    `;
+    
+    // Add to DOM
+    document.body.appendChild(overlay);
+    
+    // Initialize drag functionality
+    initializeWebsiteOverlayDrag(overlay);
+    
+    // Show with animation
+    setTimeout(() => {
+        overlay.classList.add('show');
+    }, 10);
+    
+    // Set a timeout for loading and check for common blocking scenarios
+    setTimeout(() => {
+        const loadingElement = overlay.querySelector('.website-loading');
+        const iframe = overlay.querySelector('iframe');
+        
+        if (loadingElement && loadingElement.style.display !== 'none') {
+            console.log('⏰ Timeout reached, checking iframe status...');
+            
+            // Check if iframe is still loading or blocked
+            try {
+                if (iframe) {
+                    const iframeSrc = iframe.src;
+                    const iframeLocation = iframe.contentWindow?.location?.href;
+                    
+                    // Common signs of blocking
+                    if (iframeLocation === 'about:blank' || 
+                        iframeSrc === 'about:blank' || 
+                        !iframeSrc || 
+                        iframeSrc === fullUrl) {
+                        
+                        console.log('🚫 Website appears to be blocked or failed to load');
+                        showWebsiteError(overlayId, fullUrl);
+                    } else {
+                        // Might have loaded, hide loading anyway
+                        console.log('✅ Assuming website loaded successfully');
+                        loadingElement.style.display = 'none';
+                        iframe.style.display = 'block';
+                    }
+                }
+            } catch (e) {
+                console.log('❌ Error checking iframe, showing error state');
+                showWebsiteError(overlayId, fullUrl);
+            }
+        }
+    }, 5000); // Reduced to 5 second timeout for better UX
+}
+
+// Website overlay control functions
+function closeWebsiteOverlay(overlayId) {
+    const overlay = document.getElementById(overlayId);
+    if (overlay) {
+        overlay.classList.remove('show');
+        setTimeout(() => {
+            overlay.remove();
+        }, 300); // Wait for animation
+    }
+}
+
+function minimizeWebsiteOverlay(overlayId) {
+    const overlay = document.getElementById(overlayId);
+    if (overlay) {
+        const content = overlay.querySelector('.website-overlay-content');
+        const minimizeBtn = overlay.querySelector('.minimize-btn svg path');
+        
+        if (content.classList.contains('minimized')) {
+            // Expand
+            content.classList.remove('minimized');
+            if (minimizeBtn) {
+                minimizeBtn.setAttribute('d', 'M6 9l6 6 6-6'); // Down arrow
+            }
+        } else {
+            // Minimize
+            content.classList.add('minimized');
+            if (minimizeBtn) {
+                minimizeBtn.setAttribute('d', 'M18 15l-6-6-6 6'); // Up arrow
+            }
+        }
+    }
+}
+
+function refreshWebsiteOverlay(overlayId) {
+    const overlay = document.getElementById(overlayId);
+    if (overlay) {
+        const iframe = overlay.querySelector('iframe');
+        const loading = overlay.querySelector('.website-loading');
+        
+        if (iframe && loading) {
+            // Show loading
+            loading.style.display = 'flex';
+            iframe.style.display = 'none';
+            
+            // Reload iframe
+            const currentSrc = iframe.src;
+            iframe.src = 'about:blank';
+            setTimeout(() => {
+                iframe.src = currentSrc;
+            }, 100);
+        }
+    }
+}
+
+function openExternalLink(url) {
+    window.open(url, '_blank');
+}
+
+function handleIframeLoad(overlayId) {
+    const overlay = document.getElementById(overlayId);
+    if (overlay) {
+        const loading = overlay.querySelector('.website-loading');
+        const iframe = overlay.querySelector('iframe');
+        
+        if (loading && iframe) {
+            // Check if iframe actually loaded content or was blocked
+            try {
+                // Try to access iframe content to detect if it's blocked
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                
+                // If we can access it, hide loading
+                setTimeout(() => {
+                    loading.style.display = 'none';
+                    iframe.style.display = 'block';
+                }, 500); // Small delay to ensure content is visible
+                
+            } catch (e) {
+                // If we can't access it, it might be blocked by X-Frame-Options
+                console.warn('Iframe may be blocked by X-Frame-Options:', e);
+                
+                // Check if iframe src is about:blank (common when blocked)
+                if (iframe.src === 'about:blank' || iframe.contentWindow.location.href === 'about:blank') {
+                    showWebsiteError(overlayId, iframe.src);
+                } else {
+                    // Assume it loaded successfully even if we can't access it
+                    loading.style.display = 'none';
+                    iframe.style.display = 'block';
+                }
+            }
+        }
+    }
+}
+
+function hideWebsiteLoading(overlayId) {
+    // Fallback function for compatibility
+    handleIframeLoad(overlayId);
+}
+
+function showWebsiteError(overlayId, url) {
+    const overlay = document.getElementById(overlayId);
+    if (overlay) {
+        const loading = overlay.querySelector('.website-loading');
+        
+        if (loading) {
+            loading.innerHTML = `
+                <div class="website-error">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    <div class="error-content">
+                        <h3>Website Cannot Be Displayed</h3>
+                        <p>This website blocks embedding in frames for security reasons.</p>
+                        <p class="error-url">${url}</p>
+                        <div class="error-suggestion">
+                            <p><strong>💡 Try these overlay-friendly commands instead:</strong></p>
+                            <div class="command-suggestions">
+                                <code>/google</code> <code>/wiki</code> <code>/weather</code> <code>/calculator</code> <code>/translate</code>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="error-actions">
+                        <button class="external-btn primary" onclick="openExternalLink('${url}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                <polyline points="15,3 21,3 21,9"/>
+                                <line x1="10" y1="14" x2="21" y2="3"/>
+                            </svg>
+                            Open in New Tab
+                        </button>
+                        <button class="retry-btn" onclick="refreshWebsiteOverlay('${overlayId}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"/>
+                                <polyline points="1 20 1 14 7 14"/>
+                                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                            </svg>
+                            Try Again
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+}
+
+function initializeWebsiteOverlayDrag(overlay) {
+    const header = overlay.querySelector('.website-overlay-header');
+    const content = overlay.querySelector('.website-overlay-content');
+    
+    if (!header || !content) return;
+    
+    let isDragging = false;
+    let startX, startY, startLeft, startTop;
+    
+    header.style.cursor = 'move';
+    
+    header.addEventListener('mousedown', (e) => {
+        // Don't drag if clicking on buttons
+        if (e.target.closest('button')) return;
+        
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        
+        const rect = content.getBoundingClientRect();
+        startLeft = rect.left;
+        startTop = rect.top;
+        
+        content.style.position = 'fixed';
+        content.style.zIndex = '10001';
+        
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        const deltaX = e.clientX - startX;
+        const deltaY = e.clientY - startY;
+        
+        let newLeft = startLeft + deltaX;
+        let newTop = startTop + deltaY;
+        
+        // Keep overlay within viewport
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const contentRect = content.getBoundingClientRect();
+        
+        newLeft = Math.max(20, Math.min(newLeft, viewportWidth - contentRect.width - 20));
+        newTop = Math.max(20, Math.min(newTop, viewportHeight - contentRect.height - 20));
+        
+        content.style.left = newLeft + 'px';
+        content.style.top = newTop + 'px';
+        content.style.transform = 'none';
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
 }
 
 // Command hints functionality
@@ -571,8 +1002,40 @@ function populateCommandsList() {
     
     commandsList.innerHTML = '';
     
+    // Add sync status indicator
+    const syncStatus = document.createElement('div');
+    syncStatus.className = 'commands-sync-status';
+    const isAuthenticated = window.chatStorage && window.chatStorage.getCurrentUser();
+    
+    if (isAuthenticated) {
+        syncStatus.innerHTML = `
+            <div class="sync-indicator synced">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 6L9 17l-5-5"/>
+                </svg>
+                <span>Commands synced to cloud</span>
+            </div>
+        `;
+    } else {
+        syncStatus.innerHTML = `
+            <div class="sync-indicator local-only">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    <polyline points="3.27,6.96 12,12.01 20.73,6.96"/>
+                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+                <span>Commands stored locally only - <a href="#" onclick="showSettingsModal()" style="color: var(--accent-primary);">Sign in</a> to sync across devices</span>
+            </div>
+        `;
+    }
+    
+    commandsList.appendChild(syncStatus);
+    
     if (Object.keys(inlineCommands).length === 0) {
-        commandsList.innerHTML = '<div class="no-commands">No commands configured yet.</div>';
+        const noCommands = document.createElement('div');
+        noCommands.className = 'no-commands';
+        noCommands.textContent = 'No commands configured yet.';
+        commandsList.appendChild(noCommands);
         return;
     }
     
@@ -596,7 +1059,7 @@ function populateCommandsList() {
     });
 }
 
-function addNewCommand() {
+async function addNewCommand() {
     const nameInput = document.getElementById('newCommandName');
     const urlInput = document.getElementById('newCommandUrl');
     
@@ -627,7 +1090,7 @@ function addNewCommand() {
     }
     
     inlineCommands[command] = url;
-    saveInlineCommands();
+    await saveInlineCommands();
     populateCommandsList();
     
     // Clear inputs
@@ -637,10 +1100,10 @@ function addNewCommand() {
     alert(`✅ Command "${command}" added successfully!`);
 }
 
-function deleteCommand(command) {
-    if (confirm(`⚠️ Are you sure you want to delete the command "${command}"?`)) {
+async function deleteCommand(command) {
+    if (confirm(`❓ Are you sure you want to delete the command "${command}"?`)) {
         delete inlineCommands[command];
-        saveInlineCommands();
+        await saveInlineCommands();
         populateCommandsList();
         alert(`✅ Command "${command}" deleted successfully!`);
     }
@@ -5746,8 +6209,23 @@ document.addEventListener('DOMContentLoaded', async function() {
     const messageInput = document.getElementById('messageInput');
     const mainContent = document.querySelector('.main-content');
 
-    // Load inline commands
-    loadInlineCommands();
+    // Load inline commands (now async)
+    loadInlineCommands().catch(error => {
+        console.warn('Failed to load inline commands during initialization:', error);
+    });
+
+    // Set up authentication state change listener for command syncing
+    let lastAuthState = null;
+    setInterval(() => {
+        const currentAuthState = window.chatStorage && window.chatStorage.getCurrentUser() ? 'authenticated' : 'unauthenticated';
+        if (lastAuthState !== null && lastAuthState !== currentAuthState) {
+            console.log(`🔄 Auth state changed from ${lastAuthState} to ${currentAuthState}`);
+            syncCommandsOnAuthChange().catch(error => {
+                console.warn('Failed to sync commands on auth change:', error);
+            });
+        }
+        lastAuthState = currentAuthState;
+    }, 2000); // Check every 2 seconds
 
     // Start periodic cache cleanup
     setInterval(() => {

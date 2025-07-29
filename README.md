@@ -1,6 +1,8 @@
-# AI Chat Application
+# 🤖 AI Chat Application
 
-A modern ChatGPT-like interface with Firebase authentication and cross-device chat synchronization.
+A modern ChatGPT-like interface with Firebase authentication, cross-device chat synchronization, and cloud-synced slash commands.
+
+> **📁 Recently Optimized**: File structure has been reorganized for better maintainability and development experience.
 
 ## Features
 
