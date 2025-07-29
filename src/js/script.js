@@ -1129,11 +1129,13 @@ async function loadChatHistory() {
     console.log('Loading chat history, preserving current chat ID:', previousChatId);
     
     try {
-        // Wait for Firebase and authentication to complete
+        // Check if Firebase and authentication are available
         let authRetries = 0;
-        const maxRetries = 20; // Increased from 10 to 20 (10 seconds total)
+        const maxRetries = 6; // Reduced to 3 seconds total
         while ((!window.chatStorage || !window.chatStorage.getCurrentUser()) && authRetries < maxRetries) {
-            console.log(`Waiting for authentication... (${authRetries + 1}/${maxRetries})`);
+            if (authRetries === 0) {
+                console.log('🔒 User not authenticated, using localStorage only');
+            }
             await new Promise(resolve => setTimeout(resolve, 500));
             authRetries++;
         }
@@ -1261,11 +1263,13 @@ function redisplayConversation() {
 // Load chat folders from Firebase only
 async function loadChatFolders() {
     try {
-        // Wait for Firebase and authentication to complete (folders don't need as long)
+        // Check if Firebase and authentication are available for folders
         let authRetries = 0;
-        const maxRetries = 10; // 5 seconds should be enough for folders
+        const maxRetries = 4; // Reduced to 2 seconds for folders
         while ((!window.chatStorage || !window.chatStorage.getCurrentUser()) && authRetries < maxRetries) {
-            console.log(`Waiting for authentication for folders... (${authRetries + 1}/${maxRetries})`);
+            if (authRetries === 0) {
+                console.log('📁 Loading folders from localStorage (user not authenticated)');
+            }
             await new Promise(resolve => setTimeout(resolve, 500));
             authRetries++;
         }
@@ -1312,18 +1316,24 @@ async function saveChatFolders() {
             }
         });
         
-        // Save to Firebase only if user is authenticated
+        // Always save to localStorage first
+        localStorage.setItem('chatgpt_folders_dev', JSON.stringify(chatFolders));
+        console.log(`📁 Saved ${chatFolders.length} folders to localStorage`);
+        
+        // Also save to Firebase if user is authenticated
         if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
-            console.log(`Attempting to save ${chatFolders.length} folders to Firebase...`);
+            console.log(`☁️ Syncing ${chatFolders.length} folders to Firebase...`);
             
-            const result = await window.chatStorage.saveFolders(chatFolders);
-            if (result.success) {
-                console.log('Successfully saved folders to Firebase');
-            } else {
-                console.warn('Failed to save folders to Firebase:', result.error);
+            try {
+                const result = await window.chatStorage.saveFolders(chatFolders);
+                if (result.success) {
+                    console.log('✅ Folders synced to Firebase');
+                } else {
+                    console.warn('⚠️ Failed to sync folders to Firebase:', result.error);
+                }
+            } catch (error) {
+                console.warn('⚠️ Firebase folder sync failed, but localStorage save succeeded:', error);
             }
-        } else {
-            console.log('User not authenticated, folders not saved');
         }
     } catch (e) {
         console.error('Error saving chat folders:', e);
@@ -1527,9 +1537,13 @@ async function saveChatHistory() {
             }
         });
         
-        // Save to Firebase only if user is authenticated
+        // Always save to localStorage first for immediate persistence
+        localStorage.setItem('chatgpt_history_dev', JSON.stringify(chatHistory));
+        console.log(`💾 Saved ${chatHistory.length} chats to localStorage`);
+        
+        // Also save to Firebase if user is authenticated
         if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
-            console.log(`Attempting to save ${chatHistory.length} chats to Firebase...`);
+            console.log(`☁️ Syncing ${chatHistory.length} chats to Firebase...`);
             
             // Check if we're in development and warn about CORS
             if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
