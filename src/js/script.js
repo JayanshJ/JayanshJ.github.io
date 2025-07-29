@@ -2560,7 +2560,7 @@ Title:`;
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'chatgpt-4o-latest',
+                model: 'gpt-4.1-2025-04-14',
                 messages: [{
                     role: 'user',
                     content: titlePrompt
@@ -2688,7 +2688,7 @@ async function loadChat(chatId) {
     
     // Update URL when loading a chat
     updateChatUrl(currentChatId);
-    currentModel = chat.model || 'chatgpt-4o-latest';
+    currentModel = chat.model || 'gpt-4.1-2025-04-14';
     
     // Determine which folder this chat belongs to
     currentFolderId = null;
@@ -3502,7 +3502,6 @@ function updateInputPlaceholder(model) {
     const placeholders = {
         'gpt-image-1': 'Describe the image you want to generate...',
         'gpt-4.1-2025-04-14': 'Message GPT-4.1...',
-        'chatgpt-4o-latest': 'Message ChatGPT-4o...',
         'gpt-4o-search-preview-2025-03-11': 'Message GPT-4o Search Preview...'
     };
     
@@ -3535,7 +3534,6 @@ function updateWelcomeMessage(model) {
     const messages = {
         'gpt-image-1': 'What image would you like me to create?',
         'gpt-4.1-2025-04-14': 'How can I assist you today?',
-        'chatgpt-4o-latest': 'How can I assist you today?'
     };
     
     welcomeScreen.textContent = messages[model] || 'How can I help you today?';
@@ -3713,7 +3711,6 @@ function getModelDisplayName(model) {
     const names = {
         'gpt-4.1-2025-04-14': 'GPT-4.1',
         'gpt-image-1': 'Image Gen',
-        'chatgpt-4o-latest': 'ChatGPT-4o Latest',
         'gpt-4o-search-preview-2025-03-11': 'GPT-4o Search Preview'
     };
     return names[model] || model;
@@ -3723,14 +3720,13 @@ function getModelTemperature(model) {
     const temperatures = {
         'gpt-4.1-2025-04-14': 0.7,
         'gpt-image-1': 0.7,
-        'chatgpt-4o-latest': 1.0,
         'gpt-4o-search-preview-2025-03-11': 0.7
     };
     return temperatures[model] || 0.7; // Default fallback
 }
 
 // Available models for cycling
-const availableModels = ['gpt-4.1-2025-04-14', 'gpt-image-1', 'chatgpt-4o-latest', 'gpt-4o-search-preview-2025-03-11'];
+const availableModels = ['gpt-4.1-2025-04-14', 'gpt-image-1', 'gpt-4o-search-preview-2025-03-11'];
 
 // Function to cycle to next model
 function cycleToNextModel() {
@@ -3909,8 +3905,8 @@ async function sendMessageAsync() {
     }
 
     // Check if model supports vision when images are selected
-    if (selectedImages.length > 0 && !currentModel.includes('gpt-4') && !currentModel.includes('gpt-image-1') && !currentModel.includes('chatgpt-4o-latest') && !currentModel.includes('gpt-4o-search-preview')) {
-        addMessage('⚠️ Image analysis requires vision-capable models. Please switch to GPT-4.1-2025-04-14, gpt-image-1, chatgpt-4o-latest, or gpt-4o-search-preview-2025-03-11.', 'ai', 'error');
+    if (selectedImages.length > 0 && !currentModel.includes('gpt-4') && !currentModel.includes('gpt-image-1') && !currentModel.includes('gpt-4o-search-preview')) {
+        addMessage('⚠️ Image analysis requires vision-capable models. Please switch to GPT-4.1-2025-04-14, gpt-image-1, or gpt-4o-search-preview-2025-03-11.', 'ai', 'error');
         return;
     }
 
@@ -5257,7 +5253,7 @@ async function getSelectionResponse(message) {
             'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-            model: currentModel || 'chatgpt-4o-latest',
+            model: currentModel || 'gpt-4.1-2025-04-14',
             messages: messages,
             max_completion_tokens: 2000,
             temperature: 0.7
