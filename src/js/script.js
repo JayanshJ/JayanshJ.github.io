@@ -1290,8 +1290,21 @@ async function loadChatFolders() {
                 chatFolders = []; // Start with empty folders on error
             }
         } else {
-            console.log('User not authenticated, folders require login');
-            chatFolders = []; // Empty folders when not authenticated
+            console.log('User not authenticated, loading folders from localStorage');
+            // Load from localStorage when not authenticated
+            try {
+                const saved = localStorage.getItem('chatgpt_folders_dev');
+                if (saved) {
+                    chatFolders = JSON.parse(saved);
+                    console.log(`📁 Loaded ${chatFolders.length} folders from localStorage:`, chatFolders.map(f => ({ id: f.id, name: f.name })));
+                } else {
+                    console.log('📁 No folders found in localStorage');
+                    chatFolders = [];
+                }
+            } catch (error) {
+                console.error('❌ Error loading folders from localStorage:', error);
+                chatFolders = [];
+            }
         }
     } catch (e) {
         console.error('Error loading chat folders:', e);
@@ -1342,8 +1355,14 @@ async function saveChatFolders() {
             }
         } else {
             // User not signed in - save to localStorage
-            localStorage.setItem('chatgpt_folders_dev', JSON.stringify(chatFolders));
-            console.log(`📁 User not signed in - saved ${chatFolders.length} folders to localStorage`);
+            try {
+                localStorage.setItem('chatgpt_folders_dev', JSON.stringify(chatFolders));
+                console.log(`📁 User not signed in - saved ${chatFolders.length} folders to localStorage`);
+                console.log('📁 Folders saved to localStorage:', chatFolders.map(f => ({ id: f.id, name: f.name })));
+            } catch (error) {
+                console.error('❌ Failed to save folders to localStorage:', error);
+                throw error;
+            }
         }
     } catch (e) {
         console.error('Error saving chat folders:', e);
@@ -1376,25 +1395,46 @@ async function createFolder() {
 
 // Delete a folder (async implementation)
 async function deleteFolderAsync(folderId) {
+    console.log('🗑️ deleteFolderAsync called for:', folderId);
+    console.log('📁 Current folders:', chatFolders.map(f => ({ id: f.id, name: f.name })));
+    
     const folder = chatFolders.find(f => f.id === folderId);
-    if (!folder) return;
+    if (!folder) {
+        console.error('❌ Folder not found:', folderId);
+        return;
+    }
+    
+    console.log('📂 Found folder to delete:', folder.name, 'with', folder.chats.length, 'chats');
     
     const confirmMessage = folder.chats.length > 0 
         ? `Delete folder "${folder.name}" and its ${folder.chats.length} chat(s)? This cannot be undone.`
         : `Delete folder "${folder.name}"?`;
     
     if (confirm(confirmMessage)) {
+        console.log('✅ User confirmed deletion');
+        
         // Remove all chats from this folder from main chatHistory
-        folder.chats.forEach(chatId => {
+        const chatsToDelete = [...folder.chats]; // Copy array to avoid mutation issues
+        console.log('🗑️ Deleting chats:', chatsToDelete);
+        
+        chatsToDelete.forEach(chatId => {
             chatHistory = chatHistory.filter(chat => chat.id !== chatId);
         });
         
         // Remove the folder
+        const originalFolderCount = chatFolders.length;
         chatFolders = chatFolders.filter(f => f.id !== folderId);
+        console.log(`📁 Folders: ${originalFolderCount} → ${chatFolders.length}`);
         
-        debouncedSave();
-        await saveChatFolders();
-        updateHistoryDisplay();
+        try {
+            debouncedSave();
+            await saveChatFolders();
+            updateHistoryDisplay();
+            console.log('✅ Folder deleted successfully');
+        } catch (error) {
+            console.error('❌ Error saving after folder deletion:', error);
+            throw error;
+        }
         
         // If current chat was in this folder, start new chat
         if (currentFolderId === folderId) {
@@ -2616,8 +2656,10 @@ Title:`;
 
 // Wrapper for HTML onclick handlers
 function deleteFolder(folderId) {
+    console.log('🗑️ deleteFolder called for:', folderId);
     deleteFolderAsync(folderId).catch(error => {
         console.error('Error deleting folder:', error);
+        alert('Failed to delete folder: ' + error.message);
     });
 }
 
