@@ -129,11 +129,12 @@ body {
     overflow: hidden;
 }
 
+
 .sidebar-header {
     padding: var(--space-6) var(--space-5) var(--space-5);
     background: var(--bg-elevated);
     position: relative;
-    border-radius: 12px !important;
+    border-radius: 12px 12px 0 0 !important;
 }
 
 
@@ -262,6 +263,7 @@ body {
     overflow-y: auto;
     margin-top: 0;
     position: relative;
+    border-radius: 0 0 12px 12px;
 }
 
 
@@ -2525,6 +2527,21 @@ body {
     background: linear-gradient(135deg, rgba(248, 249, 250, 0.18) 0%, rgba(248, 249, 250, 0.1) 100%);
 }
 
+/* Large screen border radius fix */
+@media (min-width: 1200px) {
+    .sidebar {
+        border-radius: 12px !important;
+    }
+    
+    .sidebar-header {
+        border-radius: 12px 12px 0 0 !important;
+    }
+    
+    .chat-history {
+        border-radius: 0 0 12px 12px !important;
+    }
+}
+
 /* Mobile responsiveness */
 @media (max-width: 768px) {
     /* Ensure proper viewport handling */
@@ -3122,6 +3139,201 @@ body {
         border-radius: 12px;
         margin: 8px 0;
     }
+}
+
+/* Command Hints Dropdown */
+.command-hints-dropdown {
+    position: fixed;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-xl);
+    z-index: 1000;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+    transform: translateY(-100%);
+    backdrop-filter: blur(12px);
+}
+
+.command-hint-item {
+    padding: var(--space-3) var(--space-4);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid var(--border-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.command-hint-item:last-child {
+    border-bottom: none;
+}
+
+.command-hint-item:hover,
+.command-hint-item.selected {
+    background: var(--interactive-hover);
+    transform: translateX(2px);
+}
+
+.command-hint-item.selected {
+    background: rgba(var(--accent-primary-rgb), 0.15);
+    border-left: 3px solid var(--accent-primary);
+}
+
+.hint-command {
+    font-weight: 600;
+    color: var(--accent-primary);
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-size: var(--text-sm);
+}
+
+.hint-url {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    word-break: break-all;
+    opacity: 0.8;
+}
+
+.command-hint-item:hover .hint-url,
+.command-hint-item.selected .hint-url {
+    opacity: 1;
+    color: var(--text-secondary);
+}
+
+/* Scrollbar for hints dropdown */
+.command-hints-dropdown::-webkit-scrollbar {
+    width: 4px;
+}
+
+.command-hints-dropdown::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.command-hints-dropdown::-webkit-scrollbar-thumb {
+    background: var(--border-primary);
+    border-radius: 2px;
+}
+
+.command-hints-dropdown::-webkit-scrollbar-thumb:hover {
+    background: var(--border-accent);
+}
+
+/* Commands Modal Styles */
+.commands-help {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    margin-bottom: var(--space-5);
+}
+
+.commands-help p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+}
+
+.commands-help code {
+    background: var(--bg-surface);
+    color: var(--accent-primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+.commands-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: var(--space-5);
+    border: 1px solid var(--border-secondary);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+}
+
+.no-commands {
+    padding: var(--space-6);
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.command-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--border-secondary);
+    transition: background-color 0.2s ease;
+}
+
+.command-item:last-child {
+    border-bottom: none;
+}
+
+.command-item:hover {
+    background: var(--interactive-hover);
+}
+
+.command-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.command-name {
+    font-weight: 600;
+    color: var(--accent-primary);
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-size: var(--text-sm);
+    margin-bottom: 2px;
+}
+
+.command-url {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    word-break: break-all;
+}
+
+.command-delete-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: var(--space-2);
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+    margin-left: var(--space-3);
+    flex-shrink: 0;
+}
+
+.command-delete-btn:hover {
+    background: var(--accent-error);
+    color: white;
+    transform: scale(1.1);
+}
+
+.add-command-section {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+}
+
+.add-command-section h4 {
+    margin: 0 0 var(--space-4) 0;
+    color: var(--text-primary);
+    font-size: var(--text-lg);
+    font-weight: 600;
+}
+
+.add-command-section .input-group {
+    margin-bottom: var(--space-4);
+}
+
+.add-command-section .input-group:last-of-type {
+    margin-bottom: var(--space-5);
 }
 
 /* Settings Modal Styles */

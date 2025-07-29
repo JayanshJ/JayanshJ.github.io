@@ -53,6 +53,256 @@ let chatHistory = [];
 let chatFolders = [];
 let currentFolderId = null;
 
+// Inline Commands System
+let inlineCommands = {
+    '/yt': 'https://youtube.com',
+    '/google': 'https://google.com',
+    '/github': 'https://github.com',
+    '/gmail': 'https://gmail.com'
+};
+
+// Load commands from localStorage
+function loadInlineCommands() {
+    const saved = localStorage.getItem('inlineCommands');
+    if (saved) {
+        try {
+            inlineCommands = JSON.parse(saved);
+        } catch (e) {
+            console.warn('Failed to load inline commands:', e);
+        }
+    }
+}
+
+// Save commands to localStorage
+function saveInlineCommands() {
+    localStorage.setItem('inlineCommands', JSON.stringify(inlineCommands));
+}
+
+// Process inline command
+function processInlineCommand(input) {
+    const trimmed = input.trim();
+    if (trimmed in inlineCommands) {
+        const url = inlineCommands[trimmed];
+        window.open(url, '_blank');
+        return true; // Command was processed
+    }
+    return false; // Not a command
+}
+
+// Command hints functionality
+let commandHintsDropdown = null;
+let selectedHintIndex = -1;
+
+function showCommandHints(input) {
+    const messageInput = document.getElementById('messageInput');
+    if (!messageInput) return;
+
+    // Filter commands based on input
+    const query = input.toLowerCase();
+    const matchingCommands = Object.entries(inlineCommands).filter(([command, url]) => 
+        command.toLowerCase().includes(query)
+    );
+
+    if (matchingCommands.length === 0) {
+        hideCommandHints();
+        return;
+    }
+
+    // Create or update hints dropdown
+    if (!commandHintsDropdown) {
+        commandHintsDropdown = document.createElement('div');
+        commandHintsDropdown.className = 'command-hints-dropdown';
+        document.body.appendChild(commandHintsDropdown);
+    }
+
+    // Position the dropdown
+    const inputRect = messageInput.getBoundingClientRect();
+    commandHintsDropdown.style.left = inputRect.left + 'px';
+    commandHintsDropdown.style.top = (inputRect.top - 10) + 'px';
+    commandHintsDropdown.style.width = inputRect.width + 'px';
+
+    // Populate hints
+    commandHintsDropdown.innerHTML = '';
+    matchingCommands.forEach(([command, url], index) => {
+        const hintItem = document.createElement('div');
+        hintItem.className = 'command-hint-item';
+        if (index === selectedHintIndex) {
+            hintItem.classList.add('selected');
+        }
+        
+        hintItem.innerHTML = `
+            <div class="hint-command">${command}</div>
+            <div class="hint-url">${url}</div>
+        `;
+        
+        hintItem.addEventListener('click', () => {
+            messageInput.value = command;
+            hideCommandHints();
+            messageInput.focus();
+        });
+        
+        commandHintsDropdown.appendChild(hintItem);
+    });
+
+    commandHintsDropdown.style.display = 'block';
+    selectedHintIndex = -1; // Reset selection
+}
+
+function hideCommandHints() {
+    if (commandHintsDropdown) {
+        commandHintsDropdown.style.display = 'none';
+    }
+    selectedHintIndex = -1;
+}
+
+function navigateHints(direction) {
+    if (!commandHintsDropdown || commandHintsDropdown.style.display === 'none') return false;
+    
+    const hintItems = commandHintsDropdown.querySelectorAll('.command-hint-item');
+    if (hintItems.length === 0) return false;
+
+    // Remove current selection
+    if (selectedHintIndex >= 0 && selectedHintIndex < hintItems.length) {
+        hintItems[selectedHintIndex].classList.remove('selected');
+    }
+
+    // Update selection
+    if (direction === 'down') {
+        selectedHintIndex = (selectedHintIndex + 1) % hintItems.length;
+    } else if (direction === 'up') {
+        selectedHintIndex = selectedHintIndex <= 0 ? hintItems.length - 1 : selectedHintIndex - 1;
+    }
+
+    // Apply new selection
+    if (selectedHintIndex >= 0 && selectedHintIndex < hintItems.length) {
+        hintItems[selectedHintIndex].classList.add('selected');
+        hintItems[selectedHintIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    return true;
+}
+
+function selectCurrentHint() {
+    if (!commandHintsDropdown || commandHintsDropdown.style.display === 'none') return false;
+    
+    const hintItems = commandHintsDropdown.querySelectorAll('.command-hint-item');
+    if (selectedHintIndex >= 0 && selectedHintIndex < hintItems.length) {
+        const selectedItem = hintItems[selectedHintIndex];
+        const command = selectedItem.querySelector('.hint-command').textContent;
+        const messageInput = document.getElementById('messageInput');
+        if (messageInput) {
+            messageInput.value = command;
+            hideCommandHints();
+            messageInput.focus();
+        }
+        return true;
+    }
+    return false;
+}
+
+// Commands Modal Functions
+function showCommandsModal() {
+    closeSettingsModal();
+    const modal = document.getElementById('commandsModal');
+    if (modal) {
+        populateCommandsList();
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeCommandsModal() {
+    const modal = document.getElementById('commandsModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto';
+        // Clear input fields
+        document.getElementById('newCommandName').value = '';
+        document.getElementById('newCommandUrl').value = '';
+    }
+}
+
+function populateCommandsList() {
+    const commandsList = document.getElementById('commandsList');
+    if (!commandsList) return;
+    
+    commandsList.innerHTML = '';
+    
+    if (Object.keys(inlineCommands).length === 0) {
+        commandsList.innerHTML = '<div class="no-commands">No commands configured yet.</div>';
+        return;
+    }
+    
+    Object.entries(inlineCommands).forEach(([command, url]) => {
+        const commandItem = document.createElement('div');
+        commandItem.className = 'command-item';
+        commandItem.innerHTML = `
+            <div class="command-info">
+                <div class="command-name">${command}</div>
+                <div class="command-url">${url}</div>
+            </div>
+            <button class="command-delete-btn" onclick="deleteCommand('${command}')" title="Delete command">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 6h18"/>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                </svg>
+            </button>
+        `;
+        commandsList.appendChild(commandItem);
+    });
+}
+
+function addNewCommand() {
+    const nameInput = document.getElementById('newCommandName');
+    const urlInput = document.getElementById('newCommandUrl');
+    
+    const command = nameInput.value.trim();
+    const url = urlInput.value.trim();
+    
+    if (!command || !url) {
+        alert('❌ Please enter both command and URL');
+        return;
+    }
+    
+    if (!command.startsWith('/')) {
+        alert('❌ Command must start with /');
+        return;
+    }
+    
+    try {
+        new URL(url); // Validate URL
+    } catch (e) {
+        alert('❌ Please enter a valid URL');
+        return;
+    }
+    
+    if (command in inlineCommands) {
+        if (!confirm(`⚠️ Command "${command}" already exists. Do you want to replace it?`)) {
+            return;
+        }
+    }
+    
+    inlineCommands[command] = url;
+    saveInlineCommands();
+    populateCommandsList();
+    
+    // Clear inputs
+    nameInput.value = '';
+    urlInput.value = '';
+    
+    alert(`✅ Command "${command}" added successfully!`);
+}
+
+function deleteCommand(command) {
+    if (confirm(`⚠️ Are you sure you want to delete the command "${command}"?`)) {
+        delete inlineCommands[command];
+        saveInlineCommands();
+        populateCommandsList();
+        alert(`✅ Command "${command}" deleted successfully!`);
+    }
+}
+
 
 
 
@@ -5071,6 +5321,86 @@ document.addEventListener('DOMContentLoaded', async function() {
     const fileInput = document.getElementById('fileInput');
     const messageInput = document.getElementById('messageInput');
     const mainContent = document.querySelector('.main-content');
+
+    // Load inline commands
+    loadInlineCommands();
+
+    // Add input event listener for inline commands
+    if (messageInput) {
+        messageInput.addEventListener('keydown', function(e) {
+            // Handle hint navigation
+            if (e.key === 'ArrowDown') {
+                if (navigateHints('down')) {
+                    e.preventDefault();
+                    return;
+                }
+            } else if (e.key === 'ArrowUp') {
+                if (navigateHints('up')) {
+                    e.preventDefault();
+                    return;
+                }
+            } else if (e.key === 'Tab') {
+                if (selectCurrentHint()) {
+                    e.preventDefault();
+                    return;
+                }
+            } else if (e.key === 'Escape') {
+                hideCommandHints();
+                return;
+            }
+            
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                
+                // Check if we have a selected hint
+                if (selectCurrentHint()) {
+                    return;
+                }
+                
+                const input = messageInput.value.trim();
+                
+                // Check if it's an inline command
+                if (processInlineCommand(input)) {
+                    messageInput.value = ''; // Clear input after command
+                    hideCommandHints();
+                    return;
+                }
+                
+                // Otherwise, send as normal message
+                hideCommandHints();
+                sendMessage();
+            }
+        });
+
+        // Add input event listener for showing hints
+        messageInput.addEventListener('input', function(e) {
+            const value = messageInput.value;
+            
+            if (value.startsWith('/')) {
+                showCommandHints(value);
+            } else {
+                hideCommandHints();
+            }
+        });
+
+        // Hide hints when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!messageInput.contains(e.target) && 
+                (!commandHintsDropdown || !commandHintsDropdown.contains(e.target))) {
+                hideCommandHints();
+            }
+        });
+
+        // Hide hints when input loses focus
+        messageInput.addEventListener('blur', function(e) {
+            // Delay hiding to allow clicking on hints
+            setTimeout(() => {
+                if (!messageInput.matches(':focus')) {
+                    hideCommandHints();
+                }
+            }, 150);
+        });
+    }
 
     // Check for API key
     const hasApiKey = await promptForApiKey();

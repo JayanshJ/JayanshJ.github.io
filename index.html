@@ -264,6 +264,17 @@
                     <!-- Divider -->
                     <div class="settings-divider"></div>
                     
+                    <button class="settings-option" onclick="showCommandsModal()">
+                        <span class="option-icon">⚡</span>
+                        <div class="option-content">
+                            <span class="option-title">Inline Commands</span>
+                            <span class="option-description">Manage quick shortcuts like /yt for YouTube</span>
+                        </div>
+                    </button>
+                    
+                    <!-- Divider -->
+                    <div class="settings-divider"></div>
+                    
                     <div class="settings-option accent-color-setting">
                         <span class="option-icon">🎨</span>
                         <div class="option-content">
@@ -432,6 +443,39 @@
         <div class="modal-backdrop" onclick="closeAuthModal()"></div>
     </div>
     
+    <!-- Commands Modal -->
+    <div id="commandsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚡ Inline Commands</h3>
+                <button class="modal-close" onclick="closeCommandsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="commands-help">
+                    <p>💡 Create shortcuts to quickly open websites. Type a command (like <code>/yt</code>) and press Enter to open the URL.</p>
+                </div>
+                
+                <div class="commands-list" id="commandsList">
+                    <!-- Commands will be populated here -->
+                </div>
+                
+                <div class="add-command-section">
+                    <h4>Add New Command</h4>
+                    <div class="input-group">
+                        <label for="newCommandName">Command (e.g., /yt):</label>
+                        <input type="text" id="newCommandName" class="modal-input" placeholder="/example">
+                    </div>
+                    <div class="input-group">
+                        <label for="newCommandUrl">URL:</label>
+                        <input type="url" id="newCommandUrl" class="modal-input" placeholder="https://example.com">
+                    </div>
+                    <button class="modal-btn primary" onclick="addNewCommand()">Add Command</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop" onclick="closeCommandsModal()"></div>
+    </div>
+
     <!-- User Profile Modal -->
     <div id="userProfileModal" class="modal" style="display: none;">
         <div class="modal-content">
