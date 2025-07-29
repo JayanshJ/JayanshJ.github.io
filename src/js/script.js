@@ -367,6 +367,9 @@ function addMessage(content, sender = 'user', type = 'normal', messageId = null)
             role: sender === 'user' ? 'user' : 'assistant',
             content: content
         });
+        
+        // Save the chat when a new message is added
+        saveCurrentChat();
     }
     
     // Append to messages container
@@ -1317,7 +1320,14 @@ async function saveChatFolders() {
         });
         
         // Save to cloud if signed in, localStorage if not
-        if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
+        // Check multiple auth sources to ensure we detect signed-in state
+        const isAuthenticated = (
+            (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) ||
+            (typeof window.firebaseAuth !== 'undefined' && window.firebaseAuth && window.firebaseAuth.currentUser) ||
+            (typeof window.authFunctions !== 'undefined' && window.authFunctions && window.authFunctions.getCurrentUser && window.authFunctions.getCurrentUser())
+        );
+        
+        if (isAuthenticated) {
             console.log(`☁️ User signed in - saving ${chatFolders.length} folders to Firebase...`);
             
             try {
@@ -1538,7 +1548,20 @@ async function saveChatHistory() {
         });
         
         // Save to cloud if signed in, localStorage if not
-        if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
+        // Check multiple auth sources to ensure we detect signed-in state
+        const isAuthenticated = (
+            (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) ||
+            (typeof window.firebaseAuth !== 'undefined' && window.firebaseAuth && window.firebaseAuth.currentUser) ||
+            (typeof window.authFunctions !== 'undefined' && window.authFunctions && window.authFunctions.getCurrentUser && window.authFunctions.getCurrentUser())
+        );
+        
+        console.log('🔍 Auth check:', {
+            chatStorage: typeof window.chatStorage !== 'undefined' && window.chatStorage ? window.chatStorage.getCurrentUser() : 'undefined',
+            firebaseAuth: typeof window.firebaseAuth !== 'undefined' && window.firebaseAuth ? window.firebaseAuth.currentUser : 'undefined',
+            authFunctions: typeof window.authFunctions !== 'undefined' && window.authFunctions ? window.authFunctions.getCurrentUser() : 'undefined'
+        });
+        
+        if (isAuthenticated) {
             console.log(`☁️ User signed in - saving ${chatHistory.length} chats to Firebase...`);
             
             // Check if we're in development and warn about CORS
@@ -4275,7 +4298,13 @@ async function continueMessageProcessing() {
                 role: 'assistant',
                 content: aiMessage
             });
+            
+            // Update chat timestamp and save
+            targetChat.lastUpdated = Date.now();
             console.log('✅ Response added to chat:', requestChatId);
+            
+            // Save the updated chat
+            saveChatHistory();
         }
 
         // Only update UI if user is currently viewing this chat

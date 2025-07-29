@@ -387,8 +387,23 @@ class SecureFirebaseClient {
     }
 
     getCurrentUser() {
-        console.log('🔍 getCurrentUser called, returning:', this.currentUser);
-        return this.currentUser;
+        // Check multiple auth sources for current user
+        let user = this.currentUser;
+        
+        // If no user in our cache, check Firebase auth directly
+        if (!user && window.firebaseAuth && window.firebaseAuth.currentUser) {
+            user = window.firebaseAuth.currentUser;
+            this.currentUser = user; // Cache it
+        }
+        
+        // Also check authFunctions
+        if (!user && window.authFunctions && window.authFunctions.getCurrentUser) {
+            user = window.authFunctions.getCurrentUser();
+            this.currentUser = user; // Cache it
+        }
+        
+        console.log('🔍 getCurrentUser called, returning:', user ? user.email || user.uid : null);
+        return user;
     }
 
     async handleInitialRedirectResult() {
@@ -810,19 +825,34 @@ class SecureFirebaseClient {
     // Chat storage functions that use secure API
     async saveChat(chatData) {
         console.log('💾 saveChat called for chat:', chatData.id);
-        console.log('👤 Current user:', this.currentUser);
         
+        const currentUser = this.getCurrentUser();
+        console.log('👤 Current user:', currentUser ? currentUser.email || currentUser.uid : null);
+        
+        if (!currentUser) {
+            console.warn('❌ No authenticated user found');
+            return { success: false, error: 'Not authenticated' };
+        }
+        
+        // Try to get fresh token from Firebase auth
         let token = localStorage.getItem('firebase_token');
+        
+        // If no token, try to get one from current Firebase user
+        if (!token && window.firebaseAuth && window.firebaseAuth.currentUser) {
+            try {
+                token = await window.firebaseAuth.currentUser.getIdToken();
+                localStorage.setItem('firebase_token', token);
+                console.log('🔑 Got fresh token from Firebase auth');
+            } catch (error) {
+                console.error('❌ Failed to get token from Firebase auth:', error);
+            }
+        }
+        
         console.log('🔑 Firebase token exists:', !!token);
         
         if (!token) {
             console.warn('❌ No authentication token found');
             return { success: false, error: 'Not authenticated' };
-        }
-        
-        if (!this.currentUser) {
-            console.warn('❌ No current user found');
-            return { success: false, error: 'User not authenticated' };
         }
 
         // Try the request, and if it fails with auth error, refresh token and retry
