@@ -53,6 +53,349 @@ let chatHistory = [];
 let chatFolders = [];
 let currentFolderId = null;
 
+// Storage Optimization Layer
+class StorageOptimizer {
+    constructor() {
+        this.chatCache = new Map();
+        this.maxCacheSize = 50;
+        this.batchOperations = new Map();
+        this.batchTimeout = null;
+        this.lastCacheCleanup = Date.now();
+        this.cleanupInterval = 5 * 60 * 1000; // 5 minutes
+    }
+
+    // LRU Cache implementation
+    getCachedChat(chatId) {
+        if (this.chatCache.has(chatId)) {
+            // Move to end (most recently used)
+            const chat = this.chatCache.get(chatId);
+            this.chatCache.delete(chatId);
+            this.chatCache.set(chatId, chat);
+            return chat;
+        }
+        return null;
+    }
+
+    setCachedChat(chatId, chat) {
+        // Remove oldest if cache is full
+        if (this.chatCache.size >= this.maxCacheSize) {
+            const firstKey = this.chatCache.keys().next().value;
+            this.chatCache.delete(firstKey);
+        }
+        this.chatCache.set(chatId, { ...chat, cached: Date.now() });
+    }
+
+    // Batch save operations to reduce API calls
+    batchSaveChat(chat) {
+        this.batchOperations.set(chat.id, chat);
+        
+        // Debounce batch execution
+        clearTimeout(this.batchTimeout);
+        this.batchTimeout = setTimeout(() => {
+            this.executeBatchSave();
+        }, 1000); // 1 second debounce
+    }
+
+    async executeBatchSave() {
+        if (this.batchOperations.size === 0) return;
+
+        const chatsToSave = Array.from(this.batchOperations.values());
+        this.batchOperations.clear();
+
+        console.log(`💾 Batch saving ${chatsToSave.length} chats`);
+
+        // Save to cache immediately for UI responsiveness
+        chatsToSave.forEach(chat => {
+            this.setCachedChat(chat.id, chat);
+            // Update local chatHistory array
+            const index = chatHistory.findIndex(c => c.id === chat.id);
+            if (index >= 0) {
+                chatHistory[index] = chat;
+            } else {
+                chatHistory.push(chat);
+            }
+        });
+
+        // Save to Firebase in background
+        try {
+            if (window.chatStorage && window.chatStorage.getCurrentUser()) {
+                // Save each chat (could be optimized with batch API)
+                for (const chat of chatsToSave) {
+                    await window.chatStorage.saveChat(chat);
+                }
+                console.log('✅ Batch save completed');
+            }
+        } catch (error) {
+            console.warn('⚠️ Batch save failed:', error);
+            // Could implement retry logic here
+        }
+    }
+
+    // Optimistic update - update UI immediately, sync in background
+    async optimisticSaveChat(chat) {
+        // Update cache and UI immediately
+        this.setCachedChat(chat.id, chat);
+        
+        // Update local array
+        const index = chatHistory.findIndex(c => c.id === chat.id);
+        if (index >= 0) {
+            chatHistory[index] = chat;
+        } else {
+            chatHistory.push(chat);
+        }
+
+        // Update UI
+        updateHistoryDisplay();
+
+        // Save to server in background
+        try {
+            if (window.chatStorage && window.chatStorage.getCurrentUser()) {
+                await window.chatStorage.saveChat(chat);
+            }
+        } catch (error) {
+            console.warn('⚠️ Background save failed:', error);
+            // Could show a "sync pending" indicator
+        }
+    }
+
+    // Cleanup old cache entries
+    cleanupCache() {
+        const now = Date.now();
+        if (now - this.lastCacheCleanup < this.cleanupInterval) return;
+
+        const cutoffTime = now - (30 * 60 * 1000); // 30 minutes
+        for (const [chatId, chat] of this.chatCache.entries()) {
+            if (chat.cached < cutoffTime) {
+                this.chatCache.delete(chatId);
+            }
+        }
+        this.lastCacheCleanup = now;
+        console.log(`🧹 Cache cleanup completed. Size: ${this.chatCache.size}`);
+    }
+
+    // Get chat with caching
+    async getChat(chatId) {
+        // Check cache first
+        const cached = this.getCachedChat(chatId);
+        if (cached) {
+            return cached;
+        }
+
+        // Check local array
+        const local = chatHistory.find(c => c.id === chatId);
+        if (local) {
+            this.setCachedChat(chatId, local);
+            return local;
+        }
+
+        // Fetch from server as last resort
+        try {
+            if (window.chatStorage && window.chatStorage.getCurrentUser()) {
+                const result = await window.chatStorage.getChat(chatId);
+                if (result.success && result.chat) {
+                    this.setCachedChat(chatId, result.chat);
+                    return result.chat;
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Failed to fetch chat from server:', error);
+        }
+
+        return null;
+    }
+
+    // Progressive loading - load recent chats first
+    async loadChatsProgressive() {
+        try {
+            // Load recent chats first (last 10)
+            if (window.chatStorage && window.chatStorage.getCurrentUser()) {
+                const result = await window.chatStorage.getUserChats();
+                if (result.success && result.chats) {
+                    // Sort by last updated and take recent ones
+                    const sortedChats = result.chats.sort((a, b) => 
+                        (b.lastUpdated || b.timestamp || 0) - (a.lastUpdated || a.timestamp || 0)
+                    );
+                    
+                    // Load first 10 immediately
+                    const recentChats = sortedChats.slice(0, 10);
+                    chatHistory = recentChats;
+                    
+                    // Cache them
+                    recentChats.forEach(chat => this.setCachedChat(chat.id, chat));
+                    
+                    // Update UI with recent chats
+                    updateHistoryDisplay();
+                    
+                    // Load remaining chats in background
+                    if (sortedChats.length > 10) {
+                        setTimeout(() => {
+                            const remainingChats = sortedChats.slice(10);
+                            chatHistory.push(...remainingChats);
+                            remainingChats.forEach(chat => this.setCachedChat(chat.id, chat));
+                            updateHistoryDisplay();
+                        }, 1000);
+                    }
+                    
+                    return true;
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Progressive loading failed:', error);
+        }
+        return false;
+    }
+}
+
+// Initialize storage optimizer
+const storageOptimizer = new StorageOptimizer();
+
+// Optimized save function - use this instead of direct Firebase calls
+async function saveCurrentChatOptimized() {
+    if (!currentChatId || conversationHistory.length === 0) return;
+
+    const chat = {
+        id: currentChatId,
+        title: generateChatTitle(),
+        messages: conversationHistory,
+        timestamp: Date.now(),
+        lastUpdated: Date.now(),
+        model: currentModel,
+        folderId: currentFolderId
+    };
+
+    // Use optimistic save for better UX
+    await storageOptimizer.optimisticSaveChat(chat);
+}
+
+// Batch save function for multiple chats
+function batchSaveChat(chat) {
+    storageOptimizer.batchSaveChat(chat);
+}
+
+// Get chat with caching
+async function getChatOptimized(chatId) {
+    return await storageOptimizer.getChat(chatId);
+}
+
+// Main sendMessage function - this was missing!
+async function sendMessage() {
+    console.log('📤 sendMessage() called');
+    
+    const messageInput = document.getElementById('messageInput');
+    if (!messageInput) {
+        console.error('Message input element not found!');
+        return;
+    }
+    
+    const message = messageInput.value.trim();
+    
+    // Check if it's an inline command first
+    if (processInlineCommand(message)) {
+        messageInput.value = ''; // Clear input after command
+        hideCommandHints();
+        return;
+    }
+    
+    // If not a command, proceed with normal message sending
+    if (!message && selectedImages.length === 0 && selectedFiles.length === 0) {
+        return; // Don't send empty messages
+    }
+    
+    // Clear the input immediately for better UX
+    messageInput.value = '';
+    hideCommandHints();
+    
+    // Call the async message sending function
+    await sendMessageAsync();
+}
+
+// Add message function - this was also missing!
+function addMessage(content, sender = 'user', type = 'normal', messageId = null) {
+    console.log('📝 addMessage() called:', { content, sender, type, messageId });
+    
+    const messagesContainer = document.getElementById('messages');
+    if (!messagesContainer) {
+        console.error('Messages container not found!');
+        return null;
+    }
+    
+    // Generate unique message ID if not provided
+    if (!messageId) {
+        messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.id = messageId;
+    messageDiv.className = `message ${sender}-message`;
+    
+    // Add special classes for different types
+    if (type === 'typing') {
+        messageDiv.classList.add('typing-message');
+    } else if (type === 'error') {
+        messageDiv.classList.add('error-message');
+    }
+    
+    // Create message content
+    let messageContent = '';
+    
+    if (type === 'typing') {
+        messageContent = `
+            <div class="message-content">
+                <div class="typing-indicator">
+                    <div class="typing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <span class="typing-text">AI is thinking...</span>
+                </div>
+            </div>
+        `;
+    } else {
+        messageContent = `
+            <div class="message-content">
+                <div class="message-text">${content}</div>
+            </div>
+        `;
+    }
+    
+    messageDiv.innerHTML = messageContent;
+    
+    // Add to conversation history if it's a real message (not typing indicator)
+    if (type !== 'typing' && content.trim()) {
+        conversationHistory.push({
+            role: sender === 'user' ? 'user' : 'assistant',
+            content: content
+        });
+    }
+    
+    // Append to messages container
+    messagesContainer.appendChild(messageDiv);
+    
+    // Scroll to bottom
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    // Auto-save chat if it's a real message
+    if (type !== 'typing' && content.trim()) {
+        setTimeout(() => {
+            saveCurrentChatOptimized();
+        }, 500);
+    }
+    
+    return messageId;
+}
+
+// Remove message function
+function removeMessage(messageId) {
+    if (!messageId) return;
+    
+    const messageElement = document.getElementById(messageId);
+    if (messageElement) {
+        messageElement.remove();
+        console.log('🗑️ Removed message:', messageId);
+    }
+}
+
 // Inline Commands System
 let inlineCommands = {
     '/yt': 'https://youtube.com',
@@ -316,7 +659,7 @@ let activeRequestTokens = new Map(); // chatId -> requestToken
 
 
 
-// Load chat history from Firebase only
+// Load chat history from Firebase with optimization
 async function loadChatHistory() {
     // Store current chat ID to preserve it if possible
     const previousChatId = currentChatId;
@@ -334,15 +677,20 @@ async function loadChatHistory() {
         
         // Load from Firebase only if user is authenticated
         if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
-            console.log('User authenticated, loading chats from Firebase...');
+            console.log('User authenticated, using progressive loading...');
             
-            const result = await window.chatStorage.getUserChats();
-            if (result.success && result.chats) {
-                chatHistory = result.chats;
-                console.log(`Loaded ${result.chats.length} chats from Firebase`);
-            } else if (result.error && result.error !== 'User not authenticated') {
-                console.warn('Firebase load error:', result.error);
-                chatHistory = []; // Start with empty history on error
+            // Use progressive loading for better performance
+            const loaded = await storageOptimizer.loadChatsProgressive();
+            if (!loaded) {
+                // Fallback to original method
+                const result = await window.chatStorage.getUserChats();
+                if (result.success && result.chats) {
+                    chatHistory = result.chats;
+                    console.log(`Loaded ${result.chats.length} chats from Firebase (fallback)`);
+                } else if (result.error && result.error !== 'User not authenticated') {
+                    console.warn('Firebase load error:', result.error);
+                    chatHistory = []; // Start with empty history on error
+                }
             }
         } else {
             console.log('User not authenticated, chat history requires login');
@@ -3303,8 +3651,84 @@ async function sendMessageAsync() {
         messageContent = message;
     }
 
+    // Add user message to conversation history
+    conversationHistory.push({
+        role: 'user',
+        content: messageContent
+    });
 
-    // Add user message to conversation history for all models
+    // Clear selected files and context after adding to conversation
+    clearSelectedFiles();
+    // clearSelectionContext(); // Function doesn't exist, commenting out
+
+    // Show typing indicator
+    const typingId = addMessage('', 'ai', 'typing');
+
+    try {
+        // Build messages array for API call
+        let messages;
+        if (currentModel === 'gpt-image-1') {
+            messages = conversationHistory;
+        } else {
+            messages = buildMessagesWithSystem(conversationHistory);
+        }
+
+        // Make API call
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: currentModel,
+                messages: messages,
+                max_completion_tokens: 10000,
+                ...(currentModel !== 'gpt-4o-search-preview-2025-03-11' && { temperature: getModelTemperature(currentModel) })
+            })
+        });
+
+        // Remove typing indicator
+        removeMessage(typingId);
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || `HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        let aiMessage = data.choices[0].message.content;
+        
+        // Apply formatting rules to AI response
+        aiMessage = formatAIResponse(aiMessage);
+
+        // Add AI response to conversation history
+        conversationHistory.push({
+            role: 'assistant',
+            content: aiMessage
+        });
+
+        // Display the AI response
+        addMessage(aiMessage, 'ai');
+        
+        // Save the updated chat
+        await saveCurrentChat();
+
+    } catch (error) {
+        // Remove typing indicator on error
+        removeMessage(typingId);
+        console.error('Error sending message:', error);
+        addMessage(`❌ Error: ${error.message}`, 'ai', 'error');
+    } finally {
+        // Re-enable input and button
+        input.disabled = false;
+        sendButton.disabled = false;
+        input.focus();
+    }
+}
+
+// Add user message to conversation history for all models
+async function continueMessageProcessing() {
     const userMessage = {
         role: 'user',
         content: messageContent
@@ -3365,7 +3789,7 @@ async function sendMessageAsync() {
 
         // Check if this is a valid request for the original chat
         const currentActiveToken = activeRequestTokens.get(requestChatId);
-        if (currentActiveToken !== requestToken) {
+        if (currentActiveToken && currentActiveToken !== requestToken) {
             console.warn('🚨 Invalid token! Expected:', currentActiveToken, 'got:', requestToken);
             console.log('❌ Discarding response - token mismatch');
             removeMessage(typingId);
@@ -5324,6 +5748,11 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Load inline commands
     loadInlineCommands();
+
+    // Start periodic cache cleanup
+    setInterval(() => {
+        storageOptimizer.cleanupCache();
+    }, 5 * 60 * 1000); // Every 5 minutes
 
     // Add input event listener for inline commands
     if (messageInput) {
