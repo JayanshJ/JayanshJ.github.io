@@ -1537,13 +1537,9 @@ async function saveChatHistory() {
             }
         });
         
-        // Always save to localStorage first for immediate persistence
-        localStorage.setItem('chatgpt_history_dev', JSON.stringify(chatHistory));
-        console.log(`💾 Saved ${chatHistory.length} chats to localStorage`);
-        
-        // Also save to Firebase if user is authenticated
+        // Save to cloud if signed in, localStorage if not
         if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
-            console.log(`☁️ Syncing ${chatHistory.length} chats to Firebase...`);
+            console.log(`☁️ User signed in - saving ${chatHistory.length} chats to Firebase...`);
             
             // Check if we're in development and warn about CORS
             if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
@@ -1583,7 +1579,7 @@ async function saveChatHistory() {
             const results = await Promise.allSettled(savePromises);
             const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
             
-            console.log(`Successfully saved ${successCount}/${chatHistory.length} chats to Firebase`);
+            console.log(`✅ Successfully saved ${successCount}/${chatHistory.length} chats to Firebase`);
             
             // Check for any failures and log them
             const failures = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success));
