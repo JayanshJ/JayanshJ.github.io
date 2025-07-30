@@ -126,6 +126,13 @@ class StorageOptimizer {
             }
         }
 
+        // Ensure proper sorting before updating UI
+        chatHistory.sort((a, b) => {
+            const aTime = a.lastUpdated || a.timestamp || 0;
+            const bTime = b.lastUpdated || b.timestamp || 0;
+            return bTime - aTime; // Newest first (descending order)
+        });
+        
         // Update UI
         updateHistoryDisplay();
 
@@ -268,18 +275,22 @@ const storageOptimizer = new StorageOptimizer();
 async function saveCurrentChatOptimized() {
     if (!currentChatId || conversationHistory.length === 0) return;
 
+    const currentTime = Date.now();
     const chat = {
         id: currentChatId,
         title: generateChatTitle(),
         messages: conversationHistory,
-        timestamp: Date.now(),
-        lastUpdated: Date.now(),
+        timestamp: currentTime,
+        lastUpdated: currentTime,
         model: currentModel,
         folderId: currentFolderId
     };
 
     // Use optimistic save for better UX
     await storageOptimizer.optimisticSaveChat(chat);
+    
+    // Force immediate sort and display update
+    forceSortAndUpdate();
 }
 
 // Batch save function for multiple chats
@@ -306,6 +317,16 @@ function cleanupChatHistory() {
     });
     
     console.log(`✅ Chat history cleaned: ${originalLength} → ${chatHistory.length} chats`);
+    updateHistoryDisplay();
+}
+
+// Force immediate sort and display update - call this after any chat modification
+function forceSortAndUpdate() {
+    chatHistory.sort((a, b) => {
+        const aTime = a.lastUpdated || a.timestamp || 0;
+        const bTime = b.lastUpdated || b.timestamp || 0;
+        return bTime - aTime; // Newest first (descending order)
+    });
     updateHistoryDisplay();
 }
 
@@ -414,6 +435,8 @@ function addMessage(content, sender = 'user', type = 'normal', messageId = null)
     if (type !== 'typing' && content.trim()) {
         setTimeout(() => {
             saveCurrentChatOptimized();
+            // Force immediate sort and display update
+            forceSortAndUpdate();
         }, 500);
     }
     
@@ -2679,8 +2702,9 @@ Title:`;
                 const chatIndex = chatHistory.findIndex(chat => chat.id === currentChatId);
                 if (chatIndex !== -1) {
                     chatHistory[chatIndex].title = smartTitle;
+                    chatHistory[chatIndex].lastUpdated = Date.now(); // Update timestamp
                     debouncedSave();
-                    updateHistoryDisplay();
+                    forceSortAndUpdate(); // Force immediate sort and update
                 }
             }
         }
@@ -2981,6 +3005,9 @@ window.testFirebaseConnection = testFirebaseConnection;
 // Make cleanup function available globally for manual use
 window.cleanupChatHistory = cleanupChatHistory;
 
+// Make force sort function available globally for manual use
+window.forceSortAndUpdate = forceSortAndUpdate;
+
 // Wrapper for HTML onclick handlers  
 function deleteChat(chatId) {
     deleteChatAsync(chatId).catch(error => {
@@ -3021,20 +3048,20 @@ function updateHistoryDisplay() {
     const historyList = document.getElementById('historyList');
     if (!historyList) return;
     
+    // First, ensure chatHistory is properly sorted
+    chatHistory.sort((a, b) => {
+        const aTime = a.lastUpdated || a.timestamp || 0;
+        const bTime = b.lastUpdated || b.timestamp || 0;
+        return bTime - aTime; // Newest first (descending order)
+    });
+    
     let html = '';
     
     // ...existing code...
     
-    // Get chats not in any folder and sort them by most recent activity
+    // Get chats not in any folder (already sorted above)
     const chatsInFolders = chatFolders.flatMap(folder => folder.chats);
-    const unorganizedChats = chatHistory
-        .filter(chat => !chatsInFolders.includes(chat.id))
-        .sort((a, b) => {
-            // Use lastUpdated if available, otherwise fall back to timestamp
-            const aTime = a.lastUpdated || a.timestamp || 0;
-            const bTime = b.lastUpdated || b.timestamp || 0;
-            return bTime - aTime; // Newest first (descending order)
-        });
+    const unorganizedChats = chatHistory.filter(chat => !chatsInFolders.includes(chat.id));
     
     // Show previous chats section
     if (unorganizedChats.length > 0) {
@@ -3138,13 +3165,15 @@ function updateChatHistory() {
     const chatHistoryContainer = document.querySelector('.chat-history-container');
     if (!chatHistoryContainer) return;
 
-    // Sort chatHistory array properly by most recent activity
-    const chats = [...chatHistory].sort((a, b) => {
+    // Sort chatHistory array in place to ensure consistent ordering
+    chatHistory.sort((a, b) => {
         // Use lastUpdated if available, otherwise fall back to timestamp
         const aTime = a.lastUpdated || a.timestamp || 0;
         const bTime = b.lastUpdated || b.timestamp || 0;
         return bTime - aTime; // Newest first (descending order)
     });
+    
+    const chats = chatHistory;
     
     // Always show the add folder button, regardless of chat count
     const addFolderButton = document.querySelector('.add-folder-btn');
