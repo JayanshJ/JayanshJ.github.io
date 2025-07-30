@@ -108,6 +108,9 @@ class StorageOptimizer {
 
     // Optimistic update - update UI immediately, sync in background
     async optimisticSaveChat(chat) {
+        // Ensure chat has proper timestamp
+        chat.lastUpdated = Date.now();
+        
         // Update cache and UI immediately
         this.setCachedChat(chat.id, chat);
         
@@ -2961,9 +2964,16 @@ function updateHistoryDisplay() {
     
     // ...existing code...
     
-    // Get chats not in any folder
+    // Get chats not in any folder and sort them by most recent activity
     const chatsInFolders = chatFolders.flatMap(folder => folder.chats);
-    const unorganizedChats = chatHistory.filter(chat => !chatsInFolders.includes(chat.id));
+    const unorganizedChats = chatHistory
+        .filter(chat => !chatsInFolders.includes(chat.id))
+        .sort((a, b) => {
+            // Use lastUpdated if available, otherwise fall back to timestamp
+            const aTime = a.lastUpdated || a.timestamp || 0;
+            const bTime = b.lastUpdated || b.timestamp || 0;
+            return bTime - aTime; // Newest first (descending order)
+        });
     
     // Show previous chats section
     if (unorganizedChats.length > 0) {
@@ -2976,11 +2986,15 @@ function updateHistoryDisplay() {
         `;
         
         unorganizedChats.forEach(chat => {
+            // Format the date properly
+            const chatDate = chat.lastUpdated || chat.timestamp || 0;
+            const formattedDate = chatDate ? new Date(chatDate).toLocaleDateString() : 'Unknown';
+            
             html += `
                 <div class="history-item ${chat.id === currentChatId ? 'active' : ''}" onclick="loadChat('${chat.id}')">
                     <div class="history-content">
                         <div class="history-title">${chat.title}</div>
-                        <div class="history-date">${chat.date}</div>
+                        <div class="history-date">${formattedDate}</div>
                     </div>
                     <div class="history-actions">
                         <button class="history-action-btn move" onclick="event.stopPropagation(); showMoveMenu('${chat.id}')" title="Move to folder">
@@ -3063,7 +3077,8 @@ function updateChatHistory() {
     const chatHistoryContainer = document.querySelector('.chat-history-container');
     if (!chatHistoryContainer) return;
 
-    const chats = Object.values(chatHistory).sort((a, b) => {
+    // Sort chatHistory array properly by most recent activity
+    const chats = [...chatHistory].sort((a, b) => {
         // Use lastUpdated if available, otherwise fall back to timestamp
         const aTime = a.lastUpdated || a.timestamp || 0;
         const bTime = b.lastUpdated || b.timestamp || 0;
