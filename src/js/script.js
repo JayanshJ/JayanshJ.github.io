@@ -4031,7 +4031,7 @@ async function sendMessageAsync() {
     input.disabled = true;
     sendButton.disabled = true;
 
-    // Update display message for files if no display message
+    //Update display message for files if no display message
     if (!displayMessage && (selectedImages.length > 0 || selectedFiles.length > 0)) {
         const hasImages = selectedImages.length > 0;
         const hasPDFs = selectedFiles.some(f => !f.isAudio);
@@ -4040,7 +4040,7 @@ async function sendMessageAsync() {
         if (hasImages && hasPDFs) {
             displayMessage = 'Analyze these images and PDFs';
         } else if (hasImages) {
-            displayMessage = selectedImages.length === 1 ? 'Analyze this image' : 'Analyze these images';
+            displayMessage = selectedImages.length === 1 ? 'Analyze and Answer' : 'Analyze and Answer';
         } else if (hasPDFs) {
             displayMessage = selectedFiles.filter(f => !f.isAudio).length === 1 ? 'Analyze this PDF' : 'Analyze these PDFs';
         } else if (hasAudio) {
