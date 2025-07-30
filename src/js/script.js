@@ -2371,8 +2371,27 @@ function processMessageText(text) {
     const codeBlocks = [];
     console.log('Processing text for code blocks:', text.substring(0, 200));
     
-    // Try multiple code block patterns
+    // Try multiple code block patterns, but exclude mathematical content
     text = text.replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, language, code) => {
+        // Check if this is mathematical content that should be processed by MathJax
+        const isMathContent = code.includes('\\begin{') || code.includes('\\end{') || 
+                             code.includes('\\matrix') || code.includes('\\bmatrix') || 
+                             code.includes('\\pmatrix') || code.includes('\\vmatrix') ||
+                             code.includes('\\det') || code.includes('\\frac') ||
+                             code.includes('\\sum') || code.includes('\\int') ||
+                             code.includes('\\alpha') || code.includes('\\beta') ||
+                             code.includes('\\gamma') || code.includes('\\delta') ||
+                             code.includes('\\theta') || code.includes('\\lambda') ||
+                             code.includes('\\mu') || code.includes('\\sigma') ||
+                             code.includes('\\pi') || code.includes('\\omega') ||
+                             (code.includes('\\') && code.match(/\\[a-zA-Z]+/));
+        
+        // If it's math content, don't treat it as a code block - let MathJax handle it
+        if (isMathContent) {
+            console.log('Detected mathematical content, preserving for MathJax:', code.substring(0, 50));
+            return match; // Return the original match unchanged
+        }
+        
         console.log('Found triple backtick code block!');
         const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`;
         const cleanCode = code.replace(/^\n+/, '').replace(/\n+$/, '');
@@ -2383,8 +2402,27 @@ function processMessageText(text) {
         return placeholder;
     });
     
-    // Also try to handle code without language specifier  
+    // Also try to handle code without language specifier, but exclude math content
     text = text.replace(/```\n?([\s\S]*?)```/g, (match, code) => {
+        // Check if this is mathematical content that should be processed by MathJax
+        const isMathContent = code.includes('\\begin{') || code.includes('\\end{') || 
+                             code.includes('\\matrix') || code.includes('\\bmatrix') || 
+                             code.includes('\\pmatrix') || code.includes('\\vmatrix') ||
+                             code.includes('\\det') || code.includes('\\frac') ||
+                             code.includes('\\sum') || code.includes('\\int') ||
+                             code.includes('\\alpha') || code.includes('\\beta') ||
+                             code.includes('\\gamma') || code.includes('\\delta') ||
+                             code.includes('\\theta') || code.includes('\\lambda') ||
+                             code.includes('\\mu') || code.includes('\\sigma') ||
+                             code.includes('\\pi') || code.includes('\\omega') ||
+                             (code.includes('\\') && code.match(/\\[a-zA-Z]+/));
+        
+        // If it's math content, don't treat it as a code block - let MathJax handle it
+        if (isMathContent) {
+            console.log('Detected mathematical content in plain block, preserving for MathJax:', code.substring(0, 50));
+            return match; // Return the original match unchanged
+        }
+        
         console.log('Found plain code block!');
         const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`;
         const cleanCode = code.replace(/^\n+/, '').replace(/\n+$/, '');

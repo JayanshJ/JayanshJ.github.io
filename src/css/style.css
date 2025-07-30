@@ -2269,8 +2269,8 @@ body {
     position: relative;
     transform: translateY(0);
     box-shadow: var(--shadow-md), var(--shadow-inner);
-    max-width: 600px;
-    width: 70%;
+    max-width: 800px;
+    width: 85%;
     margin: 0 auto;
 }
 
@@ -3497,8 +3497,8 @@ body {
         align-items: center;
         box-shadow: var(--shadow-md);
         max-width: none;
-        width: 100%;
-        margin: 0;
+        width: 95%;
+        margin: 0 auto;
         min-height: 56px;
     }
     
