@@ -114,16 +114,25 @@ class StorageOptimizer {
         // Update cache and UI immediately
         this.setCachedChat(chat.id, chat);
         
-        // Update local array
+        // Update local array and prevent duplicates
         const index = chatHistory.findIndex(c => c.id === chat.id);
         if (index >= 0) {
             chatHistory[index] = chat;
         } else {
-            chatHistory.push(chat);
+            // Double-check for duplicates before adding
+            const existingChat = chatHistory.find(c => c.id === chat.id);
+            if (!existingChat) {
+                chatHistory.push(chat);
+            }
         }
 
         // Update UI
         updateHistoryDisplay();
+
+        // Periodic cleanup every 10 saves to prevent accumulation of duplicates
+        if (Math.random() < 0.1) { // 10% chance
+            setTimeout(() => cleanupChatHistory(), 1000);
+        }
 
         // Save to server in background
         try {
@@ -149,6 +158,30 @@ class StorageOptimizer {
         }
         this.lastCacheCleanup = now;
         console.log(`🧹 Cache cleanup completed. Size: ${this.chatCache.size}`);
+    }
+
+    // Remove duplicate chats based on ID, keeping the most recent version
+    removeDuplicateChats(chats) {
+        const chatMap = new Map();
+        
+        chats.forEach(chat => {
+            const existingChat = chatMap.get(chat.id);
+            if (!existingChat) {
+                chatMap.set(chat.id, chat);
+            } else {
+                // Keep the chat with the most recent lastUpdated or timestamp
+                const existingTime = existingChat.lastUpdated || existingChat.timestamp || 0;
+                const newTime = chat.lastUpdated || chat.timestamp || 0;
+                
+                if (newTime > existingTime) {
+                    chatMap.set(chat.id, chat);
+                }
+            }
+        });
+        
+        const uniqueChats = Array.from(chatMap.values());
+        console.log(`🔧 Removed ${chats.length - uniqueChats.length} duplicate chats`);
+        return uniqueChats;
     }
 
     // Get chat with caching
@@ -189,8 +222,9 @@ class StorageOptimizer {
             if (window.chatStorage && window.chatStorage.getCurrentUser()) {
                 const result = await window.chatStorage.getUserChats();
                 if (result.success && result.chats) {
-                    // Sort by last updated and take recent ones
-                    const sortedChats = result.chats.sort((a, b) => 
+                    // Remove duplicates first, then sort by last updated
+                    const uniqueChats = this.removeDuplicateChats(result.chats);
+                    const sortedChats = uniqueChats.sort((a, b) => 
                         (b.lastUpdated || b.timestamp || 0) - (a.lastUpdated || a.timestamp || 0)
                     );
                     
@@ -208,8 +242,11 @@ class StorageOptimizer {
                     if (sortedChats.length > 10) {
                         setTimeout(() => {
                             const remainingChats = sortedChats.slice(10);
-                            chatHistory.push(...remainingChats);
-                            remainingChats.forEach(chat => this.setCachedChat(chat.id, chat));
+                            // Prevent duplicates by checking existing IDs
+                            const existingIds = new Set(chatHistory.map(chat => chat.id));
+                            const newChats = remainingChats.filter(chat => !existingIds.has(chat.id));
+                            chatHistory.push(...newChats);
+                            newChats.forEach(chat => this.setCachedChat(chat.id, chat));
                             updateHistoryDisplay();
                         }, 1000);
                     }
@@ -253,6 +290,23 @@ function batchSaveChat(chat) {
 // Get chat with caching
 async function getChatOptimized(chatId) {
     return await storageOptimizer.getChat(chatId);
+}
+
+// Clean up chatHistory array to remove duplicates and ensure proper ordering
+function cleanupChatHistory() {
+    console.log('🧹 Cleaning up chat history...');
+    const originalLength = chatHistory.length;
+    
+    // Remove duplicates and sort
+    chatHistory = storageOptimizer.removeDuplicateChats(chatHistory);
+    chatHistory.sort((a, b) => {
+        const aTime = a.lastUpdated || a.timestamp || 0;
+        const bTime = b.lastUpdated || b.timestamp || 0;
+        return bTime - aTime; // Newest first
+    });
+    
+    console.log(`✅ Chat history cleaned: ${originalLength} → ${chatHistory.length} chats`);
+    updateHistoryDisplay();
 }
 
 // Main sendMessage function - this was missing!
@@ -1131,8 +1185,12 @@ async function loadChatHistory() {
                 // Fallback to original method
                 const result = await window.chatStorage.getUserChats();
                 if (result.success && result.chats) {
-                    chatHistory = result.chats;
-                    console.log(`Loaded ${result.chats.length} chats from Firebase (fallback)`);
+                    // Remove duplicates and sort properly
+                    const uniqueChats = storageOptimizer.removeDuplicateChats(result.chats);
+                    chatHistory = uniqueChats.sort((a, b) => 
+                        (b.lastUpdated || b.timestamp || 0) - (a.lastUpdated || a.timestamp || 0)
+                    );
+                    console.log(`Loaded ${chatHistory.length} unique chats from Firebase (fallback)`);
                 } else if (result.error && result.error !== 'User not authenticated') {
                     console.warn('Firebase load error:', result.error);
                     chatHistory = []; // Start with empty history on error
@@ -2919,6 +2977,9 @@ async function testFirebaseConnection() {
 
 // Make test function available globally
 window.testFirebaseConnection = testFirebaseConnection;
+
+// Make cleanup function available globally for manual use
+window.cleanupChatHistory = cleanupChatHistory;
 
 // Wrapper for HTML onclick handlers  
 function deleteChat(chatId) {
