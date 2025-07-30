@@ -121,10 +121,10 @@ body {
     left: 0;
     transform: none;
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
-    margin: 16px;
-    margin-left: 16px;
-    height: calc(100vh - 32px);
+    /* border-radius: 0; */
+    /* margin: 16px;
+    margin-left: 16px; */
+    /* height: calc(100vh - 32px); */
     overflow: hidden;
 }
 
@@ -133,7 +133,7 @@ body {
     padding: 24px 20px 20px;
     background: var(--bg-tertiary);
     position: relative;
-    border-radius: 16px 16px 0 0;
+    border-radius: 0;
     border-bottom: 1px solid var(--bg-elevated);
 }
 
@@ -257,7 +257,7 @@ body {
     overflow-y: auto;
     margin-top: 0;
     position: relative;
-    border-radius: 0 0 16px 16px;
+    border-radius: 0;
 }
 
 
@@ -1160,9 +1160,9 @@ body {
     position: relative;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     border: 1px solid #151515;
-    border-radius: 12px !important;
-    margin: var(--space-3);
-    margin-left: 0;
+    border-radius: 0 !important;
+    /* margin: var(--space-3);
+    margin-left: 0; */
     box-shadow: var(--shadow-md);
     overflow: hidden;
 }
@@ -1258,7 +1258,7 @@ body {
     padding: var(--space-4);
     scroll-behavior: smooth;
     background: linear-gradient(180deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
-    border-radius: 12px 12px 12px 12px !important;
+    /*border-radius: 12px 12px 12px 12px !important;*/
 }
 
 /* Welcome Screen */
@@ -2938,7 +2938,7 @@ body {
 }
 
 /* Large screen border radius fix */
-@media (min-width: 1200px) {
+/* @media (min-width: 1200px) {
     .sidebar {
         border-radius: 12px !important;
     }
@@ -2950,7 +2950,7 @@ body {
     .chat-history {
         border-radius: 0 0 12px 12px !important;
     }
-}
+} */
 
 /* Mobile responsiveness */
 @media (max-width: 768px) {
@@ -3036,7 +3036,7 @@ body {
         width: 85vw;
         max-width: 320px;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        border-radius: 0;
+        /* border-radius: 0; */
         background-color: var(--bg-secondary);
         border-right: 1px solid var(--border-primary);
         overflow-y: auto;
@@ -3056,7 +3056,7 @@ body {
     }
     
     .sidebar-header {
-        padding: 28px 24px 24px 24px;
+        /* padding: 28px 24px 24px 24px; */
         background: var(--bg-tertiary);
         border-bottom: 1px solid var(--border-primary);
         position: sticky;
@@ -5756,7 +5756,7 @@ body {
     -webkit-text-fill-color: transparent;
     background-clip: text;
 }
-
+/* 
 /* Ultra-wide screen optimizations */
 @media (min-width: 1600px) {
     /* Make chat area even wider on large screens */
@@ -5813,6 +5813,7 @@ body {
         border-radius: 12px 0 0 12px !important;
     }
 }
+*/
 
 /* Loading States & Skeleton Loaders */
 .skeleton {
