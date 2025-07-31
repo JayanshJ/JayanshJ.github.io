@@ -2269,8 +2269,8 @@ body {
     position: relative;
     transform: translateY(0);
     box-shadow: var(--shadow-md), var(--shadow-inner);
-    max-width: 800px;
-    width: 85%;
+    /* max-width: 800px; */
+    width: 100%;
     margin: 0 auto;
 }
 
@@ -5756,64 +5756,8 @@ body {
     -webkit-text-fill-color: transparent;
     background-clip: text;
 }
-/* 
-/* Ultra-wide screen optimizations */
-@media (min-width: 1600px) {
-    /* Make chat area even wider on large screens */
-    .message {
-        max-width: 90rem;
-    }
-    
-    .input-area {
-        max-width: 90rem;
-    }
-    
-    .input-wrapper {
-        max-width: 88rem;
-        margin: 0 auto;
-    }
-    
-    /* Optimize message content width for ultra-wide */
-    .message.ai-message .message-content {
-        max-width: 92%;
-    }
-    
-    .message.user-message .message-content {
-        max-width: 78%;
-    }
-}
 
-@media (min-width: 2000px) {
-    /* Maximum width for very large displays */
-    .message {
-        max-width: 110rem;
-    }
-    
-    .input-area {
-        max-width: 110rem;
-    }
-    
-    .input-wrapper {
-        max-width: 108rem;
-        margin: 0 auto;
-    }
-    
-    /* Maintain readability on very wide screens */
-    .message.ai-message .message-content {
-        max-width: 88%;
-    }
-    
-    .message.user-message .message-content {
-        max-width: 75%;
-    }
-    
-    /* Slightly reduce sidebar on very wide screens */
-    .sidebar {
-        width: 240px;
-        border-radius: 12px 0 0 12px !important;
-    }
-}
-*/
+
 
 /* Loading States & Skeleton Loaders */
 .skeleton {
