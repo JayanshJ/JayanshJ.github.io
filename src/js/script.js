@@ -25,8 +25,6 @@ let selectedFiles = []; // Support multiple files
 let currentModel = 'gpt-4.1-2025-04-14';
 let currentChatId = null;
 let chatHistory = [];
-let chatFolders = [];
-let currentFolderId = null;
 
 // Storage Optimization Layer
 class StorageOptimizer {
@@ -282,8 +280,7 @@ async function saveCurrentChatOptimized() {
         messages: conversationHistory,
         timestamp: currentTime,
         lastUpdated: currentTime,
-        model: currentModel,
-        folderId: currentFolderId
+        model: currentModel
     };
 
     // Use optimistic save for better UX
@@ -322,12 +319,31 @@ function cleanupChatHistory() {
 
 // Force immediate sort and display update - call this after any chat modification
 function forceSortAndUpdate() {
+    console.log('🔄 Force sorting chat history...');
+    const beforeCount = chatHistory.length;
+    
+    // Remove any duplicates first
+    const uniqueChats = [];
+    const seenIds = new Set();
+    
+    chatHistory.forEach(chat => {
+        if (!seenIds.has(chat.id)) {
+            seenIds.add(chat.id);
+            uniqueChats.push(chat);
+        }
+    });
+    
+    chatHistory = uniqueChats;
+    
+    // Then sort by lastUpdated/timestamp
     chatHistory.sort((a, b) => {
         const aTime = a.lastUpdated || a.timestamp || 0;
         const bTime = b.lastUpdated || b.timestamp || 0;
         return bTime - aTime; // Newest first (descending order)
     });
-    updateHistoryDisplay();
+    
+    console.log(`✅ Sorted ${beforeCount} → ${chatHistory.length} chats`);
+    throttledUpdateHistoryDisplay();
 }
 
 // Main sendMessage function - this was missing!
@@ -1187,6 +1203,18 @@ let isRecording = false;
 // Track active requests per chat to prevent race conditions
 let activeRequestTokens = new Map(); // chatId -> requestToken
 
+// Throttle display updates to prevent UI jumping
+let displayUpdateTimeout = null;
+function throttledUpdateHistoryDisplay() {
+    if (displayUpdateTimeout) {
+        clearTimeout(displayUpdateTimeout);
+    }
+    displayUpdateTimeout = setTimeout(() => {
+        updateHistoryDisplay();
+        displayUpdateTimeout = null;
+    }, 100); // 100ms throttle
+}
+
 
 
 // Load chat history from Firebase with optimization
@@ -1273,7 +1301,6 @@ async function loadChatHistory() {
             chatHistory = []; // Start with empty history on any error in production
         }
     }
-    await loadChatFolders();
     
     // Try to restore the previous current chat ID if it still exists
     if (previousChatId) {
@@ -1331,275 +1358,6 @@ function redisplayConversation() {
 }
 
 
-// Load chat folders from Firebase only
-async function loadChatFolders() {
-    try {
-        // Check if Firebase and authentication are available for folders
-        let authRetries = 0;
-        const maxRetries = 4; // Reduced to 2 seconds for folders
-        while ((!window.chatStorage || !window.chatStorage.getCurrentUser()) && authRetries < maxRetries) {
-            if (authRetries === 0) {
-                console.log('📁 Loading folders from localStorage (user not authenticated)');
-            }
-            await new Promise(resolve => setTimeout(resolve, 500));
-            authRetries++;
-        }
-        
-        // Load from Firebase only if user is authenticated
-        if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
-            console.log('User authenticated, loading folders from Firebase...');
-            
-            const result = await window.chatStorage.getUserFolders();
-            if (result.success && result.folders) {
-                chatFolders = result.folders;
-                console.log(`Loaded ${result.folders.length} folders from Firebase`);
-            } else if (result.error && result.error !== 'User not authenticated') {
-                console.warn('Firebase folder load error:', result.error);
-                chatFolders = []; // Start with empty folders on error
-            }
-        } else {
-            console.log('User not authenticated, loading folders from localStorage');
-            // Load from localStorage when not authenticated
-            try {
-                const saved = localStorage.getItem('chatgpt_folders_dev');
-                if (saved) {
-                    chatFolders = JSON.parse(saved);
-                    console.log(`📁 Loaded ${chatFolders.length} folders from localStorage:`, chatFolders.map(f => ({ id: f.id, name: f.name })));
-                } else {
-                    console.log('📁 No folders found in localStorage');
-                    chatFolders = [];
-                }
-            } catch (error) {
-                console.error('❌ Error loading folders from localStorage:', error);
-                chatFolders = [];
-            }
-        }
-    } catch (e) {
-        console.error('Error loading chat folders:', e);
-        chatFolders = []; // Start with empty folders on any error
-    }
-}
-
-// Merge folders from different sources, keeping the most recent version
-
-// Save chat folders to Firebase only
-let folderSavingInProgress = false;
-async function saveChatFolders() {
-    if (folderSavingInProgress) {
-        console.log('Folder save already in progress, skipping...');
-        return;
-    }
-    
-    folderSavingInProgress = true;
-    try {
-        // First, update all folders with current timestamp
-        const currentTime = Date.now();
-        chatFolders.forEach(folder => {
-            if (!folder.lastUpdated || folder.lastUpdated < currentTime - 1000) {
-                folder.lastUpdated = currentTime;
-            }
-        });
-        
-        // Save to cloud if signed in, localStorage if not
-        // Check multiple auth sources to ensure we detect signed-in state
-        const isAuthenticated = (
-            (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) ||
-            (typeof window.firebaseAuth !== 'undefined' && window.firebaseAuth && window.firebaseAuth.currentUser) ||
-            (typeof window.authFunctions !== 'undefined' && window.authFunctions && window.authFunctions.getCurrentUser && window.authFunctions.getCurrentUser())
-        );
-        
-        if (isAuthenticated) {
-            console.log(`☁️ User signed in - saving ${chatFolders.length} folders to Firebase...`);
-            
-            try {
-                const result = await window.chatStorage.saveFolders(chatFolders);
-                if (result.success) {
-                    console.log('✅ Folders saved to Firebase');
-                } else {
-                    console.warn('⚠️ Failed to save folders to Firebase:', result.error);
-                }
-            } catch (error) {
-                console.warn('⚠️ Firebase folder save failed:', error);
-            }
-        } else {
-            // User not signed in - save to localStorage
-            try {
-                localStorage.setItem('chatgpt_folders_dev', JSON.stringify(chatFolders));
-                console.log(`📁 User not signed in - saved ${chatFolders.length} folders to localStorage`);
-                console.log('📁 Folders saved to localStorage:', chatFolders.map(f => ({ id: f.id, name: f.name })));
-            } catch (error) {
-                console.error('❌ Failed to save folders to localStorage:', error);
-                throw error;
-            }
-        }
-    } catch (e) {
-        console.error('Error saving chat folders:', e);
-    } finally {
-        folderSavingInProgress = false;
-    }
-}
-
-// Create a new folder
-async function createFolder() {
-    const folderName = prompt('Enter folder name:');
-    if (folderName && folderName.trim()) {
-        const newFolder = {
-            id: 'folder_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-            name: folderName.trim(),
-            chats: [],
-            expanded: true,
-            createdAt: Date.now()
-        };
-        
-        // Add userId if user is authenticated
-        if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
-            newFolder.userId = window.chatStorage.getCurrentUser().uid;
-        }
-        chatFolders.push(newFolder);
-        await saveChatFolders();
-        updateHistoryDisplay();
-    }
-}
-
-// Delete a folder (async implementation)
-async function deleteFolderAsync(folderId) {
-    console.log('🗑️ deleteFolderAsync called for:', folderId);
-    console.log('📁 Current folders:', chatFolders.map(f => ({ id: f.id, name: f.name })));
-    
-    const folder = chatFolders.find(f => f.id === folderId);
-    if (!folder) {
-        console.error('❌ Folder not found:', folderId);
-        return;
-    }
-    
-    console.log('📂 Found folder to delete:', folder.name, 'with', folder.chats.length, 'chats');
-    
-    const confirmMessage = folder.chats.length > 0 
-        ? `Delete folder "${folder.name}" and its ${folder.chats.length} chat(s)? This cannot be undone.`
-        : `Delete folder "${folder.name}"?`;
-    
-    if (confirm(confirmMessage)) {
-        console.log('✅ User confirmed deletion');
-        
-        // Remove all chats from this folder from main chatHistory
-        const chatsToDelete = [...folder.chats]; // Copy array to avoid mutation issues
-        console.log('🗑️ Deleting chats:', chatsToDelete);
-        
-        chatsToDelete.forEach(chatId => {
-            chatHistory = chatHistory.filter(chat => chat.id !== chatId);
-        });
-        
-        // Remove the folder
-        const originalFolderCount = chatFolders.length;
-        chatFolders = chatFolders.filter(f => f.id !== folderId);
-        console.log(`📁 Folders: ${originalFolderCount} → ${chatFolders.length}`);
-        
-        try {
-            debouncedSave();
-            await saveChatFolders();
-            updateHistoryDisplay();
-            console.log('✅ Folder deleted successfully');
-        } catch (error) {
-            console.error('❌ Error saving after folder deletion:', error);
-            throw error;
-        }
-        
-        // If current chat was in this folder, start new chat
-        if (currentFolderId === folderId) {
-            startNewChat();
-        }
-    }
-}
-
-// Rename a folder
-// Global variable to store folder ID being renamed
-let currentRenamingFolderId = null;
-// Global variable to store chat ID being moved
-let currentMovingChatId = null;
-
-function renameFolder(folderId) {
-    const folder = chatFolders.find(f => f.id === folderId);
-    if (!folder) return;
-    
-    // Store the folder ID and show the modal
-    currentRenamingFolderId = folderId;
-    const modal = document.getElementById('renameFolderModal');
-    const input = document.getElementById('folderNameInput');
-    
-    if (modal && input) {
-        input.value = folder.name; // Pre-fill with current name
-        modal.style.display = 'flex';
-        input.focus();
-        input.select(); // Select all text for easy editing
-        document.body.style.overflow = 'hidden';
-    }
-}
-
-function closeRenameFolderModal() {
-    const modal = document.getElementById('renameFolderModal');
-    if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = 'auto';
-        currentRenamingFolderId = null;
-    }
-}
-
-async function saveFolderName() {
-    const input = document.getElementById('folderNameInput');
-    const newName = input.value.trim();
-    
-    if (!newName) {
-        alert('❌ Please enter a folder name');
-        return;
-    }
-    
-    if (currentRenamingFolderId) {
-        const folder = chatFolders.find(f => f.id === currentRenamingFolderId);
-        if (folder && newName !== folder.name) {
-            folder.name = newName;
-            await saveChatFolders();
-            updateHistoryDisplay();
-        }
-    }
-    
-    closeRenameFolderModal();
-}
-
-// Toggle folder expanded/collapsed state
-async function toggleFolder(folderId) {
-    const folder = chatFolders.find(f => f.id === folderId);
-    if (folder) {
-        folder.expanded = !folder.expanded;
-        await saveChatFolders();
-        updateHistoryDisplay();
-    }
-}
-
-// Move chat to folder
-async function moveChatToFolder(chatId, targetFolderId) {
-    // Remove chat from any existing folder
-    chatFolders.forEach(folder => {
-        folder.chats = folder.chats.filter(id => id !== chatId);
-    });
-    
-    // Add to target folder if specified
-    if (targetFolderId) {
-        const targetFolder = chatFolders.find(f => f.id === targetFolderId);
-        if (targetFolder) {
-            targetFolder.chats.push(chatId);
-        }
-    }
-    
-    await saveChatFolders();
-    updateHistoryDisplay();
-}
-
-// Start new chat in specific folder
-function startNewChatInFolder(folderId) {
-    currentFolderId = folderId;
-    startNewChat(true); // Pass true to preserve folder context
-}
-
 // Save chat history to Firebase (with localStorage fallback for development)
 let savingInProgress = false;
 let saveTimeout = null;
@@ -1616,9 +1374,11 @@ function debouncedSave() {
     if (saveTimeout) {
         clearTimeout(saveTimeout);
     }
-    saveTimeout = setTimeout(() => {
-        saveChatHistory();
-    }, 1000); // Wait 1 second after last change
+    saveTimeout = setTimeout(async () => {
+        console.log('🔄 Executing debounced save...');
+        await saveChatHistory();
+        console.log('✅ Debounced save completed');
+    }, 2000); // Increased to 2 seconds to reduce frequency
 }
 
 // Immediate save for critical operations
@@ -1633,9 +1393,8 @@ async function immediateSave() {
 // Sync with Firebase when coming back online
 async function syncChatsWithFirebase() {
     if (typeof window.chatStorage !== 'undefined' && window.chatStorage && window.chatStorage.getCurrentUser()) {
-        console.log('🔄 Syncing chats and folders with Firebase...');
+        console.log('🔄 Syncing chats with Firebase...');
         await saveChatHistory(); // This will sync all local changes
-        await saveChatFolders(); // Also sync folders
     }
 }
 async function saveChatHistory() {
@@ -2176,15 +1935,6 @@ Title:`;
     }
 }
 
-// Wrapper for HTML onclick handlers
-function deleteFolder(folderId) {
-    console.log('🗑️ deleteFolder called for:', folderId);
-    deleteFolderAsync(folderId).catch(error => {
-        console.error('Error deleting folder:', error);
-        alert('Failed to delete folder: ' + error.message);
-    });
-}
-
 // Save current chat
 async function saveCurrentChat() {
     if (conversationHistory.length === 0) {
@@ -2220,7 +1970,10 @@ async function saveCurrentChat() {
     // Find existing chat or add new one
     const existingIndex = chatHistory.findIndex(chat => chat.id === chatData.id);
     if (existingIndex !== -1) {
+        // Update existing chat - preserve original timestamp but update lastUpdated
+        chatData.timestamp = chatHistory[existingIndex].timestamp || currentTime;
         chatHistory[existingIndex] = chatData;
+        console.log('✅ Updated existing chat');
     } else {
         chatHistory.unshift(chatData); // Add to beginning
         // currentChatId should already be set, but ensure it matches
@@ -2230,28 +1983,18 @@ async function saveCurrentChat() {
         
         // Update URL for new chat
         updateChatUrl(currentChatId);
-        
-        // If starting in a folder, add chat to that folder
-        if (currentFolderId) {
-            const folder = chatFolders.find(f => f.id === currentFolderId);
-            if (folder && !folder.chats.includes(chatData.id)) {
-                folder.chats.unshift(chatData.id);
-                await saveChatFolders();
-            }
-        }
+        console.log('✅ Added new chat to history');
     }
-    
-    // Update history display to show the new chat
-    updateHistoryDisplay();
     
     // Keep only last 50 chats
     if (chatHistory.length > 50) {
         chatHistory = chatHistory.slice(0, 50);
     }
     
-    console.log('✅ Chat added to history');
+    // Single update call at the end
+    console.log('✅ Chat saved successfully');
     debouncedSave();
-    updateHistoryDisplay();
+    throttledUpdateHistoryDisplay();
 }
 
 // Load a chat from history
@@ -2279,15 +2022,6 @@ async function loadChat(chatId) {
     currentModel = chat.model || 'gpt-4.1-2025-04-14';
     
     // Determine which folder this chat belongs to
-    currentFolderId = null;
-    for (const folder of chatFolders) {
-        if (folder.chats.includes(chatId)) {
-            currentFolderId = folder.id;
-            break;
-        }
-    }
-    
-    
     // Update model selector
     selectModel(currentModel);
     
@@ -2489,14 +2223,11 @@ async function clearAllHistory() {
 }
 
 // Start a new chat
-function startNewChat(preserveFolder = false) {
+function startNewChat() {
     // Clear any pending requests when starting a new chat (since currentChatId will be null)
     console.log('🗑️ Starting new chat, existing requests for other chats will be preserved');
     
     currentChatId = null;
-    if (!preserveFolder) {
-        currentFolderId = null; // Reset folder when starting new chat normally
-    }
     clearChat();
     clearAllOverlays(); // Clear overlays when starting new chat
     updateHistoryDisplay();
@@ -2510,23 +2241,33 @@ function updateHistoryDisplay() {
     const historyList = document.getElementById('historyList');
     if (!historyList) return;
     
-    // First, ensure chatHistory is properly sorted
-    chatHistory.sort((a, b) => {
-        const aTime = a.lastUpdated || a.timestamp || 0;
-        const bTime = b.lastUpdated || b.timestamp || 0;
-        return bTime - aTime; // Newest first (descending order)
-    });
+    // Sort chatHistory only if needed (avoid unnecessary re-sorting)
+    let needsSorting = false;
+    for (let i = 1; i < chatHistory.length; i++) {
+        const current = chatHistory[i];
+        const previous = chatHistory[i - 1];
+        const currentTime = current.lastUpdated || current.timestamp || 0;
+        const previousTime = previous.lastUpdated || previous.timestamp || 0;
+        
+        if (currentTime > previousTime) {
+            needsSorting = true;
+            break;
+        }
+    }
+    
+    if (needsSorting) {
+        console.log('🔄 Sorting chat history...');
+        chatHistory.sort((a, b) => {
+            const aTime = a.lastUpdated || a.timestamp || 0;
+            const bTime = b.lastUpdated || b.timestamp || 0;
+            return bTime - aTime; // Newest first (descending order)
+        });
+    }
     
     let html = '';
     
-    // ...existing code...
-    
-    // Get chats not in any folder (already sorted above)
-    const chatsInFolders = chatFolders.flatMap(folder => folder.chats);
-    const unorganizedChats = chatHistory.filter(chat => !chatsInFolders.includes(chat.id));
-    
-    // Show previous chats section
-    if (unorganizedChats.length > 0) {
+    // Show all chats in a simple list
+    if (chatHistory.length > 0) {
         html += `
             <div class="previous-chats-section">
                 <div class="section-header">
@@ -2535,7 +2276,7 @@ function updateHistoryDisplay() {
                 <div class="previous-chats-list">
         `;
         
-        unorganizedChats.forEach(chat => {
+        chatHistory.forEach(chat => {
             // Format the date properly
             const chatDate = chat.lastUpdated || chat.timestamp || 0;
             const formattedDate = chatDate ? new Date(chatDate).toLocaleDateString() : 'Unknown';
@@ -2547,11 +2288,6 @@ function updateHistoryDisplay() {
                         <div class="history-date">${formattedDate}</div>
                     </div>
                     <div class="history-actions">
-                        <button class="history-action-btn move" onclick="event.stopPropagation(); showMoveMenu('${chat.id}')" title="Move to folder">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                            </svg>
-                        </button>
                         <button class="history-action-btn delete" onclick="event.stopPropagation(); deleteChat('${chat.id}')" title="Delete chat">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M3 6h18m-2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
@@ -2572,83 +2308,9 @@ function updateHistoryDisplay() {
     historyList.innerHTML = html;
 }
 
-// Show move menu for chat
-function showMoveMenu(chatId) {
-    currentMovingChatId = chatId;
-    
-    // Create folder options
-    const folderOptions = document.getElementById('folderOptions');
-    folderOptions.innerHTML = '';
-    
-    // Add "Remove from folder" option
-    const removeOption = document.createElement('div');
-    removeOption.className = 'folder-option remove-option';
-    removeOption.innerHTML = `
-        <span class="folder-option-icon">🗂️</span>
-        <span class="folder-option-name">Remove from folder</span>
-    `;
-    removeOption.onclick = () => moveChatToFolderModal(null);
-    folderOptions.appendChild(removeOption);
-    
-    // Add existing folders
-    chatFolders.forEach(folder => {
-        const folderOption = document.createElement('div');
-        folderOption.className = 'folder-option';
-        folderOption.innerHTML = `
-            <span class="folder-option-icon">📁</span>
-            <span class="folder-option-name">${folder.name}</span>
-        `;
-        folderOption.onclick = () => moveChatToFolderModal(folder.id);
-        folderOptions.appendChild(folderOption);
-    });
-    
-    // Show modal
-    document.getElementById('moveChatModal').style.display = 'flex';
-}
-
-// Close move chat modal
-function closeMoveChat() {
-    document.getElementById('moveChatModal').style.display = 'none';
-    currentMovingChatId = null;
-}
-
-// Handle moving chat to folder from modal
-function moveChatToFolderModal(folderId) {
-    if (currentMovingChatId) {
-        moveChatToFolder(currentMovingChatId, folderId);
-        closeMoveChat();
-    }
-}
-
-// Find the sidebar initialization and ensure folder button is always visible
-
-// Around line where sidebar is rendered, update to always show the add folder button
+// Update chat history (deprecated function for compatibility)
 function updateChatHistory() {
-    const chatHistoryContainer = document.querySelector('.chat-history-container');
-    if (!chatHistoryContainer) return;
-
-    // Sort chatHistory array in place to ensure consistent ordering
-    chatHistory.sort((a, b) => {
-        // Use lastUpdated if available, otherwise fall back to timestamp
-        const aTime = a.lastUpdated || a.timestamp || 0;
-        const bTime = b.lastUpdated || b.timestamp || 0;
-        return bTime - aTime; // Newest first (descending order)
-    });
-    
-    const chats = chatHistory;
-    
-    // Always show the add folder button, regardless of chat count
-    const addFolderButton = document.querySelector('.add-folder-btn');
-    if (addFolderButton) {
-        addFolderButton.style.display = 'block'; // Always visible
-    }
-
-    if (chats.length === 0) {
-        chatHistoryContainer.innerHTML = '<div class="no-chats">No chat history yet</div>';
-        return;
-    }
-
-    // Rest of the chat history rendering...
+    updateHistoryDisplay();
 }
 
 // Global variable to store the session API key
@@ -2947,6 +2609,36 @@ window.testCopyButtons = function() {
             console.log(`Code block ${i + 1}:`, block);
         });
     }, 1000);
+};
+
+// Fix chat ordering issues
+window.fixChatOrdering = function() {
+    console.log('🔧 Fixing chat ordering issues...');
+    
+    // Remove duplicates and ensure proper timestamps
+    const fixedChats = [];
+    const seenIds = new Set();
+    
+    chatHistory.forEach(chat => {
+        if (!seenIds.has(chat.id)) {
+            seenIds.add(chat.id);
+            
+            // Ensure chat has proper timestamps
+            if (!chat.timestamp) {
+                chat.timestamp = Date.now() - (chatHistory.length - fixedChats.length) * 1000;
+            }
+            if (!chat.lastUpdated) {
+                chat.lastUpdated = chat.timestamp;
+            }
+            
+            fixedChats.push(chat);
+        }
+    });
+    
+    chatHistory = fixedChats;
+    forceSortAndUpdate();
+    
+    console.log(`✅ Fixed chat ordering. ${chatHistory.length} chats properly sorted.`);
 };
 
 // Update API key status indicator
@@ -3357,7 +3049,7 @@ function closeSettingsModal() {
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         // Check for any open modal and close it
-        const modals = ['settingsModal', 'apiKeyModal', 'confirmationModal', 'renameFolderModal', 'moveChatModal'];
+        const modals = ['settingsModal', 'apiKeyModal', 'confirmationModal'];
         
         for (const modalId of modals) {
             const modal = document.getElementById(modalId);
@@ -3374,12 +3066,6 @@ document.addEventListener('keydown', function(event) {
                         break;
                     case 'confirmationModal':
                         closeConfirmationModal();
-                        break;
-                    case 'renameFolderModal':
-                        closeRenameFolderModal();
-                        break;
-                    case 'moveChatModal':
-                        closeMoveChat();
                         break;
                 }
                 break; // Only close the first open modal
@@ -6256,7 +5942,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 } else {
                     console.log('User signed out, clearing chat data');
                     chatHistory = [];
-                    chatFolders = [];
                     updateHistoryDisplay();
                     
                     // Still initialize URL routing for new chats
