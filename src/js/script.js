@@ -1787,26 +1787,199 @@ function confirmAction() {
 
 
 // Process and format text with LaTeX rendering
-// Formatting assistant function to clean up AI responses
-function formatAIResponse(text) {
+// Formatting assistant function to clean up AI responses using OpenAI API
+async function formatAIResponse(text) {
     if (!text) return '';
     
-    // Return raw text without any formatting
-    return text;
+    console.log('🎨 formatAIResponse called with text length:', text.length);
+    
+    // For short responses, just return with basic HTML escaping
+    if (text.length < 100) {
+        console.log('📏 Text too short, using basic HTML escaping');
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;')
+            .replace(/\n/g, '<br>');
+    }
+    
+    // For very long texts, use basic formatting to avoid excessive API costs
+    if (text.length > 8000) {
+        console.log('📏 Text too long for AI formatting, using basic formatting');
+        return processMessageTextBasic(text);
+    }
+    
+    console.log('🤖 Attempting AI formatting...');
+    
+    try {
+        const apiKey = getApiKey();
+        if (!apiKey || apiKey === 'YOUR_API_KEY' || apiKey === 'your-api-key-here') {
+            console.log('❌ No valid API key, using basic formatting');
+            // Fallback to basic formatting if no API key
+            return processMessageTextBasic(text);
+        }
+
+        console.log('✅ API key available, making formatting request...');
+
+        const formattingPrompt = `Please format the following text into clean HTML for display in a chat application. Use proper HTML tags for:
+- Headers: <h1>, <h2>, <h3>, etc.
+- Lists: <ul>, <ol>, <li>
+- Code blocks: <pre><code class="language-[language]">...</code></pre> (specify language when identifiable)
+- Inline code: <code>...</code>
+- Bold: <strong>...</strong>
+- Italic: <em>...</em>
+- Links: <a href="...">...</a>
+- Line breaks: <br>
+- Paragraphs: <p>...</p>
+- Horizontal rules: <hr>
+- Tables: <table>, <tr>, <th>, <td>
+- Blockquotes: <blockquote>
+- Math expressions: Wrap LaTeX in <span class="math-inline">$...$</span> for inline or <div class="math-block">$$...$$</div> for block math
+
+Keep the content exactly the same, just add proper HTML formatting. Do not add any explanations, markdown syntax, or extra text. Return only the formatted HTML without any surrounding markdown code blocks or backticks:
+
+${text}`;
+
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini', // Use faster, cheaper model for formatting
+                messages: [{
+                    role: 'user',
+                    content: formattingPrompt
+                }],
+                max_completion_tokens: Math.min(2000, Math.ceil(text.length * 1.2)), // Reasonable limit based on input length
+                temperature: 0.1 // Low temperature for consistent formatting
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const formattedText = data.choices[0]?.message?.content?.trim();
+            
+            if (formattedText && formattedText.length > 0) {
+                // Log the AI formatting result for debugging
+                console.log('✅ AI formatting successful - input:', text.length, 'chars, output:', formattedText.length, 'chars');
+                console.log('🔍 Formatted text preview:', formattedText.substring(0, 200) + '...');
+                
+                // Post-process for enhanced features
+                const enhancedText = postProcessFormattedText(formattedText);
+                console.log('🔧 Enhanced text preview:', enhancedText.substring(0, 200) + '...');
+                return enhancedText;
+            } else {
+                console.warn('AI formatting returned empty response');
+            }
+        } else {
+            console.warn('AI formatting API request failed:', response.status, response.statusText);
+            const errorData = await response.json().catch(() => ({}));
+            console.warn('Error details:', errorData);
+        }
+    } catch (error) {
+        console.log('AI formatting failed, using basic formatting:', error);
+        console.log('Input text length:', text.length);
+        console.log('API key available:', !!getApiKey() && getApiKey() !== 'YOUR_API_KEY');
+    }
+    
+    // Fallback to basic formatting
+    console.log('🔄 Using basic formatting fallback');
+    const basicResult = processMessageTextBasic(text);
+    console.log('📝 Basic formatting result preview:', basicResult.substring(0, 200) + '...');
+    return basicResult;
 }
 
-// Process message text - return raw text without any formatting
-function processMessageText(text) {
+// Post-process formatted text for enhanced features
+function postProcessFormattedText(html) {
+    if (!html) return '';
+    
+    // Add syntax highlighting classes for better CSS styling
+    html = html.replace(/<pre><code class="language-(\w+)">/g, '<pre class="code-block"><code class="language-$1" data-lang="$1">');
+    html = html.replace(/<pre><code>/g, '<pre class="code-block"><code>');
+    
+    // Enhance inline code with copy functionality
+    html = html.replace(/<code>([^<]+)<\/code>/g, '<code class="inline-code">$1</code>');
+    
+    // Process math expressions for MathJax if available
+    if (typeof MathJax !== 'undefined') {
+        // Convert LaTeX delimiters for MathJax
+        html = html.replace(/<span class="math-inline">\$([^$]+)\$<\/span>/g, '<span class="math-inline">\\($1\\)</span>');
+        html = html.replace(/<div class="math-block">\$\$([^$]+)\$\$<\/div>/g, '<div class="math-block">\\[$1\\]</div>');
+    }
+    
+    return html;
+}
+
+// Basic text processing fallback with markdown support
+function processMessageTextBasic(text) {
     if (!text) return '';
     
-    // Simply escape HTML entities for security and return raw text
-    return text
+    // Escape HTML entities first for security
+    let processedText = text
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;')
-        .replace(/\n/g, '<br>'); // Convert line breaks to <br> tags
+        .replace(/'/g, '&#x27;');
+    
+    // Process basic markdown formatting
+    // Headers
+    processedText = processedText.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    processedText = processedText.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    processedText = processedText.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+    
+    // Bold and italic
+    processedText = processedText.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    processedText = processedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    processedText = processedText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // Code blocks
+    processedText = processedText.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+        const langClass = lang ? ` class="language-${lang}"` : '';
+        return `<pre class="code-block"><code${langClass}>${code.trim()}</code></pre>`;
+    });
+    
+    // Inline code
+    processedText = processedText.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    
+    // Lists - improved processing
+    // First, wrap individual list items in ul tags for unordered lists
+    processedText = processedText.replace(/((?:^- .*$\n?)+)/gm, (match) => {
+        return '<ul>' + match + '</ul>';
+    });
+    // Then replace the - with <li> tags
+    processedText = processedText.replace(/^- (.*$)/gim, '<li>$1</li>');
+    
+    // Numbered lists
+    processedText = processedText.replace(/((?:^\d+\. .*$\n?)+)/gm, (match) => {
+        return '<ol>' + match + '</ol>';
+    });
+    processedText = processedText.replace(/^\d+\. (.*$)/gim, '<li>$1</li>');
+    
+    // Links
+    processedText = processedText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    
+    // Line breaks and paragraphs
+    processedText = processedText.replace(/\n\n/g, '</p><p>');
+    processedText = processedText.replace(/\n/g, '<br>');
+    processedText = '<p>' + processedText + '</p>';
+    
+    // Clean up empty paragraphs
+    processedText = processedText.replace(/<p><\/p>/g, '');
+    
+    return processedText;
+}
+
+// Process message text - using AI-powered formatting
+async function processMessageText(text) {
+    if (!text) return '';
+    
+    // Use AI-powered formatting for responses
+    return await formatAIResponse(text);
 }
 
 // Render math in element - do nothing, return raw text
@@ -1815,18 +1988,12 @@ function renderMathInElement(element) {
     return;
 }
 
-// Render markdown fallback - return raw text without formatting
-function renderMarkdownFallback(text) {
+// Render markdown fallback - using AI-powered formatting
+async function renderMarkdownFallback(text) {
     if (!text) return '';
     
-    // Simply escape HTML entities for security and return raw text
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;')
-        .replace(/\n/g, '<br>'); // Convert line breaks to <br> tags
+    // Use the same AI-powered formatting
+    return await formatAIResponse(text);
 }
 
 
@@ -2722,6 +2889,22 @@ window.loadSavedApiKey = loadSavedApiKey;
 window.refreshApiKeyFromAccount = refreshApiKeyFromAccount;
 window.waitForFirebaseAuth = waitForFirebaseAuth;
 
+// Test function for debugging formatting
+window.testFormatting = function(text) {
+    console.log('🧪 Testing formatting with:', text);
+    const result = processMessageTextBasic(text);
+    console.log('🧪 Basic formatting result:', result);
+    return result;
+};
+
+// Test AI formatting
+window.testAIFormatting = async function(text) {
+    console.log('🤖 Testing AI formatting with:', text);
+    const result = await formatAIResponse(text);
+    console.log('🤖 AI formatting result:', result);
+    return result;
+};
+
 // Update API key status indicator
 function updateApiKeyStatus() {
     const logo = document.querySelector('.logo span');
@@ -3376,7 +3559,7 @@ async function sendMessageAsync() {
                     let aiMessage = data.choices[0].message.content;
                     
                     // Apply formatting rules to AI response
-                    aiMessage = formatAIResponse(aiMessage);
+                    aiMessage = await formatAIResponse(aiMessage);
 
 
                     conversationHistory.push({
@@ -3384,7 +3567,7 @@ async function sendMessageAsync() {
                         content: aiMessage
                     });
 
-                    addMessage(aiMessage, 'ai');
+                    addMessage(aiMessage, 'ai', 'normal');
                     await saveCurrentChat();
                 }
             }
@@ -3470,19 +3653,21 @@ async function sendMessageAsync() {
             messages = buildMessagesWithSystem(conversationHistory);
         }
 
-        // Make API call
+        // Make API call with enhanced features
+        const requestBody = {
+            model: currentModel,
+            messages: messages,
+            max_completion_tokens: 10000,
+            ...(currentModel !== 'gpt-4o-search-preview-2025-03-11' && { temperature: getModelTemperature(currentModel) })
+        };
+
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
-            body: JSON.stringify({
-                model: currentModel,
-                messages: messages,
-                max_completion_tokens: 10000,
-                ...(currentModel !== 'gpt-4o-search-preview-2025-03-11' && { temperature: getModelTemperature(currentModel) })
-            })
+            body: JSON.stringify(requestBody)
         });
 
         // Remove typing indicator
@@ -3496,8 +3681,12 @@ async function sendMessageAsync() {
         const data = await response.json();
         let aiMessage = data.choices[0].message.content;
         
+        console.log('🔍 Raw AI response (sendMessageAsync):', aiMessage.substring(0, 200) + '...');
+        
         // Apply formatting rules to AI response
-        aiMessage = formatAIResponse(aiMessage);
+        aiMessage = await formatAIResponse(aiMessage);
+        
+        console.log('🔍 Formatted AI response (sendMessageAsync):', aiMessage.substring(0, 200) + '...');
 
         // Add AI response to conversation history
         conversationHistory.push({
@@ -3506,7 +3695,7 @@ async function sendMessageAsync() {
         });
 
         // Display the AI response
-        addMessage(aiMessage, 'ai');
+        addMessage(aiMessage, 'ai', 'normal');
         
         // Save the updated chat
         await saveCurrentChat();
@@ -3581,7 +3770,7 @@ async function continueMessageProcessing() {
         let aiMessage = data.choices[0].message.content;
         
         // Apply formatting rules to AI response
-        aiMessage = formatAIResponse(aiMessage);
+        aiMessage = await formatAIResponse(aiMessage);
 
 
         // Check if this is a valid request for the original chat
@@ -3747,8 +3936,15 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
             if (text.includes('<div class="quoted-context">')) {
                 contentHtml += `<div class="message-text">${text}</div>`;
             } else {
-                const processedText = processMessageText(text);
-                contentHtml += `<div class="message-text">${processedText}</div>`;
+                // For AI messages, text should already be formatted by formatAIResponse
+                if (sender === 'ai') {
+                    console.log('🔍 addMessage received AI text:', text.substring(0, 200) + '...');
+                    console.log('🔍 AI text contains HTML tags:', /<[a-z][\s\S]*>/i.test(text));
+                    contentHtml += `<div class="message-text">${text}</div>`;
+                } else {
+                    const processedText = processMessageTextBasic(text);
+                    contentHtml += `<div class="message-text">${processedText}</div>`;
+                }
             }
         }
         
@@ -3756,6 +3952,12 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
         messageDiv.innerHTML = `
             <div class="message-content" style="overflow: visible !important;">${contentHtml}</div>
         `;
+        
+        // Debug: Log what HTML was actually set
+        if (sender === 'ai' && text) {
+            console.log('🔍 Final messageDiv innerHTML:', messageDiv.innerHTML);
+            console.log('🔍 Final contentHtml:', contentHtml);
+        }
         
         // Store the message text for the copy function
         if (sender === 'ai' && type === 'normal' && text) {
@@ -3772,15 +3974,129 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
     
     // Render LaTeX if this is an AI message with text
     if (sender === 'ai' && text && type === 'normal') {
-        const messageTextElement = messageDiv.querySelector('.message-text');
-        if (messageTextElement) {
-            renderMathInElement(messageTextElement);
-        }
+        setTimeout(() => {
+            const messageTextElement = messageDiv.querySelector('.message-text');
+            if (messageTextElement) {
+                // Enhanced math rendering with MathJax
+                if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
+                    MathJax.typesetPromise([messageTextElement]).then(() => {
+                        console.log('✅ MathJax rendered for message');
+                    }).catch((err) => {
+                        console.warn('⚠️ MathJax rendering failed:', err);
+                        // Fallback to basic rendering
+                        renderMathInElement(messageTextElement);
+                    });
+                } else {
+                    renderMathInElement(messageTextElement);
+                }
+                
+                // Add copy buttons to code blocks
+                addCopyButtonsToCodeBlocks(messageTextElement);
+            }
+        }, 100);
     }
     
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
     
     return messageId;
+}
+
+// Add copy buttons to code blocks for better UX
+function addCopyButtonsToCodeBlocks(container) {
+    if (!container) return;
+    
+    const codeBlocks = container.querySelectorAll('pre code');
+    codeBlocks.forEach((codeBlock, index) => {
+        const pre = codeBlock.parentElement;
+        
+        // Skip if copy button already exists
+        if (pre.querySelector('.copy-code-btn')) return;
+        
+        // Create copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-code-btn';
+        copyBtn.title = 'Copy code';
+        copyBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+        `;
+        
+        // Add click handler
+        copyBtn.addEventListener('click', async () => {
+            try {
+                const code = codeBlock.textContent;
+                await navigator.clipboard.writeText(code);
+                
+                // Visual feedback
+                const originalHTML = copyBtn.innerHTML;
+                copyBtn.innerHTML = `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                `;
+                copyBtn.style.color = '#22c55e';
+                
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalHTML;
+                    copyBtn.style.color = '';
+                }, 1500);
+            } catch (err) {
+                console.warn('Failed to copy code:', err);
+                // Fallback for older browsers
+                fallbackCopyTextToClipboard(codeBlock.textContent);
+            }
+        });
+        
+        // Position and style the button
+        pre.style.position = 'relative';
+        copyBtn.style.cssText = `
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s ease;
+            z-index: 1;
+        `;
+        
+        // Show/hide on hover
+        pre.addEventListener('mouseenter', () => {
+            copyBtn.style.opacity = '1';
+        });
+        pre.addEventListener('mouseleave', () => {
+            copyBtn.style.opacity = '0.7';
+        });
+        
+        pre.appendChild(copyBtn);
+    });
+}
+
+// Fallback copy function for older browsers
+function fallbackCopyTextToClipboard(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        document.execCommand('copy');
+        console.log('Fallback: Code copied to clipboard');
+    } catch (err) {
+        console.error('Fallback: Could not copy code', err);
+    }
+    
+    document.body.removeChild(textArea);
 }
 
 // Text Selection Tooltip Feature
@@ -4283,7 +4599,7 @@ async function updateSelectionOverlayResponse(overlayId, response, isError = fal
     // First update with the response
     if (responseArea) {
         responseArea.style.display = 'block';
-        responseArea.innerHTML = `<div class="response-content">${formatAIResponse(response)}</div>`;
+        responseArea.innerHTML = `<div class="response-content">${await formatAIResponse(response)}</div>`;
     }
     
     // Generate a concise summary using GPT
@@ -4346,7 +4662,7 @@ async function updateSelectionOverlayResponse(overlayId, response, isError = fal
         responseDiv.textContent = response;
     } else {
         // Format the response with the same formatting as chat messages
-        responseDiv.innerHTML = processMessageText(response);
+        responseDiv.innerHTML = await processMessageText(response);
     }
     
     if (responseArea) {
