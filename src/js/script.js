@@ -1897,11 +1897,16 @@ ${text}`;
 function postProcessFormattedText(html) {
     if (!html) return '';
     
-    // Add syntax highlighting classes for better CSS styling
+    // Handle new code block wrapper structure from our enhanced processing
+    html = html.replace(/<div class="code-block-wrapper">(.*?)<\/div>/gs, (match, content) => {
+        return `<div class="code-block-wrapper">${content}</div>`;
+    });
+    
+    // Legacy support: Add syntax highlighting classes for older code blocks
     html = html.replace(/<pre><code class="language-(\w+)">/g, '<pre class="code-block"><code class="language-$1" data-lang="$1">');
     html = html.replace(/<pre><code>/g, '<pre class="code-block"><code>');
     
-    // Enhance inline code with copy functionality
+    // Enhance inline code styling
     html = html.replace(/<code>([^<]+)<\/code>/g, '<code class="inline-code">$1</code>');
     
     // Process math expressions for MathJax if available
@@ -1937,10 +1942,19 @@ function processMessageTextBasic(text) {
     processedText = processedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     processedText = processedText.replace(/\*(.*?)\*/g, '<em>$1</em>');
     
-    // Code blocks
-    processedText = processedText.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
-        const langClass = lang ? ` class="language-${lang}"` : '';
-        return `<pre class="code-block"><code${langClass}>${code.trim()}</code></pre>`;
+    // Code blocks with enhanced language detection
+    processedText = processedText.replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
+        const trimmedCode = code.trim();
+        
+        // Auto-detect language if not specified
+        if (!lang && trimmedCode) {
+            lang = detectCodeLanguage(trimmedCode);
+        }
+        
+        const langClass = lang ? ` class="language-${lang}" data-lang="${lang}"` : '';
+        const langLabel = lang ? `<div class="code-lang-label">${lang.toUpperCase()}</div>` : '';
+        
+        return `<div class="code-block-wrapper">${langLabel}<pre class="code-block"><code${langClass}>${trimmedCode}</code></pre></div>`;
     });
     
     // Inline code
@@ -2905,6 +2919,36 @@ window.testAIFormatting = async function(text) {
     return result;
 };
 
+// Test copy button functionality
+window.testCopyButtons = function() {
+    console.log('🧪 Testing copy button functionality...');
+    
+    // Create a test message with code
+    const testCode = `function hello() {
+    console.log("Hello, world!");
+    return "test";
+}`;
+    
+    // Add a test message
+    const messageId = addMessage('Here is some test code:\n\n```javascript\n' + testCode + '\n```', 'ai', 'normal');
+    console.log('✅ Test message added with ID:', messageId);
+    
+    // Wait a bit then try to find copy buttons
+    setTimeout(() => {
+        const copyButtons = document.querySelectorAll('.copy-btn');
+        console.log('🔍 Found copy buttons:', copyButtons.length);
+        copyButtons.forEach((btn, i) => {
+            console.log(`Copy button ${i + 1}:`, btn);
+        });
+        
+        const codeBlocks = document.querySelectorAll('.code-block-wrapper, pre.code-block, pre code');
+        console.log('🔍 Found code blocks:', codeBlocks.length);
+        codeBlocks.forEach((block, i) => {
+            console.log(`Code block ${i + 1}:`, block);
+        });
+    }, 1000);
+};
+
 // Update API key status indicator
 function updateApiKeyStatus() {
     const logo = document.querySelector('.logo span');
@@ -3657,7 +3701,7 @@ async function sendMessageAsync() {
         const requestBody = {
             model: currentModel,
             messages: messages,
-            max_completion_tokens: 10000,
+            max_completion_tokens: 4000,
             ...(currentModel !== 'gpt-4o-search-preview-2025-03-11' && { temperature: getModelTemperature(currentModel) })
         };
 
@@ -3753,7 +3797,7 @@ async function continueMessageProcessing() {
             body: JSON.stringify({
                 model: currentModel,
                 messages: messages,
-                max_completion_tokens: 10000,
+                max_completion_tokens: 4000,
                 ...(currentModel !== 'gpt-4o-search-preview-2025-03-11' && { temperature: getModelTemperature(currentModel) })
             })
         });
@@ -3958,11 +4002,6 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
             console.log('🔍 Final messageDiv innerHTML:', messageDiv.innerHTML);
             console.log('🔍 Final contentHtml:', contentHtml);
         }
-        
-        // Store the message text for the copy function
-        if (sender === 'ai' && type === 'normal' && text) {
-            messageDiv.dataset.messageText = text;
-        }
     }
     
     // Add action buttons directly inside the message content for AI messages (desktop only)
@@ -3990,8 +4029,9 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
                     renderMathInElement(messageTextElement);
                 }
                 
+                // Code blocks are now processed with syntax highlighting only
                 // Add copy buttons to code blocks
-                addCopyButtonsToCodeBlocks(messageTextElement);
+                addCopyButtonsToCodeBlocks(messageDiv);
             }
         }, 100);
     }
@@ -4001,102 +4041,217 @@ function addMessage(text, sender, type = 'normal', image = null, file = null) {
     return messageId;
 }
 
-// Add copy buttons to code blocks for better UX
-function addCopyButtonsToCodeBlocks(container) {
-    if (!container) return;
+// Detect programming language from code content
+function detectCodeLanguage(code) {
+    if (!code || !code.trim()) return null;
     
-    const codeBlocks = container.querySelectorAll('pre code');
-    codeBlocks.forEach((codeBlock, index) => {
-        const pre = codeBlock.parentElement;
-        
-        // Skip if copy button already exists
-        if (pre.querySelector('.copy-code-btn')) return;
-        
-        // Create copy button
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'copy-code-btn';
-        copyBtn.title = 'Copy code';
-        copyBtn.innerHTML = `
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-        `;
-        
-        // Add click handler
-        copyBtn.addEventListener('click', async () => {
-            try {
-                const code = codeBlock.textContent;
-                await navigator.clipboard.writeText(code);
-                
-                // Visual feedback
-                const originalHTML = copyBtn.innerHTML;
-                copyBtn.innerHTML = `
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M20 6L9 17l-5-5"/>
-                    </svg>
-                `;
-                copyBtn.style.color = '#22c55e';
-                
-                setTimeout(() => {
-                    copyBtn.innerHTML = originalHTML;
-                    copyBtn.style.color = '';
-                }, 1500);
-            } catch (err) {
-                console.warn('Failed to copy code:', err);
-                // Fallback for older browsers
-                fallbackCopyTextToClipboard(codeBlock.textContent);
+    const patterns = {
+        javascript: [
+            /\b(function|const|let|var|=>|async|await)\b/,
+            /console\.(log|error|warn)/,
+            /require\(|import\s+.+\s+from/,
+            /\.map\(|\.filter\(|\.reduce\(/
+        ],
+        python: [
+            /\b(def|class|import|from|if\s+__name__|print\()\b/,
+            /:\s*$.*^\s+/m, // Indentation after colon
+            /\bself\b/,
+            /#.*$/m
+        ],
+        java: [
+            /\b(public\s+class|public\s+static\s+void\s+main|System\.out\.println)\b/,
+            /\bpublic\s+(static\s+)?[\w<>]+\s+\w+\s*\(/,
+            /import\s+java\./
+        ],
+        css: [
+            /[.#]?[\w-]+\s*\{[^}]*\}/,
+            /[\w-]+\s*:\s*[^;]+;/,
+            /@media|@keyframes|@import/
+        ],
+        html: [
+            /<\/?[a-z][\s\S]*>/i,
+            /<!DOCTYPE/i,
+            /<html|<head|<body|<div|<span/i
+        ],
+        sql: [
+            /\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|CREATE|TABLE)\b/i,
+            /\b(JOIN|LEFT|RIGHT|INNER|OUTER)\b/i,
+            /\b(GROUP BY|ORDER BY|HAVING)\b/i
+        ],
+        json: [
+            /^\s*[{\[][\s\S]*[}\]]\s*$/,
+            /"\w+":\s*[{\["]/,
+            /^[\s\n]*\{[\s\S]*\}[\s\n]*$/
+        ],
+        bash: [
+            /^#!/,
+            /\$\w+/,
+            /\b(echo|ls|cd|mkdir|rm|cp|mv|grep|awk|sed)\b/,
+            /&&|\|\||;/
+        ],
+        xml: [
+            /<\?xml/,
+            /<\w+[^>]*>[\s\S]*<\/\w+>/,
+            /xmlns:/
+        ]
+    };
+    
+    let maxScore = 0;
+    let detectedLang = null;
+    
+    for (const [lang, langPatterns] of Object.entries(patterns)) {
+        let score = 0;
+        for (const pattern of langPatterns) {
+            if (pattern.test(code)) {
+                score++;
             }
-        });
+        }
         
-        // Position and style the button
-        pre.style.position = 'relative';
-        copyBtn.style.cssText = `
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 6px;
-            cursor: pointer;
-            opacity: 0.7;
-            transition: opacity 0.2s ease;
-            z-index: 1;
-        `;
-        
-        // Show/hide on hover
-        pre.addEventListener('mouseenter', () => {
-            copyBtn.style.opacity = '1';
-        });
-        pre.addEventListener('mouseleave', () => {
-            copyBtn.style.opacity = '0.7';
-        });
-        
-        pre.appendChild(copyBtn);
-    });
-}
-
-// Fallback copy function for older browsers
-function fallbackCopyTextToClipboard(text) {
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-999999px';
-    textArea.style.top = '-999999px';
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    
-    try {
-        document.execCommand('copy');
-        console.log('Fallback: Code copied to clipboard');
-    } catch (err) {
-        console.error('Fallback: Could not copy code', err);
+        if (score > maxScore) {
+            maxScore = score;
+            detectedLang = lang;
+        }
     }
     
-    document.body.removeChild(textArea);
+    // Return detected language only if confidence is high enough
+    return maxScore >= 2 ? detectedLang : null;
+}
+
+// Syntax highlighting function
+function applySyntaxHighlighting(codeElement, language) {
+    console.log('🎨 applySyntaxHighlighting called for language:', language);
+    if (!codeElement || !codeElement.textContent) {
+        console.log('❌ No code element or content found');
+        return;
+    }
+    
+    let code = codeElement.textContent;
+    const lang = language || 'text';
+    console.log('📝 Code to highlight:', code.substring(0, 50) + '...');
+    
+    // Language-specific highlighting patterns
+    const patterns = {
+        javascript: [
+            // Keywords
+            { pattern: /\b(function|const|let|var|if|else|for|while|return|class|extends|import|export|from|default|async|await|try|catch|finally|throw|new|this|super|static|get|set|typeof|instanceof|in|of|null|undefined|true|false)\b/g, className: 'keyword' },
+            // Strings
+            { pattern: /(['"`])((?:\\.|(?!\1)[^\\])*?)\1/g, className: 'string' },
+            // Numbers
+            { pattern: /\b(\d+\.?\d*)\b/g, className: 'number' },
+            // Comments
+            { pattern: /\/\/.*$/gm, className: 'comment' },
+            { pattern: /\/\*[\s\S]*?\*\//g, className: 'comment' },
+            // Functions
+            { pattern: /\b(\w+)(?=\s*\()/g, className: 'function' },
+            // Objects/Methods
+            { pattern: /\.(\w+)(?=\s*\()/g, className: 'function', replace: '.$1' },
+        ],
+        python: [
+            // Keywords
+            { pattern: /\b(def|class|if|elif|else|for|while|return|import|from|as|try|except|finally|raise|with|pass|break|continue|and|or|not|in|is|None|True|False|self|lambda|yield|global|nonlocal)\b/g, className: 'keyword' },
+            // Strings
+            { pattern: /(['"])((?:\\.|(?!\1)[^\\])*?)\1/g, className: 'string' },
+            { pattern: /('''|""")[\s\S]*?\1/g, className: 'string' },
+            // Numbers
+            { pattern: /\b(\d+\.?\d*)\b/g, className: 'number' },
+            // Comments
+            { pattern: /#.*$/gm, className: 'comment' },
+            // Functions
+            { pattern: /\bdef\s+(\w+)/g, className: 'function', replace: 'def $1' },
+            { pattern: /\b(\w+)(?=\s*\()/g, className: 'function' },
+        ],
+        java: [
+            // Keywords
+            { pattern: /\b(public|private|protected|static|final|abstract|class|interface|extends|implements|import|package|if|else|for|while|do|return|try|catch|finally|throw|throws|new|this|super|void|int|String|boolean|double|float|long|char|byte|short)\b/g, className: 'keyword' },
+            // Strings
+            { pattern: /"(?:\\.|[^"\\])*"/g, className: 'string' },
+            // Numbers
+            { pattern: /\b(\d+\.?\d*[fFdDlL]?)\b/g, className: 'number' },
+            // Comments
+            { pattern: /\/\/.*$/gm, className: 'comment' },
+            { pattern: /\/\*[\s\S]*?\*\//g, className: 'comment' },
+            // Functions/Methods
+            { pattern: /\b(\w+)(?=\s*\()/g, className: 'function' },
+        ],
+        css: [
+            // Properties
+            { pattern: /([a-z-]+)(?=\s*:)/g, className: 'property' },
+            // Values
+            { pattern: /:\s*([^;{]+)/g, className: 'value', replace: ': $1' },
+            // Selectors
+            { pattern: /([.#]?[\w-]+)(?=\s*{)/g, className: 'tag' },
+            // Strings
+            { pattern: /(['"])((?:\\.|(?!\1)[^\\])*?)\1/g, className: 'string' },
+            // Comments
+            { pattern: /\/\*[\s\S]*?\*\//g, className: 'comment' },
+        ],
+        html: [
+            // Tags
+            { pattern: /(<\/?)([\w-]+)/g, className: 'tag', replace: '$1$2' },
+            // Attributes
+            { pattern: /\s([\w-]+)(?==)/g, className: 'attribute', replace: ' $1' },
+            // Attribute values
+            { pattern: /=(['"])((?:\\.|(?!\1)[^\\])*?)\1/g, className: 'string', replace: '=$1$2$1' },
+            // Comments
+            { pattern: /<!--[\s\S]*?-->/g, className: 'comment' },
+        ],
+        json: [
+            // Keys
+            { pattern: /"([^"\\]|\\.)*"(?=\s*:)/g, className: 'json-key' },
+            // String values
+            { pattern: /:\s*"([^"\\]|\\.)*"/g, className: 'json-string' },
+            // Numbers
+            { pattern: /:\s*(-?\d+\.?\d*)/g, className: 'json-number', replace: ': $1' },
+            // Booleans
+            { pattern: /:\s*(true|false|null)/g, className: 'json-boolean', replace: ': $1' },
+        ],
+        sql: [
+            // Keywords
+            { pattern: /\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|TABLE|INDEX|DATABASE|PRIMARY|KEY|FOREIGN|REFERENCES|CONSTRAINT|NOT|NULL|UNIQUE|DEFAULT|AUTO_INCREMENT|VARCHAR|INT|BIGINT|SMALLINT|DECIMAL|FLOAT|DOUBLE|DATE|DATETIME|TIMESTAMP|TEXT|BLOB|ENUM|SET|AND|OR|IN|LIKE|BETWEEN|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|JOIN|INNER|LEFT|RIGHT|FULL|OUTER|ON|AS|UNION|ALL|DISTINCT|COUNT|SUM|AVG|MIN|MAX|CASE|WHEN|THEN|ELSE|END|IF|EXISTS)\b/gi, className: 'sql-keyword' },
+            // Strings
+            { pattern: /('(?:[^'\\]|\\.)*')/g, className: 'sql-string' },
+            // Numbers
+            { pattern: /\b(\d+\.?\d*)\b/g, className: 'sql-number' },
+            // Comments
+            { pattern: /--.*$/gm, className: 'comment' },
+            { pattern: /\/\*[\s\S]*?\*\//g, className: 'comment' },
+        ],
+        bash: [
+            // Commands
+            { pattern: /^\s*(\w+)/gm, className: 'shell-command' },
+            // Flags/Options
+            { pattern: /\s(-{1,2}\w+)/g, className: 'shell-flag', replace: ' $1' },
+            // Strings
+            { pattern: /(['"])((?:\\.|(?!\1)[^\\])*?)\1/g, className: 'string' },
+            // Variables
+            { pattern: /\$\w+/g, className: 'variable' },
+            // Comments
+            { pattern: /#.*$/gm, className: 'comment' },
+        ]
+    };
+    
+    // Apply highlighting for the specific language
+    const langPatterns = patterns[lang.toLowerCase()] || patterns.javascript;
+    console.log('🔍 Using patterns for language:', lang.toLowerCase(), 'Pattern count:', langPatterns.length);
+    
+    // Store original code for fallback
+    let highlightedCode = code;
+    
+    // Apply each pattern
+    langPatterns.forEach(({ pattern, className, replace }) => {
+        if (replace) {
+            highlightedCode = highlightedCode.replace(pattern, (match, ...groups) => {
+                const replacement = replace.replace(/\$(\d+)/g, (_, num) => groups[parseInt(num) - 1] || '');
+                return `<span class="${className}">${replacement}</span>`;
+            });
+        } else {
+            highlightedCode = highlightedCode.replace(pattern, `<span class="${className}">$&</span>`);
+        }
+    });
+    
+    // Set the highlighted HTML
+    codeElement.innerHTML = highlightedCode;
+    console.log('✅ Syntax highlighting applied. Result:', highlightedCode.substring(0, 100) + '...');
 }
 
 // Text Selection Tooltip Feature
@@ -5057,16 +5212,18 @@ function addMessageActions(messageDiv, messageText) {
     // Store the message text on the message div for safe access
     messageDiv.dataset.messageText = messageText;
     
+    // Copy button
     const copyButton = document.createElement('button');
     copyButton.className = 'message-action-btn copy-btn';
-    copyButton.setAttribute('aria-label', 'Copy message to clipboard');
+    copyButton.setAttribute('aria-label', 'Copy this response');
     copyButton.innerHTML = `
         <svg viewBox="0 0 24 24">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="m5 15-2-2v-6a2 2 0 0 1 2-2h6l2 2"></path>
+            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
         </svg>
+        Copy
     `;
-    copyButton.addEventListener('click', () => copyMessageToClipboard(copyButton, messageDiv));
+    copyButton.addEventListener('click', () => copyMessageToClipboard(messageDiv));
     
     const rewriteButton = document.createElement('button');
     rewriteButton.className = 'message-action-btn rewrite-btn';
@@ -5087,128 +5244,236 @@ function addMessageActions(messageDiv, messageText) {
     messageContent.appendChild(actionsDiv);
 }
 
-// Mobile-friendly copy functionality
-function addMobileCopyFunctionality(messageDiv, messageText) {
-    const messageContent = messageDiv.querySelector('.message-content');
-    if (!messageContent) return;
-    
-    let longPressTimer;
-    let longPressTriggered = false;
-    
-    // Store the message text
-    messageDiv.dataset.messageText = messageText;
-    
-    // Long press to copy
-    messageContent.addEventListener('touchstart', (e) => {
-        longPressTriggered = false;
-        longPressTimer = setTimeout(() => {
-            longPressTriggered = true;
-            // Haptic feedback if available
-            if (navigator.vibrate) {
-                navigator.vibrate(50);
-            }
-            
-            // Copy to clipboard
-            copyToClipboardMobile(messageText, messageContent);
-        }, 800); // 800ms long press
-    });
-    
-    messageContent.addEventListener('touchend', () => {
-        clearTimeout(longPressTimer);
-    });
-    
-    messageContent.addEventListener('touchmove', () => {
-        clearTimeout(longPressTimer);
-    });
-}
-
-// Mobile clipboard copy with feedback
-async function copyToClipboardMobile(text, element) {
-    try {
-        await navigator.clipboard.writeText(text);
-        showMobileCopyFeedback(element, 'Copied!');
-    } catch (err) {
-        console.error('Failed to copy: ', err);
-        showMobileCopyFeedback(element, 'Copy failed');
+// Copy message content to clipboard
+function copyMessageToClipboard(messageDiv) {
+    const messageText = messageDiv.dataset.messageText;
+    if (!messageText) {
+        return;
     }
+    
+    // Create a temporary element to extract clean text from HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = messageText;
+    const cleanText = tempDiv.textContent || tempDiv.innerText || '';
+    
+    navigator.clipboard.writeText(cleanText).then(() => {
+        showCopyTooltip(messageDiv.querySelector('.copy-btn'), 'Copied!');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        showCopyTooltip(messageDiv.querySelector('.copy-btn'), 'Copy failed');
+    });
 }
 
-// Show mobile copy feedback
-function showMobileCopyFeedback(element, message) {
-    const feedback = document.createElement('div');
-    feedback.textContent = message;
-    feedback.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 500;
-        z-index: 10000;
-        pointer-events: none;
-    `;
+// Show copy feedback tooltip
+function showCopyTooltip(button, message) {
+    const tooltip = document.createElement('div');
+    tooltip.className = 'copy-tooltip';
+    tooltip.textContent = message;
     
-    document.body.appendChild(feedback);
+    // Position the tooltip relative to the button
+    const buttonRect = button.getBoundingClientRect();
+    tooltip.style.position = 'fixed';
+    tooltip.style.left = buttonRect.left + 'px';
+    tooltip.style.top = (buttonRect.top - 35) + 'px';
+    tooltip.style.backgroundColor = '#4CAF50';
+    tooltip.style.color = 'white';
+    tooltip.style.padding = '5px 10px';
+    tooltip.style.borderRadius = '4px';
+    tooltip.style.fontSize = '12px';
+    tooltip.style.zIndex = '10000';
+    tooltip.style.pointerEvents = 'none';
+    tooltip.style.whiteSpace = 'nowrap';
     
+    document.body.appendChild(tooltip);
+    
+    // Remove tooltip after 2 seconds
     setTimeout(() => {
-        if (feedback.parentNode) {
-            feedback.parentNode.removeChild(feedback);
+        if (tooltip.parentNode) {
+            tooltip.parentNode.removeChild(tooltip);
         }
     }, 2000);
 }
 
-// Copy message content to clipboard
-async function copyMessageToClipboard(button, messageDiv) {
-    try {
-        const messageText = messageDiv.dataset.messageText;
-        if (!messageText) {
-            showCopyTooltip(button, 'No text to copy');
+// Add copy buttons to code blocks and apply syntax highlighting
+function addCopyButtonsToCodeBlocks(messageDiv) {
+    console.log('🔧 addCopyButtonsToCodeBlocks called for:', messageDiv);
+    
+    // Find code blocks with a more specific approach to avoid duplicates
+    const codeBlocks = messageDiv.querySelectorAll('.code-block-wrapper, pre.code-block, pre:not(.code-block):has(code), pre code:not(.code-block-wrapper code)');
+    console.log('📦 Found code blocks:', codeBlocks.length);
+    
+    // Create a Set to track processed elements and avoid duplicates
+    const processedElements = new Set();
+    
+    codeBlocks.forEach((block, index) => {
+        console.log(`Processing code block ${index + 1}:`, block);
+        
+        // Skip if we've already processed this element or its parent
+        if (processedElements.has(block)) {
+            console.log('Already processed, skipping');
             return;
         }
         
-        await navigator.clipboard.writeText(messageText);
-        showCopyTooltip(button, 'Copied!');
-    } catch (err) {
-        console.error('Failed to copy text: ', err);
-        showCopyTooltip(button, 'Copy failed');
-    }
+        let wrapper = null;
+        let codeElement = null;
+        
+        // Determine if this is a wrapper or a direct code block
+        if (block.classList.contains('code-block-wrapper')) {
+            wrapper = block;
+            codeElement = wrapper.querySelector('code');
+            processedElements.add(block);
+            // Also mark the inner elements as processed
+            wrapper.querySelectorAll('pre, code').forEach(el => processedElements.add(el));
+        } else if (block.tagName === 'PRE') {
+            // Check if this pre is already inside a wrapper
+            const existingWrapper = block.closest('.code-block-wrapper');
+            if (existingWrapper) {
+                console.log('Pre element already in wrapper, skipping');
+                return;
+            }
+            
+            // This is a pre element, create a wrapper for it
+            wrapper = document.createElement('div');
+            wrapper.className = 'code-block-wrapper';
+            block.parentNode.insertBefore(wrapper, block);
+            wrapper.appendChild(block);
+            codeElement = block.querySelector('code') || block;
+            processedElements.add(block);
+            processedElements.add(wrapper);
+        } else if (block.tagName === 'CODE') {
+            // Check if this code element is already processed or inside a wrapper
+            const existingWrapper = block.closest('.code-block-wrapper');
+            if (existingWrapper) {
+                console.log('Code element already in wrapper, skipping');
+                return;
+            }
+            
+            // This is a code element, check if it's in a pre
+            const preParent = block.closest('pre');
+            if (preParent) {
+                // Skip if the pre is already processed
+                if (processedElements.has(preParent)) {
+                    console.log('Parent pre already processed, skipping');
+                    return;
+                }
+                
+                // Create wrapper around the pre
+                wrapper = document.createElement('div');
+                wrapper.className = 'code-block-wrapper';
+                preParent.parentNode.insertBefore(wrapper, preParent);
+                wrapper.appendChild(preParent);
+                codeElement = block;
+                processedElements.add(preParent);
+                processedElements.add(wrapper);
+                processedElements.add(block);
+            } else {
+                // Skip inline code elements
+                return;
+            }
+        }
+        
+        if (!wrapper || !codeElement) {
+            console.log('❌ Could not find wrapper or code element');
+            return;
+        }
+        
+        // Check if copy button already exists
+        if (wrapper.querySelector('.copy-btn')) {
+            console.log('Copy button already exists, skipping');
+            return;
+        }
+        
+        // Apply syntax highlighting to the code element
+        if (codeElement) {
+            console.log('Code element found:', codeElement);
+            // Get language from data-lang attribute or class
+            const language = codeElement.getAttribute('data-lang') || 
+                            (codeElement.className.match(/language-(\w+)/) && codeElement.className.match(/language-(\w+)/)[1]) ||
+                            'text';
+            
+            console.log('Detected language:', language);
+            
+            // Apply syntax highlighting if not already highlighted
+            if (!codeElement.querySelector('.keyword, .string, .comment')) {
+                console.log('Applying syntax highlighting for:', language);
+                applySyntaxHighlighting(codeElement, language);
+            } else {
+                console.log('Syntax highlighting already applied');
+            }
+        }
+        
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.setAttribute('aria-label', 'Copy code');
+        copyBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="16" height="16">
+                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+            </svg>
+        `;
+        
+        copyBtn.addEventListener('click', () => {
+            if (codeElement) {
+                // Get clean text content (without HTML tags from syntax highlighting)
+                const codeText = codeElement.textContent || codeElement.innerText || '';
+                navigator.clipboard.writeText(codeText).then(() => {
+                    showCodeCopyFeedback(copyBtn, 'Copied!');
+                }).catch(err => {
+                    console.error('Failed to copy code:', err);
+                    showCodeCopyFeedback(copyBtn, 'Copy failed');
+                });
+            }
+        });
+        
+        // Position the copy button in the top right corner of the wrapper
+        copyBtn.style.position = 'absolute';
+        copyBtn.style.top = '8px';
+        copyBtn.style.right = '8px';
+        copyBtn.style.zIndex = '10';
+        
+        // Make wrapper position relative to contain the absolute positioned button
+        wrapper.style.position = 'relative';
+        
+        wrapper.appendChild(copyBtn);
+        console.log('✅ Copy button added to code block', index + 1);
+    });
 }
 
-// Show tooltip feedback for copy action
-function showCopyTooltip(button, message) {
-    // Remove existing tooltip
-    const existingTooltip = button.querySelector('.tooltip');
-    if (existingTooltip) {
-        existingTooltip.remove();
-    }
+// Show copy feedback for code blocks
+function showCodeCopyFeedback(button, message) {
+    const originalContent = button.innerHTML;
+    button.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M20 6L9 17l-5-5"></path>
+        </svg>
+    `;
+    button.style.color = '#4CAF50';
     
-    // Create tooltip
-    const tooltip = document.createElement('div');
-    tooltip.className = 'tooltip';
-    tooltip.textContent = message;
-    
-    // Position tooltip relative to button
-    button.style.position = 'relative';
-    button.appendChild(tooltip);
-    
-    // Show tooltip
     setTimeout(() => {
-        tooltip.classList.add('show');
-    }, 10);
+        button.innerHTML = originalContent;
+        button.style.color = '';
+    }, 1500);
+}
+
+// Initialize copy buttons for existing messages (useful on page load)
+function initializeCopyButtons() {
+    // Add copy buttons and syntax highlighting to existing code blocks
+    const existingMessages = document.querySelectorAll('.ai-message');
+    existingMessages.forEach(messageDiv => {
+        addCopyButtonsToCodeBlocks(messageDiv);
+    });
     
-    // Hide tooltip after delay
-    setTimeout(() => {
-        tooltip.classList.remove('show');
-        setTimeout(() => {
-            if (tooltip.parentNode) {
-                tooltip.remove();
-            }
-        }, 200);
-    }, 2000);
+    // Also handle any standalone code blocks that might not be in AI messages
+    const allCodeBlocks = document.querySelectorAll('.code-block-wrapper');
+    allCodeBlocks.forEach(wrapper => {
+        const codeElement = wrapper.querySelector('code');
+        if (codeElement && !codeElement.querySelector('.keyword, .string, .comment')) {
+            const language = codeElement.getAttribute('data-lang') || 
+                            (codeElement.className.match(/language-(\w+)/) && codeElement.className.match(/language-(\w+)/)[1]) ||
+                            'text';
+            applySyntaxHighlighting(codeElement, language);
+        }
+    });
 }
 
 // Rewrite message by automatically submitting a rewrite request
@@ -5275,7 +5540,7 @@ async function regenerateLastResponse() {
             body: JSON.stringify({
                 model: currentModel,
                 messages: messages,
-                max_completion_tokens: 10000,
+                max_completion_tokens: 4000,
                 ...(currentModel !== 'gpt-4o-search-preview-2025-03-11' && { temperature: getModelTemperature(currentModel) })
             })
         });
@@ -6037,6 +6302,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Show a helpful message in the welcome screen
         updateWelcomeScreenForNoApiKey();
     }
+    
+    // Initialize copy buttons for any existing messages
+    initializeCopyButtons();
 });
 
 // Initialize URL routing
@@ -6750,39 +7018,6 @@ async function copyImageUrlToClipboard(imageUrl) {
     }
 }
 
-// Copy code block content to clipboard
-async function copyToClipboard(button) {
-    try {
-        const codeWrapper = button.closest('.code-block-wrapper');
-        const codeElement = codeWrapper.querySelector('pre code');
-        const codeText = codeElement.textContent;
-        
-        await navigator.clipboard.writeText(codeText);
-        
-        // Update button appearance temporarily
-        const originalContent = button.innerHTML;
-        button.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20,6 9,17 4,12"></polyline></svg>';
-        button.style.color = '#10b981';
-        
-        setTimeout(() => {
-            button.innerHTML = originalContent;
-            button.style.color = '';
-        }, 2000);
-        
-    } catch (error) {
-        console.error('Failed to copy code:', error);
-        // Show error state
-        const originalContent = button.innerHTML;
-        button.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
-        button.style.color = '#ef4444';
-        
-        setTimeout(() => {
-            button.innerHTML = originalContent;
-            button.style.color = '';
-        }, 2000);
-    }
-}
-
 // Accent Color Management
 const accentColors = {
     '#4f46e5': { 
@@ -7253,4 +7488,54 @@ function restoreOverlayState(overlay) {
     }
 }
 
+// Clean up duplicate copy buttons function
+window.cleanupDuplicateCopyButtons = function() {
+    console.log('🧹 Cleaning up duplicate copy buttons...');
+    
+    // Find all code block wrappers
+    const allWrappers = document.querySelectorAll('.code-block-wrapper');
+    
+    allWrappers.forEach((wrapper, index) => {
+        console.log(`Checking wrapper ${index + 1}:`, wrapper);
+        
+        // Find all copy buttons in this wrapper
+        const copyButtons = wrapper.querySelectorAll('.copy-btn');
+        
+        if (copyButtons.length > 1) {
+            console.log(`Found ${copyButtons.length} copy buttons in wrapper ${index + 1}, removing duplicates`);
+            
+            // Keep the first one, remove the rest
+            for (let i = 1; i < copyButtons.length; i++) {
+                copyButtons[i].remove();
+            }
+        }
+    });
+    
+    // Also clean up any loose copy buttons not in wrappers
+    const looseCopyButtons = document.querySelectorAll('.copy-btn:not(.code-block-wrapper .copy-btn)');
+    if (looseCopyButtons.length > 0) {
+        console.log(`Found ${looseCopyButtons.length} loose copy buttons, removing them`);
+        looseCopyButtons.forEach(btn => btn.remove());
+    }
+    
+    console.log('✅ Cleanup complete');
+};
 
+// Test function to reinitialize copy buttons
+window.testCopyButtonsCleanup = function() {
+    console.log('🧪 Testing copy button cleanup and reinitialization...');
+    
+    // First clean up any duplicates
+    window.cleanupDuplicateCopyButtons();
+    
+    // Then reinitialize copy buttons for all AI messages
+    const aiMessages = document.querySelectorAll('.ai-message');
+    console.log(`Found ${aiMessages.length} AI messages to process`);
+    
+    aiMessages.forEach((messageDiv, index) => {
+        console.log(`Processing AI message ${index + 1}`);
+        addCopyButtonsToCodeBlocks(messageDiv);
+    });
+    
+    console.log('✅ Copy button test complete');
+};

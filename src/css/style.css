@@ -1715,27 +1715,89 @@ body {
     margin: 16px 0;
 }
 
-/* Code block styling - ChatGPT Style */
+/* Code block styling - ChatGPT Style with language labels */
 .code-block-wrapper {
     position: relative;
     margin: 16px 0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #1a1d23 0%, #23272f 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
 }
 
-.message-text pre {
+/* Legacy support for code blocks without wrapper */
+.message-text pre:not(.code-block-wrapper pre) {
     background: linear-gradient(135deg, #1a1d23 0%, #23272f 100%);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
     padding: 20px;
-    margin: 20px 0;
+    margin: 16px 0;
+}
+
+.code-lang-label {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    background: rgba(86, 156, 214, 0.2);
+    color: #569cd6;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid rgba(86, 156, 214, 0.3);
+    backdrop-filter: blur(4px);
+    z-index: 2;
+}
+
+.message-text pre {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 40px 20px 20px 20px; /* Extra top padding for language label */
+    margin: 0;
     overflow-x: auto;
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
     font-size: 14px;
     line-height: 1.7;
-    color: #f8f8f2;
+    color: #d4d4d4;
     position: relative;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    box-shadow: none;
     white-space: pre;
-    backdrop-filter: blur(10px);
+    backdrop-filter: none;
+}
+
+/* Ensure all code blocks have proper background - High specificity */
+.message.ai-message .message-text pre,
+.message.ai-message .message-text .code-block-wrapper,
+.message.ai-message .message-text .code-block,
+.message-text pre,
+.message-text .code-block-wrapper,
+.message-text .code-block {
+    background: linear-gradient(135deg, #1a1d23 0%, #23272f 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Specific styling for pre elements inside wrappers */
+.code-block-wrapper pre,
+.message-text .code-block-wrapper pre {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+/* When no language label, reduce top padding */
+.code-block-wrapper:not(:has(.code-lang-label)) pre {
+    padding-top: 20px;
 }
 
 .copy-btn {
@@ -1755,6 +1817,7 @@ body {
     backdrop-filter: blur(4px);
     opacity: 0;
     transform: translateY(-4px);
+    z-index: 3;
 }
 
 .code-block-wrapper:hover .copy-btn {
@@ -1785,176 +1848,187 @@ body {
     display: none;
 }
 
-/* Enhanced syntax highlighting colors - GitHub style */
+/* Enhanced syntax highlighting colors - Modern VS Code Dark+ theme */
 .message-text pre code {
     background: none;
     padding: 0;
     border-radius: 0;
-    color: #f0f6fc;
+    color: #d4d4d4;
     font-weight: normal;
     display: block;
     white-space: pre;
 }
 
 /* Keywords (if, else, function, class, etc.) */
-.message-text pre .keyword,
-.message-text pre .kw {
-    color: #ff79c6;
-    font-weight: 600;
+.message-text pre .keyword {
+    color: #569cd6;
+    font-weight: 500;
 }
 
 /* Strings */
-.message-text pre .string,
-.message-text pre .str {
-    color: #50fa7b;
+.message-text pre .string {
+    color: #ce9178;
 }
 
 /* Numbers */
-.message-text pre .number,
-.message-text pre .num {
-    color: #bd93f9;
+.message-text pre .number {
+    color: #b5cea8;
 }
 
 /* Comments */
-.message-text pre .comment,
-.message-text pre .com {
-    color: #6272a4;
+.message-text pre .comment {
+    color: #6a9955;
     font-style: italic;
 }
 
 /* Functions and methods */
-.message-text pre .function,
-.message-text pre .fun {
-    color: #8be9fd;
+.message-text pre .function {
+    color: #dcdcaa;
+    font-weight: 500;
 }
 
 /* Variables and identifiers */
-.message-text pre .variable,
-.message-text pre .var {
-    color: #f8f8f2;
+.message-text pre .variable {
+    color: #9cdcfe;
 }
 
 /* Operators */
-.message-text pre .operator,
-.message-text pre .op {
-    color: #ff79c6;
+.message-text pre .operator {
+    color: #d4d4d4;
 }
 
 /* Punctuation */
-.message-text pre .punctuation,
-.message-text pre .pun {
-    color: #f8f8f2;
+.message-text pre .punctuation {
+    color: #d4d4d4;
 }
 
 /* Classes and types */
 .message-text pre .class,
 .message-text pre .type {
-    color: #ffb86c;
+    color: #4ec9b0;
+    font-weight: 500;
 }
 
 /* Constants */
-.message-text pre .constant,
-.message-text pre .const {
-    color: #bd93f9;
+.message-text pre .constant {
+    color: #569cd6;
+    font-weight: 500;
 }
 
 /* Built-in functions */
 .message-text pre .builtin,
 .message-text pre .built_in {
-    color: #8be9fd;
+    color: #dcdcaa;
 }
 
 /* HTML/XML tags */
 .message-text pre .tag {
-    color: #ff79c6;
+    color: #569cd6;
+    font-weight: 500;
 }
 
 /* HTML/XML attributes */
-.message-text pre .attribute,
-.message-text pre .attr {
-    color: #50fa7b;
+.message-text pre .attribute {
+    color: #92c5f8;
 }
 
 /* CSS properties */
-.message-text pre .property,
-.message-text pre .prop {
-    color: #8be9fd;
+.message-text pre .property {
+    color: #9cdcfe;
 }
 
 /* CSS values */
 .message-text pre .value {
-    color: #f1fa8c;
-}
-
-/* JavaScript/TypeScript specific */
-.message-text pre .js-keyword {
-    color: #ff79c6;
-}
-
-.message-text pre .js-string {
-    color: #50fa7b;
-}
-
-.message-text pre .js-number {
-    color: #bd93f9;
-}
-
-.message-text pre .js-comment {
-    color: #6272a4;
-    font-style: italic;
-}
-
-/* Python specific */
-.message-text pre .py-keyword {
-    color: #ff79c6;
-}
-
-.message-text pre .py-string {
-    color: #50fa7b;
-}
-
-.message-text pre .py-function {
-    color: #8be9fd;
+    color: #ce9178;
 }
 
 /* JSON specific */
 .message-text pre .json-key {
-    color: #8be9fd;
+    color: #9cdcfe;
 }
 
 .message-text pre .json-string {
-    color: #50fa7b;
+    color: #ce9178;
 }
 
 .message-text pre .json-number {
-    color: #bd93f9;
+    color: #b5cea8;
 }
 
 .message-text pre .json-boolean {
-    color: #ff79c6;
+    color: #569cd6;
+    font-weight: 500;
 }
 
 /* Shell/Bash specific */
 .message-text pre .shell-command {
-    color: #50fa7b;
+    color: #dcdcaa;
+    font-weight: 500;
 }
 
 .message-text pre .shell-flag {
-    color: #ffb86c;
+    color: #9cdcfe;
 }
 
 /* SQL specific */
 .message-text pre .sql-keyword {
-    color: #ff79c6;
+    color: #569cd6;
+    font-weight: 500;
     text-transform: uppercase;
 }
 
 .message-text pre .sql-string {
-    color: #50fa7b;
+    color: #ce9178;
 }
 
-.message-text pre .sql-function {
-    color: #8be9fd;
+.message-text pre .sql-number {
+    color: #b5cea8;
+}
+
+/* Language-specific highlighting improvements */
+.message-text pre code[data-lang="javascript"] .keyword,
+.message-text pre code[data-lang="js"] .keyword {
+    color: #c586c0; /* Purple for JS keywords */
+}
+
+.message-text pre code[data-lang="python"] .keyword {
+    color: #569cd6; /* Blue for Python keywords */
+}
+
+.message-text pre code[data-lang="java"] .keyword {
+    color: #d73a49; /* Red for Java keywords */
+}
+
+.message-text pre code[data-lang="css"] .property {
+    color: #9cdcfe;
+    font-weight: 500;
+}
+
+.message-text pre code[data-lang="html"] .tag {
+    color: #569cd6;
+}
+
+.message-text pre code[data-lang="html"] .attribute {
+    color: #92c5f8;
+}
+
+/* Improve readability with subtle backgrounds for different token types */
+.message-text pre .keyword {
+    background: rgba(86, 156, 214, 0.1);
+    padding: 1px 2px;
+    border-radius: 2px;
+}
+
+.message-text pre .string {
+    background: rgba(206, 145, 120, 0.1);
+    padding: 1px 2px;
+    border-radius: 2px;
+}
+
+.message-text pre .function {
+    background: rgba(220, 220, 170, 0.1);
+    padding: 1px 2px;
+    border-radius: 2px;
 }
 
 /* Inline code styling */
@@ -2998,21 +3072,53 @@ body {
     .code-block-wrapper {
         position: relative;
         margin: 12px auto;
-        max-width: 90%;
+        max-width: 95%;
         display: block;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #1a1d23 0%, #23272f 100%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    /* Mobile: Ensure standalone pre elements also have background */
+    .message-text pre:not(.code-block-wrapper pre) {
+        background: linear-gradient(135deg, #1a1d23 0%, #23272f 100%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+        margin: 12px 0 !important;
+        padding: 16px !important;
+    }
+    
+    .code-lang-label {
+        position: absolute;
+        top: 6px;
+        left: 8px;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 3px;
     }
     
     .message-text pre {
-        padding: 12px;
-        font-size: 14px;
-        border-radius: 6px;
+        padding: 30px 12px 12px 12px; /* Adjust for mobile language label */
+        font-size: 13px;
+        border-radius: 0 !important; /* Only for inner pre, wrapper still has radius */
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        line-height: 1.5;
+    }
+    
+    /* When no language label on mobile, reduce top padding */
+    .code-block-wrapper:not(:has(.code-lang-label)) pre {
+        padding-top: 12px;
     }
     
     /* Always show copy button on mobile */
     .copy-btn {
         opacity: 1 !important;
+        top: 6px;
+        right: 8px;
+        padding: 6px;
         transform: translateY(0) !important;
         background: rgba(255, 255, 255, 0.15) !important;
         border: 1px solid rgba(255, 255, 255, 0.3) !important;
